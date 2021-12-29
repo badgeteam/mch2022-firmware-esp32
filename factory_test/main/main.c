@@ -1,9 +1,12 @@
 #include <stdio.h>
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_spi_flash.h"
+#include <sdkconfig.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_system.h>
+#include <esp_spi_flash.h>
+#include <esp_err.h>
+#include "hardware.h"
+#include "pca9555.h"
 
 void restart() {
     for (int i = 3; i >= 0; i--) {
@@ -16,7 +19,13 @@ void restart() {
 }
 
 void app_main(void) {
-    printf("Hello world!\n");
+    esp_err_t res;
+    
+    res = hardware_init();
+    if (res != ESP_OK) {
+        printf("Failed to initialize hardware!\n");
+        restart();
+    }
 
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -33,6 +42,4 @@ void app_main(void) {
             (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     printf("Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());
-
-    restart();
 }

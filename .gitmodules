@@ -2,3 +2,9 @@
 	path = esp-idf
 	url = https://github.com/espressif/esp-idf.git
 	branch = master
+[submodule "factory_test/components/bus-i2c"]
+	path = factory_test/components/bus-i2c
+	url = git@github.com:Nicolai-Electronics/esp32-component-bus-i2c.git
+[submodule "factory_test/components/i2c-pca9555"]
+	path = factory_test/components/i2c-pca9555
+	url = git@github.com:Nicolai-Electronics/esp32-component-i2c-pca9555.git
