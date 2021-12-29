@@ -1,0 +1,16 @@
+# After editing this file, run the command manually "make efuse_custom_table" or "idf.py efuse_custom_table"
+
+# WR_DIS_EFUSE_RD_DISABLE,                 EFUSE_BLK0,    0,     1,    Write protection for RD_DIS, ADC_VREF
+WR_DIS_WR_DIS,                             EFUSE_BLK0,    1,     1,    Write protection for WR_DIS
+# WR_DIS_FLASH_CRYPT_CNT,                  EFUSE_BLK0,    2,     1,    Write protection for FLASH_CRYPT_CNT, UART_DOWNLOAD_DIS
+WR_DIS_MAC_AND_CHIP_INFO,                  EFUSE_BLK0,    3,     1,    Write protection for MAC, MAC_CRC, CIP_VER_REV1, CHIP_VERSION, CHIP_PACKAGE
+WR_DIS_XPD,                                EFUSE_BLK0,    5,     1,    Write protection for XPD_SDIO_FORCE, XPD_SDIO_REG, XPD_SDIO_TIEH
+WR_DIS_SPI_PAD,                            EFUSE_BLK0,    6,     1,    Write protection for CHIP_VER_REV2, SPI_PAD_CONFIG
+# WR_DIS_BLK1,                             EFUSE_BLK0,    7,     1,    Write protection for WR_DIS_BLK1
+# WR_DIS_BLK2,                             EFUSE_BLK0,    8,     1,    Write protection for WR_DIS_BLK2
+# WR_DIS_BLK3,                             EFUSE_BLK0,    9,     1,    Write protection for WR_DIS_BLK3, MAC_VERSION
+WR_DIS_SCHEME_KEY_CRYPT,                   EFUSE_BLK0,   10,     1,    Write protection for CODING_SCHEME, KEY_STATUS, FLASH_CRYPT_CONFIG, BLK3_PART_RESERVE
+WR_DIS_ABS_DONE_0,                         EFUSE_BLK0,   12,     1,    Write protection for ABS_DONE_0
+WR_DIS_ABS_DONE_1,                         EFUSE_BLK0,   13,     1,    Write protection for ABS_DONE_1
+WR_DIS_JTAG_DISABLE,                       EFUSE_BLK0,   14,     1,    Write protection for JTAG_DISABLE
+WR_DIS_CONSOLE_DEBUG_AND_DISABLE_DL_CRYPT, EFUSE_BLK0,   15,     1,    Write protection for CONSOLE_DEBUG_DISABLE, DISABLE_DL
