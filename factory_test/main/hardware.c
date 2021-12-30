@@ -98,6 +98,8 @@ esp_err_t hardware_init() {
     pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_BACK, true);
     pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_ACCEPT, true);
     
+    pca9555.pin_state = 0; // Reset all pin states so that the interrupt function doesn't trigger all the handlers because we inverted the polarity :D
+    
     pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_START, button_handler);
     pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_SELECT, button_handler);
     pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_MENU, button_handler);
