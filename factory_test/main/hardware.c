@@ -7,46 +7,7 @@
 static const char *TAG = "hardware";
 
 PCA9555 pca9555;
-
-void button_handler(uint8_t pin, bool value) {
-    switch(pin) {
-        case PCA9555_PIN_BTN_START:
-            printf("Start button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_SELECT:
-            printf("Select button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_MENU:
-            printf("Menu button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_HOME:
-            printf("Home button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_JOY_LEFT:
-            printf("Joystick horizontal %s\n", value ? "left" : "center");
-            break;
-        case PCA9555_PIN_BTN_JOY_PRESS:
-            printf("Joystick %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_JOY_DOWN:
-            printf("Joystick vertical %s\n", value ? "down" : "center");
-            break;
-        case PCA9555_PIN_BTN_JOY_UP:
-            printf("Joy vertical %s\n", value ? "up" : "center");
-            break;
-        case PCA9555_PIN_BTN_JOY_RIGHT:
-            printf("Joy horizontal %s\n", value ? "right" : "center");
-            break;
-        case PCA9555_PIN_BTN_BACK:
-            printf("Back button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_ACCEPT:
-            printf("Accept button %s\n", value ? "pressed" : "released");
-            break;
-        default:
-            printf("Unknown button %d %s\n", pin, value ? "pressed" : "released");
-    }
-}
+BNO055 bno055;
 
 esp_err_t hardware_init() {
     esp_err_t res;
@@ -86,31 +47,13 @@ esp_err_t hardware_init() {
         return res;
     }
     
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_START, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_SELECT, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_MENU, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_HOME, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_JOY_LEFT, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_JOY_PRESS, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_JOY_DOWN, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_JOY_UP, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_JOY_RIGHT, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_BACK, true);
-    pca9555_set_gpio_polarity(&pca9555, PCA9555_PIN_BTN_ACCEPT, true);
+    // BNO055 sensor on system I2C bus
     
-    pca9555.pin_state = 0; // Reset all pin states so that the interrupt function doesn't trigger all the handlers because we inverted the polarity :D
-    
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_START, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_SELECT, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_MENU, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_HOME, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_JOY_LEFT, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_JOY_PRESS, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_JOY_DOWN, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_JOY_UP, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_JOY_RIGHT, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_BACK, button_handler);
-    pca9555_set_interrupt_handler(&pca9555, PCA9555_PIN_BTN_ACCEPT, button_handler);
+    res = bno055_init(&bno055, I2C_BUS_SYS, BNO055_ADDR, GPIO_INT_BNO055, true);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Initializing BNO055 failed");
+        return res;
+    }
 
     // User I2C bus
     res = i2c_init(I2C_BUS_EXT, GPIO_I2C_EXT_SDA, GPIO_I2C_EXT_SCL, I2C_SPEED_EXT, false, false);
@@ -124,4 +67,8 @@ esp_err_t hardware_init() {
 
 PCA9555* get_pca9555() {
     return &pca9555;
+}
+
+BNO055* get_bno055() {
+    return &bno055;
 }

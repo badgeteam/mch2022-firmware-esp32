@@ -4,14 +4,16 @@
 #include <esp_err.h>
 #include <driver/spi_master.h>
 #include "pca9555.h"
+#include "bno055.h"
 
 esp_err_t hardware_init();
 PCA9555* get_pca9555();
+BNO055* get_bno055();
 
 // Interrupts
 #define GPIO_INT_STM32   0
 #define GPIO_INT_PCA9555 34
-#define GPIO_INT_ACCEL   36
+#define GPIO_INT_BNO055  36
 #define GPIO_INT_FPGA    39
 
 // SD card
@@ -29,7 +31,7 @@ PCA9555* get_pca9555();
 #define GPIO_I2C_SYS_SCL 21
 #define GPIO_I2C_SYS_SDA 22
 #define I2C_BUS_SYS      0
-#define I2C_SPEED_SYS    40000
+#define I2C_SPEED_SYS    20000
 
 // PCA9555 IO expander
 #define PCA9555_ADDR              0x26
@@ -48,6 +50,9 @@ PCA9555* get_pca9555();
 #define PCA9555_PIN_BTN_JOY_RIGHT 13
 #define PCA9555_PIN_BTN_BACK      14
 #define PCA9555_PIN_BTN_ACCEPT    15
+
+// BNO055 sensor
+#define BNO055_ADDR               0x28
 
 // User I2C bus
 #define GPIO_I2C_EXT_SCL 25
