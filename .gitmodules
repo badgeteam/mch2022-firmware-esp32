@@ -18,3 +18,7 @@
 	path = factory_test/components/spi-ili9341
 	url = git@github.com:Nicolai-Electronics/esp32-component-spi-ili9341.git
 	branch = master
+[submodule "factory_test/components/spi-ice40"]
+	path = factory_test/components/spi-ice40
+	url = git@github.com:Nicolai-Electronics/esp32-component-spi-ice40.git
+	branch = master

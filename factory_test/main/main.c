@@ -8,21 +8,42 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include "hardware.h"
+#include "bitstream.h"
 
 static const char *TAG = "main";
 
 bool calibrate = true;
+bool display_bno_value = true;
 ILI9341* ili9341 = NULL;
+ICE40* ice40 = NULL;
 uint8_t* framebuffer = NULL;
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
-        case PCA9555_PIN_BTN_START:
+        case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
+            if (value) {
+                esp_err_t res = ice40_load_bitstream(ice40, bitstream, bitstream_length);
+                if (res != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to program the FPGA (%d)", res);
+                } else {
+                    printf("FPGA enabled\n");
+                }
+            }
             break;
-        case PCA9555_PIN_BTN_SELECT:
+        }
+        case PCA9555_PIN_BTN_SELECT: {
             printf("Select button %s\n", value ? "pressed" : "released");
+            if (value) {
+                esp_err_t res = ice40_disable(ice40);
+                if (res != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to disable the FPGA (%d)", res);
+                } else {
+                    printf("FPGA disabled\n");
+                }
+            }
             break;
+        }
         case PCA9555_PIN_BTN_MENU:
             printf("Menu button %s\n", value ? "pressed" : "released");
             break;
@@ -46,9 +67,10 @@ void button_handler(uint8_t pin, bool value) {
             break;
         case PCA9555_PIN_BTN_BACK:
             printf("Back button %s\n", value ? "pressed" : "released");
+            display_bno_value = value;
             break;
         case PCA9555_PIN_BTN_ACCEPT:
-            //printf("Accept button %s\n", value ? "pressed" : "released");
+            printf("Accept button %s\n", value ? "pressed" : "released");
             if (value) calibrate = true;
             break;
         default:
@@ -121,6 +143,7 @@ void app_main(void) {
     }
     
     ili9341 = get_ili9341();
+    ice40 = get_ice40();
     
     framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
@@ -224,7 +247,9 @@ void app_main(void) {
         printf("Linear acceleration (m/s²) x = %5.8f y = %5.8f z = %5.8f\n", linear_acceleration.x, linear_acceleration.y, linear_acceleration.z);
         printf("Gravity (m/s²)             x = %5.8f y = %5.8f z = %5.8f\n", gravity.x, gravity.y, gravity.z);*/
 
-        printf("Magnetic (uT) x: %5.4f y: %5.4f z: %5.4f  Rotation (deg): x: %5.4f y: %5.4f z: %5.4f \n", magnetism.x, magnetism.y, magnetism.z, rotation.x, rotation.y, rotation.z);
+        if (display_bno_value) {
+            printf("Magnetic (uT) x: %5.4f y: %5.4f z: %5.4f  Rotation (deg): x: %5.4f y: %5.4f z: %5.4f \n", magnetism.x, magnetism.y, magnetism.z, rotation.x, rotation.y, rotation.z);
+        }
     }
     
     free(framebuffer);

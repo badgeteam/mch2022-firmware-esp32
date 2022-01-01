@@ -6,11 +6,13 @@
 #include "pca9555.h"
 #include "bno055.h"
 #include "ili9341.h"
+#include "ice40.h"
 
 esp_err_t hardware_init();
 PCA9555* get_pca9555();
 BNO055* get_bno055();
 ILI9341* get_ili9341();
+ICE40* get_ice40();
 
 // Interrupts
 #define GPIO_INT_STM32   0
@@ -33,7 +35,7 @@ ILI9341* get_ili9341();
 #define GPIO_I2C_SYS_SCL 21
 #define GPIO_I2C_SYS_SDA 22
 #define I2C_BUS_SYS      0
-#define I2C_SPEED_SYS    20000
+#define I2C_SPEED_SYS    20000 // 20kHz
 
 // PCA9555 IO expander
 #define PCA9555_ADDR              0x26
@@ -60,7 +62,7 @@ ILI9341* get_ili9341();
 #define GPIO_I2C_EXT_SCL 25
 #define GPIO_I2C_EXT_SDA 26
 #define I2C_BUS_EXT      1
-#define I2C_SPEED_EXT    40000
+#define I2C_SPEED_EXT    20000 // 20 kHz
 
 // SPI bus
 #define GPIO_SPI_CLK          18
