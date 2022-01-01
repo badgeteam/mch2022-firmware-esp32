@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include <sdkconfig.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -7,11 +8,12 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include "hardware.h"
-#include "pca9555.h"
 
 static const char *TAG = "main";
 
 bool calibrate = true;
+ILI9341* ili9341 = NULL;
+uint8_t* framebuffer = NULL;
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
@@ -117,6 +119,21 @@ void app_main(void) {
         printf("Failed to initialize hardware!\n");
         restart();
     }
+    
+    ili9341 = get_ili9341();
+    
+    framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
+    if (framebuffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate framebuffer");
+        restart();
+    }
+    
+    /*memset(framebuffer, 0, ILI9341_BUFFER_SIZE); // Clear framebuffer
+    res = ili9341_write(ili9341, framebuffer);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write framebuffer to LCD");
+        restart();
+    }*/
 
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -145,18 +162,12 @@ void app_main(void) {
     rotation_offset.z = 0;
 
     while (1) {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        /*res = bno055_test(bno055);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Testing BNO055 failed");
-            continue;
-        }*/
-        
-        res = bno055_workaround(bno055);
+        //vTaskDelay(10 / portTICK_PERIOD_MS);        
+        /*res = bno055_workaround(bno055);
         if (res != ESP_OK) {
             ESP_LOGE(TAG, "Workaround failed %d\n", res);
             continue;
-        }
+        }*/
 
         /*res = bno055_get_vector(bno055, BNO055_VECTOR_ACCELEROMETER, &acceleration);
         if (res != ESP_OK) {
@@ -215,4 +226,6 @@ void app_main(void) {
 
         printf("Magnetic (uT) x: %5.4f y: %5.4f z: %5.4f  Rotation (deg): x: %5.4f y: %5.4f z: %5.4f \n", magnetism.x, magnetism.y, magnetism.z, rotation.x, rotation.y, rotation.z);
     }
+    
+    free(framebuffer);
 }

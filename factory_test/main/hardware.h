@@ -5,10 +5,12 @@
 #include <driver/spi_master.h>
 #include "pca9555.h"
 #include "bno055.h"
+#include "ili9341.h"
 
 esp_err_t hardware_init();
 PCA9555* get_pca9555();
 BNO055* get_bno055();
+ILI9341* get_ili9341();
 
 // Interrupts
 #define GPIO_INT_STM32   0
