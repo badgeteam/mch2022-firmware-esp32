@@ -22,3 +22,6 @@
 	path = factory_test/components/spi-ice40
 	url = git@github.com:Nicolai-Electronics/esp32-component-spi-ice40.git
 	branch = master
+[submodule "factory_test/components/sdcard"]
+	path = factory_test/components/sdcard
+	url = git@github.com:Nicolai-Electronics/esp32-component-sdcard.git

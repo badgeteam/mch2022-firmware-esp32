@@ -4,6 +4,7 @@
 #include <driver/gpio.h>
 #include "managed_i2c.h"
 #include "logo.h"
+#include "sdcard.h"
 
 static const char *TAG = "hardware";
 
@@ -79,7 +80,7 @@ esp_err_t hardware_init() {
     dev_ice40.pin_done = -1;
     dev_ice40.pin_reset = -1;
     dev_ice40.pin_int = GPIO_INT_FPGA;
-    dev_ice40.spi_speed = 60000000; // 60MHz
+    dev_ice40.spi_speed = 23000000; // 23MHz
     dev_ice40.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
     dev_ice40.get_done = ice40_get_done_wrapper;
     dev_ice40.set_reset = ice40_set_reset_wrapper;
@@ -121,6 +122,8 @@ esp_err_t hardware_init() {
         ESP_LOGE(TAG, "Initializing BNO055 failed");
         return res;
     }
+    
+    //res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
 
     return res;
 }

@@ -35,7 +35,7 @@ ICE40* get_ice40();
 #define GPIO_I2C_SYS_SCL 21
 #define GPIO_I2C_SYS_SDA 22
 #define I2C_BUS_SYS      0
-#define I2C_SPEED_SYS    20000 // 20kHz
+#define I2C_SPEED_SYS    20000 // 20 kHz
 
 // PCA9555 IO expander
 #define PCA9555_ADDR              0x26
@@ -62,7 +62,7 @@ ICE40* get_ice40();
 #define GPIO_I2C_EXT_SCL 25
 #define GPIO_I2C_EXT_SDA 26
 #define I2C_BUS_EXT      1
-#define I2C_SPEED_EXT    20000 // 20 kHz
+#define I2C_SPEED_EXT    100000 // 100 kHz
 
 // SPI bus
 #define GPIO_SPI_CLK          18

@@ -8,7 +8,8 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include "hardware.h"
-#include "bitstream.h"
+#include "bitstream2.h"
+#include "managed_i2c.h"
 
 static const char *TAG = "main";
 
@@ -16,14 +17,13 @@ bool calibrate = true;
 bool display_bno_value = true;
 ILI9341* ili9341 = NULL;
 ICE40* ice40 = NULL;
-uint8_t* framebuffer = NULL;
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
         case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
             if (value) {
-                esp_err_t res = ice40_load_bitstream(ice40, bitstream, bitstream_length);
+                esp_err_t res = ice40_load_bitstream(ice40, proto2_bin, proto2_bin_len);
                 if (res != ESP_OK) {
                     ESP_LOGE(TAG, "Failed to program the FPGA (%d)", res);
                 } else {
@@ -117,20 +117,69 @@ void restart() {
     esp_restart();
 }
 
-esp_err_t bno055_workaround(BNO055* device) {
-    bno055_opmode_t currentMode = 0;
+void bno055_task(BNO055* bno055, bno055_vector_t* rotation_offset) {
     esp_err_t res;
-    res = bno055_get_mode(device, &currentMode);
-    if (res != ESP_OK) return res;
-    if (currentMode !=  BNO055_OPERATION_MODE_NDOF) {
-        printf("!!! Reconfigure BNO055 !!! (%u != %u)\n", currentMode, BNO055_OPERATION_MODE_NDOF);
-        res = bno055_set_power_mode(device, BNO055_POWER_MODE_NORMAL);
-        if (res != ESP_OK) return res;
+    
+    bno055_vector_t acceleration, magnetism, orientation, rotation, linear_acceleration, gravity;
 
-        res = bno055_set_mode(device, BNO055_OPERATION_MODE_NDOF);
-        if (res != ESP_OK) return res;
+    /*res = bno055_get_vector(bno055, BNO055_VECTOR_ACCELEROMETER, &acceleration);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Acceleration failed to read %d\n", res);
+        return;
+    }*/
+
+    res = bno055_get_vector(bno055, BNO055_VECTOR_MAGNETOMETER, &magnetism);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Magnetic field to read %d\n", res);
+        return;
     }
-    return res;
+
+    /*res = bno055_get_vector(bno055, BNO055_VECTOR_GYROSCOPE, &orientation);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Orientation failed to read %d\n", res);
+        return;
+    }*/
+
+    res = bno055_get_vector(bno055, BNO055_VECTOR_EULER, &rotation);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Rotation failed to read %d\n", res);
+        return;
+    }
+
+    /*res = bno055_get_vector(bno055, BNO055_VECTOR_LINEARACCEL, &linear_acceleration);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Linear acceleration failed to read %d\n", res);
+        return;
+    }
+
+    res = bno055_get_vector(bno055, BNO055_VECTOR_GRAVITY, &gravity);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Gravity failed to read %d\n", res);
+        return;
+    }*/
+    
+    if (calibrate) {
+        rotation_offset->x = rotation.x;
+        rotation_offset->y = rotation.y;
+        rotation_offset->z = rotation.z;
+        calibrate = false;
+    }
+    
+    rotation.x -= rotation_offset->x;
+    rotation.y -= rotation_offset->y;
+    rotation.z -= rotation_offset->z;
+    
+    /*printf("\n\n");
+    printf("Acceleration (m/s²)        x = %5.8f y = %5.8f z = %5.8f\n", acceleration.x, acceleration.y, acceleration.z);
+    printf("Magnetic field (uT)        x = %5.8f y = %5.8f z = %5.8f\n", magnetism.x, magnetism.y, magnetism.z);
+    printf("Orientation (dps)          x = %5.8f y = %5.8f z = %5.8f\n", orientation.x, orientation.y, orientation.z);
+    printf("Rotation (degrees)         x = %5.8f y = %5.8f z = %5.8f\n", rotation.x, rotation.y, rotation.z);
+    printf("Linear acceleration (m/s²) x = %5.8f y = %5.8f z = %5.8f\n", linear_acceleration.x, linear_acceleration.y, linear_acceleration.z);
+    printf("Gravity (m/s²)             x = %5.8f y = %5.8f z = %5.8f\n", gravity.x, gravity.y, gravity.z);*/
+
+    if (display_bno_value) {
+        printf("Magnetic (uT) x: %5.4f y: %5.4f z: %5.4f  Rotation (deg): x: %5.4f y: %5.4f z: %5.4f \n", magnetism.x, magnetism.y, magnetism.z, rotation.x, rotation.y, rotation.z);
+    }
 }
 
 void app_main(void) {
@@ -145,18 +194,22 @@ void app_main(void) {
     ili9341 = get_ili9341();
     ice40 = get_ice40();
     
-    framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
+    // LCD test
+    /*uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate framebuffer");
         restart();
     }
     
-    /*memset(framebuffer, 0, ILI9341_BUFFER_SIZE); // Clear framebuffer
+    memset(framebuffer, 0, ILI9341_BUFFER_SIZE); // Clear framebuffer
     res = ili9341_write(ili9341, framebuffer);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write framebuffer to LCD");
         restart();
-    }*/
+    }
+
+    free(framebuffer);
+    */
 
     /* Print chip information */
     esp_chip_info_t chip_info;
@@ -173,84 +226,134 @@ void app_main(void) {
             (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
     printf("Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());
-    
+
+    // Initialize the buttons
     button_init();
     
-    BNO055* bno055 = get_bno055();
-    
-    bno055_vector_t acceleration, magnetism, orientation, rotation, linear_acceleration, gravity;
+    // Test for connection to RP2040 and to the BNO055 over I2C
+    /*BNO055* bno055 = get_bno055();
+
     bno055_vector_t rotation_offset;
     rotation_offset.x = 0;
     rotation_offset.y = 0;
     rotation_offset.z = 0;
+    
+    uint8_t data_out, data_in;
+    
+    enum {
+        I2C_REGISTER_FW_VER,
+        I2C_REGISTER_GPIO_DIR,
+        I2C_REGISTER_GPIO_IN,
+        I2C_REGISTER_GPIO_OUT,
+        I2C_REGISTER_LCD_MODE,
+        I2C_REGISTER_LCD_BACKLIGHT,
+    };
 
-    while (1) {
-        //vTaskDelay(10 / portTICK_PERIOD_MS);        
-        /*res = bno055_workaround(bno055);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Workaround failed %d\n", res);
-            continue;
-        }*/
-
-        /*res = bno055_get_vector(bno055, BNO055_VECTOR_ACCELEROMETER, &acceleration);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Acceleration failed to read %d\n", res);
-            continue;
-        }*/
-
-        res = bno055_get_vector(bno055, BNO055_VECTOR_MAGNETOMETER, &magnetism);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Magnetic field to read %d\n", res);
-            continue;
-        }
-
-        /*res = bno055_get_vector(bno055, BNO055_VECTOR_GYROSCOPE, &orientation);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Orientation failed to read %d\n", res);
-            continue;
-        }*/
-
-        res = bno055_get_vector(bno055, BNO055_VECTOR_EULER, &rotation);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Rotation failed to read %d\n", res);
-            continue;
-        }
-
-        /*res = bno055_get_vector(bno055, BNO055_VECTOR_LINEARACCEL, &linear_acceleration);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Linear acceleration failed to read %d\n", res);
-            continue;
-        }
-
-        res = bno055_get_vector(bno055, BNO055_VECTOR_GRAVITY, &gravity);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Gravity failed to read %d\n", res);
-            continue;
-        }*/
-        
-        if (calibrate) {
-            rotation_offset.x = rotation.x;
-            rotation_offset.y = rotation.y;
-            rotation_offset.z = rotation.z;
-            calibrate = false;
-        }
-        
-        rotation.x -= rotation_offset.x;
-        rotation.y -= rotation_offset.y;
-        rotation.z -= rotation_offset.z;
-        
-        /*printf("\n\n");
-        printf("Acceleration (m/s²)        x = %5.8f y = %5.8f z = %5.8f\n", acceleration.x, acceleration.y, acceleration.z);
-        printf("Magnetic field (uT)        x = %5.8f y = %5.8f z = %5.8f\n", magnetism.x, magnetism.y, magnetism.z);
-        printf("Orientation (dps)          x = %5.8f y = %5.8f z = %5.8f\n", orientation.x, orientation.y, orientation.z);
-        printf("Rotation (degrees)         x = %5.8f y = %5.8f z = %5.8f\n", rotation.x, rotation.y, rotation.z);
-        printf("Linear acceleration (m/s²) x = %5.8f y = %5.8f z = %5.8f\n", linear_acceleration.x, linear_acceleration.y, linear_acceleration.z);
-        printf("Gravity (m/s²)             x = %5.8f y = %5.8f z = %5.8f\n", gravity.x, gravity.y, gravity.z);*/
-
-        if (display_bno_value) {
-            printf("Magnetic (uT) x: %5.4f y: %5.4f z: %5.4f  Rotation (deg): x: %5.4f y: %5.4f z: %5.4f \n", magnetism.x, magnetism.y, magnetism.z, rotation.x, rotation.y, rotation.z);
-        }
+    data_out = 1 << 2; // Proto 0 pin is output
+    res = i2c_write_reg_n(I2C_BUS_EXT, 0x17, I2C_REGISTER_GPIO_DIR, &data_out, 1);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set GPIO direction on Pico: %d", res);
+        return;
     }
     
-    free(framebuffer);
+    bool blink_state = false;
+    
+    while (1) {
+        data_out = blink_state << 2;
+        res = i2c_write_reg_n(I2C_BUS_EXT, 0x17, I2C_REGISTER_GPIO_OUT, &data_out, 1);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set GPIO value on Pico: %d", res);
+            return;
+        }
+        blink_state = !blink_state;
+
+        res = i2c_read_reg(I2C_BUS_EXT, 0x17, I2C_REGISTER_GPIO_IN, &data_in, 1);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to read GPIO value from Pico %d", res);
+            return;
+        } else {
+            printf("GPIO status: %02x\n", data_in);
+        }
+        bno055_task(bno055, &rotation_offset);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }*/
+
+    // FPGA RAM passthrough test
+    
+    res = ice40_load_bitstream(ice40, proto2_bin, proto2_bin_len);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to program the FPGA (%d)", res);
+        return;
+    }
+    
+    uint8_t* tx_buffer = malloc(SPI_MAX_TRANSFER_SIZE);
+    uint8_t* rx_buffer = malloc(SPI_MAX_TRANSFER_SIZE);
+    
+    const uint8_t write_cmd = 0x02;
+    const uint8_t read_cmd = 0x03;
+    
+    uint32_t size_of_ram = 8388608;
+    uint32_t position = 0;
+    
+    ESP_LOGI(TAG, "Writing to PSRAM...");
+    int64_t tx_start_time = esp_timer_get_time();
+    while (position < size_of_ram) {
+        // First 4 bytes of the transmit buffer are used for CMD and 24-bit address
+        tx_buffer[0] = write_cmd;
+        tx_buffer[1] = (position >> 16);
+        tx_buffer[2] = (position >> 8) & 0xFF;
+        tx_buffer[3] = position & 0xFF;
+        
+        uint32_t remaining = size_of_ram - position;
+        uint32_t data_length = SPI_MAX_TRANSFER_SIZE - 4;
+        if (data_length > remaining) data_length = remaining;
+        
+        // 
+        for (uint32_t index = 0; index < data_length; index++) {
+            tx_buffer[index + 4] = ((position + (index)) & 0xFF); // Generate a test pattern
+        }
+        if (ice40_transaction(ice40, tx_buffer, data_length + 4, rx_buffer, data_length + 4) != ESP_OK) {
+            ESP_LOGE(TAG, "Write transaction failed @ %u", remaining);
+            return;
+        }
+        
+        position += data_length;
+    }
+    int64_t tx_done_time = esp_timer_get_time();
+    printf("Write took %lld microseconds\r\n", tx_done_time - tx_start_time);
+    uint64_t result = (((size_of_ram) / (tx_done_time - tx_start_time))*1000*1000)/1024;
+    printf("%u bytes in %lld microseconds = %llu kB/s\r\n", size_of_ram, tx_done_time - tx_start_time, result);
+    
+    position = 0; // Reset position
+    memset(tx_buffer, 0, SPI_MAX_TRANSFER_SIZE); // Clear TX buffer
+
+    ESP_LOGI(TAG, "Verifying PSRAM contents...");
+    int64_t rx_start_time = esp_timer_get_time();
+    while (position < size_of_ram) {
+        tx_buffer[0] = read_cmd;
+        tx_buffer[1] = (position >> 16);
+        tx_buffer[2] = (position >> 8) & 0xFF;
+        tx_buffer[3] = position & 0xFF;
+        
+        uint32_t remaining = size_of_ram - position;
+        uint32_t data_length = SPI_MAX_TRANSFER_SIZE - 4;
+        if (data_length > remaining) data_length = remaining;
+        
+        if (ice40_transaction(ice40, tx_buffer, data_length + 4, rx_buffer, data_length + 4) != ESP_OK) {
+            ESP_LOGE(TAG, "Transaction failed");
+            return;
+        }
+        
+        for (uint32_t index = 0; index < data_length; index++) {
+            if (rx_buffer[index + 4] != ((position + (index)) & 0xFF)) { // Verify the test pattern
+                ESP_LOGE(TAG, "Verification failed @ %u + %u: %u != %u", position, index, rx_buffer[index + 4], (position + (index)) & 0xFF);
+            }
+        }
+        
+        position += data_length;
+    }
+    int64_t rx_done_time = esp_timer_get_time();
+    printf("Read took %lld microseconds\r\n", rx_done_time - rx_start_time);
+    result = (((size_of_ram) / (rx_done_time - rx_start_time))*1000*1000)/1024;
+    printf("%u bytes in %lld microseconds = %llu kB/s\r\n", size_of_ram, rx_done_time - rx_start_time, result);
 }
