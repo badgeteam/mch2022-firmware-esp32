@@ -25,3 +25,6 @@
 [submodule "factory_test/components/sdcard"]
 	path = factory_test/components/sdcard
 	url = git@github.com:Nicolai-Electronics/esp32-component-sdcard.git
+[submodule "factory_test/components/pax-graphics"]
+	path = factory_test/components/pax-graphics
+	url = https://github.com/robotman2412/pax-graphics.git
