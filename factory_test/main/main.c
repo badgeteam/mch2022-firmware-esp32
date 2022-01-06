@@ -8,7 +8,6 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include "hardware.h"
-#include "bitstream2.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
 #include "sdcard.h"
@@ -34,26 +33,10 @@ void button_handler(uint8_t pin, bool value) {
     switch(pin) {
         case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
-            /*if (value) {
-                esp_err_t res = ice40_load_bitstream(ice40, proto2_bin, proto2_bin_len);
-                if (res != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to program the FPGA (%d)", res);
-                } else {
-                    printf("FPGA enabled\n");
-                }
-            }*/
             break;
         }
         case PCA9555_PIN_BTN_SELECT: {
             printf("Select button %s\n", value ? "pressed" : "released");
-            /*if (value) {
-                esp_err_t res = ice40_disable(ice40);
-                if (res != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to disable the FPGA (%d)", res);
-                } else {
-                    printf("FPGA disabled\n");
-                }
-            }*/
             break;
         }
         case PCA9555_PIN_BTN_MENU:
@@ -328,9 +311,9 @@ esp_err_t verify_file_in_psram(FILE* fd) {
 
 void fpga_test(void) {
     esp_err_t res;
-    FILE* fpga_passthrough = fopen("/sd/passthrough.bin", "rb");
+    FILE* fpga_passthrough = fopen("/sd/pt.bin", "rb");
     if (fpga_passthrough == NULL) {
-        ESP_LOGE(TAG, "Failed to open passthrough.bin");
+        ESP_LOGE(TAG, "Failed to open passthrough firmware (pt.bin) from the SD card");
         return;
     }
 
