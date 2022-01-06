@@ -14,6 +14,10 @@
 #include "sdcard.h"
 #include "appfs.h"
 
+#include "esp_sleep.h"
+#include "soc/rtc.h"
+#include "soc/rtc_cntl_reg.h"
+
 static const char *TAG = "main";
 
 bool calibrate = true;
@@ -238,11 +242,12 @@ void print_chip_info(void) {
     printf("Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());   
 }
 
-uint8_t* load_file_to_ram(FILE* fd, uint32_t* fsize) {
+uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
     fseek(fd, 0, SEEK_END);
     *fsize = ftell(fd);
     fseek(fd, 0, SEEK_SET);
     uint8_t* file = malloc(*fsize);
+    if (file == NULL) return NULL;
     fread(file, *fsize, 1, fd);
     return file;
 }
@@ -322,76 +327,127 @@ esp_err_t verify_file_in_psram(FILE* fd) {
 }
 
 void fpga_test(void) {
-    esp_err_t res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
-    if (res == ESP_OK) {
-        ESP_LOGI(TAG, "SD card mounted");
-        FILE* fpga_passthrough = fopen("/sd/passthrough.bin", "rb");
-        if (fpga_passthrough == NULL) {
-            ESP_LOGE(TAG, "Failed to open passthrough.bin (%d)", res);
-            return;
-        }
-
-        ESP_LOGI(TAG, "Loading passthrough bitstream into RAM buffer...");
-        uint32_t fpga_passthrough_bitstream_length;
-        uint8_t* fpga_passthrough_bitstream = load_file_to_ram(fpga_passthrough, &fpga_passthrough_bitstream_length);
-        fclose(fpga_passthrough);
-        ESP_LOGI(TAG, "Loading passthrough bitstream into FPGA...");
-        res = ice40_load_bitstream(ice40, fpga_passthrough_bitstream, fpga_passthrough_bitstream_length);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to load passthrough bitstream into FPGA (%d)", res);
-            return;
-        }
-        free(fpga_passthrough_bitstream);
-        
-        FILE* ram_contents = fopen("/sd/ram.bin", "rb");
-        if (ram_contents == NULL) {
-            ESP_LOGE(TAG, "Failed to open ram.bin");
-            return;
-        }
-        
-        res = load_file_into_psram(ram_contents);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to load RAM contents into PSRAM (%d)", res);
-            fclose(ram_contents);
-            return;
-        }
-        
-        res = verify_file_in_psram(ram_contents);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to verify PSRAM contents (%d)", res);
-            fclose(ram_contents);
-            return;
-        }
-        
-        FILE* fpga_app = fopen("/sd/app.bin", "rb");
-        if (fpga_app == NULL) {
-            ESP_LOGE(TAG, "Failed to open app.bin");
-            return;
-        }
-        
-        ESP_LOGI(TAG, "Loading app bitstream into RAM buffer...");
-        uint32_t fpga_app_bitstream_length;
-        uint8_t* fpga_app_bitstream = load_file_to_ram(fpga_app, &fpga_app_bitstream_length);
-        fclose(fpga_app);
-        ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
-        res = ice40_load_bitstream(ice40, fpga_app_bitstream, fpga_app_bitstream_length);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to load app bitstream into FPGA (%d)", res);
-            return;
-        }
-        free(fpga_app_bitstream);
-    } else {
-        ESP_LOGI(TAG, "No SD card, skipping FPGA test");
-    }
-}
-
-void appfs_test(void) {
-    esp_err_t res = appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "AppFS init failed: %d", res);
+    esp_err_t res;
+    FILE* fpga_passthrough = fopen("/sd/passthrough.bin", "rb");
+    if (fpga_passthrough == NULL) {
+        ESP_LOGE(TAG, "Failed to open passthrough.bin");
         return;
     }
-    ESP_LOGI(TAG, "AppFS initialized");
+
+    ESP_LOGI(TAG, "Loading passthrough bitstream into RAM buffer...");
+    size_t fpga_passthrough_bitstream_length;
+    uint8_t* fpga_passthrough_bitstream = load_file_to_ram(fpga_passthrough, &fpga_passthrough_bitstream_length);
+    fclose(fpga_passthrough);
+    ESP_LOGI(TAG, "Loading passthrough bitstream into FPGA...");
+    res = ice40_load_bitstream(ice40, fpga_passthrough_bitstream, fpga_passthrough_bitstream_length);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to load passthrough bitstream into FPGA (%d)", res);
+        return;
+    }
+    free(fpga_passthrough_bitstream);
+    
+    FILE* ram_contents = fopen("/sd/ram.bin", "rb");
+    if (ram_contents == NULL) {
+        ESP_LOGE(TAG, "Failed to open ram.bin");
+        return;
+    }
+    
+    res = load_file_into_psram(ram_contents);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to load RAM contents into PSRAM (%d)", res);
+        fclose(ram_contents);
+        return;
+    }
+    
+    res = verify_file_in_psram(ram_contents);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to verify PSRAM contents (%d)", res);
+        fclose(ram_contents);
+        return;
+    }
+    
+    FILE* fpga_app = fopen("/sd/app.bin", "rb");
+    if (fpga_app == NULL) {
+        ESP_LOGE(TAG, "Failed to open app.bin");
+        return;
+    }
+    
+    ESP_LOGI(TAG, "Loading app bitstream into RAM buffer...");
+    size_t fpga_app_bitstream_length;
+    uint8_t* fpga_app_bitstream = load_file_to_ram(fpga_app, &fpga_app_bitstream_length);
+    fclose(fpga_app);
+    ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
+    res = ice40_load_bitstream(ice40, fpga_app_bitstream, fpga_app_bitstream_length);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to load app bitstream into FPGA (%d)", res);
+        return;
+    }
+    free(fpga_app_bitstream);
+}
+
+esp_err_t appfs_init(void) {
+    return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE);
+}
+
+void appfs_store_app(void) {
+    esp_err_t res;
+    appfs_handle_t handle;
+    FILE* app_fd = fopen("/sd/gnuboy.bin", "rb");
+    if (app_fd == NULL) {
+        ESP_LOGE(TAG, "Failed to open gnuboy.bin");
+        return;
+    }
+    size_t app_size;
+    uint8_t* app = load_file_to_ram(app_fd, &app_size);
+    if (app == NULL) {
+        ESP_LOGE(TAG, "Failed to load application into RAM");
+        return;
+    }
+    res = appfsCreateFile("gnuboy", app_size, &handle);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
+        free(app);
+        return;
+    }
+    res = appfsWrite(handle, 0, app, app_size);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
+        free(app);
+        return;
+    }
+    free(app);
+    ESP_LOGI(TAG, "Application is now stored in AppFS");
+    return;
+}
+
+void appfs_boot_app(int fd) {
+    if (fd<0 || fd>255) {
+        REG_WRITE(RTC_CNTL_STORE0_REG, 0);
+    } else {
+        REG_WRITE(RTC_CNTL_STORE0_REG, 0xA5000000|fd);
+    }
+    
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
+    esp_sleep_enable_timer_wakeup(10);
+    esp_deep_sleep_start();
+}
+
+void appfs_test(bool sdcard_ready) {
+    appfsDump();
+    
+    // Try booting the app from appfs
+    
+    appfs_handle_t fd = appfsOpen("gnuboy");
+    if (fd < 0) {
+        ESP_LOGW(TAG, "gnuboy not found in appfs");
+        if (sdcard_ready) {
+            appfs_store_app();
+            appfs_test(false); // Recursive, but who cares :D
+        }
+    } else {
+        ESP_LOGE(TAG, "booting gnuboy from appfs");
+        appfs_boot_app(fd);
+    }
 }
 
 void app_main(void) {
@@ -423,9 +479,24 @@ void app_main(void) {
     
     button_init();
     
-    //appfs_test();
+    res = appfs_init();
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "AppFS init failed: %d", res);
+        return;
+    }
+    ESP_LOGI(TAG, "AppFS initialized");
     
-    fpga_test();
+    res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
+    bool sdcard_ready = (res == ESP_OK);
+    
+    if (sdcard_ready) {
+        ESP_LOGI(TAG, "SD card mounted");
+        fpga_test();
+    }
+    
+    //appfs_test(sdcard_ready);
+        
+    //
     
     /*while (1) {
         bno055_task(bno055);
@@ -551,4 +622,5 @@ void app_main(void) {
     printf("%u bytes in %lld microseconds = %llu kB/s\r\n", size_of_ram, rx_done_time - rx_start_time, result);*/
     
     free(framebuffer);
+    ESP_LOGW(TAG, "End of main function, goodbye!");
 }
