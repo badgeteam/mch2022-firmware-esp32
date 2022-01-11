@@ -12,6 +12,7 @@
 #include "pax_gfx.h"
 #include "sdcard.h"
 #include "appfs.h"
+#include "driver_framebuffer.h"
 
 #include "esp_sleep.h"
 #include "soc/rtc.h"
@@ -31,35 +32,43 @@ bno055_vector_t acceleration, magnetism, orientation, rotation, linear_accelerat
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
-        case PCA9555_PIN_BTN_START: {
-            printf("Start button %s\n", value ? "pressed" : "released");
-            break;
-        }
-        case PCA9555_PIN_BTN_SELECT: {
-            printf("Select button %s\n", value ? "pressed" : "released");
-            break;
-        }
-        case PCA9555_PIN_BTN_MENU:
-            printf("Menu button %s\n", value ? "pressed" : "released");
-            break;
-        case PCA9555_PIN_BTN_HOME:
-            printf("Home button %s\n", value ? "pressed" : "released");
-            break;
         case PCA9555_PIN_BTN_JOY_LEFT:
             printf("Joystick horizontal %s\n", value ? "left" : "center");
+            ili9341_set_partial_scanning(ili9341, 60, ILI9341_WIDTH - 61);
             break;
         case PCA9555_PIN_BTN_JOY_PRESS:
             printf("Joystick %s\n", value ? "pressed" : "released");
             break;
         case PCA9555_PIN_BTN_JOY_DOWN:
             printf("Joystick vertical %s\n", value ? "down" : "center");
+            ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH / 2 - 1);
             break;
         case PCA9555_PIN_BTN_JOY_UP:
             printf("Joy vertical %s\n", value ? "up" : "center");
+            ili9341_set_partial_scanning(ili9341, ILI9341_WIDTH / 2, ILI9341_WIDTH - 1);
             break;
         case PCA9555_PIN_BTN_JOY_RIGHT:
             printf("Joy horizontal %s\n", value ? "right" : "center");
+            ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH - 1);
             break;
+        case PCA9555_PIN_BTN_HOME:
+            printf("Home button %s\n", value ? "pressed" : "released");
+            ili9341_set_tearing_effect_line(ili9341, true);
+            break;
+        case PCA9555_PIN_BTN_MENU:
+            printf("Menu button %s\n", value ? "pressed" : "released");
+            ili9341_set_tearing_effect_line(ili9341, false);
+            break;
+        case PCA9555_PIN_BTN_START: {
+            printf("Start button %s\n", value ? "pressed" : "released");
+            ili9341_set_idle_mode(ili9341, true);
+            break;
+        }
+        case PCA9555_PIN_BTN_SELECT: {
+            printf("Select button %s\n", value ? "pressed" : "released");
+            ili9341_set_idle_mode(ili9341, false);
+            break;
+        }
         case PCA9555_PIN_BTN_BACK:
             printf("Back button %s\n", value ? "pressed" : "released");
             display_bno_value = value;
@@ -74,21 +83,7 @@ void button_handler(uint8_t pin, bool value) {
 }
 
 void button_init() {
-    PCA9555* pca9555 = get_pca9555();
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_START, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_SELECT, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_MENU, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_HOME, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_JOY_LEFT, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_JOY_PRESS, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_JOY_DOWN, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_JOY_UP, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_JOY_RIGHT, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_BACK, true);
-    pca9555_set_gpio_polarity(pca9555, PCA9555_PIN_BTN_ACCEPT, true);
-    
-    pca9555->pin_state = 0; // Reset all pin states so that the interrupt function doesn't trigger all the handlers because we inverted the polarity :D
-    
+    PCA9555* pca9555 = get_pca9555();   
     pca9555_set_interrupt_handler(pca9555, PCA9555_PIN_BTN_START, button_handler);
     pca9555_set_interrupt_handler(pca9555, PCA9555_PIN_BTN_SELECT, button_handler);
     pca9555_set_interrupt_handler(pca9555, PCA9555_PIN_BTN_MENU, button_handler);
@@ -179,14 +174,21 @@ void bno055_task(BNO055* bno055) {
     }
 }
 
+esp_err_t draw_menu(pax_buf_t* buffer) {
+    pax_push_2d(buffer);
+    pax_simple_line(buffer, pax_col_rgb(255,0,0), 0, 16, 320, 16);
+    pax_draw_text(buffer, pax_col_rgb(255,255,0), PAX_FONT_DEFAULT, 0.2, 0, 0, "Hello world!");
+    pax_pop_2d(buffer);
+    return ESP_OK;
+}
+
 esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffer) {
     uint64_t millis = esp_timer_get_time() / 1000;
     pax_background(buffer, 0x000000);
     pax_col_t color0 = pax_col_hsv(millis * 255 / 8000, 255, 255);
     pax_col_t color1 = pax_col_hsv(millis * 255 / 8000 + 127, 255, 255);
-    float a0 = 0;//millis / 3000.0 * M_PI;
-    printf("a0 = %f (%f)\r\n", a0, rotation.y);
-    float a1 = rotation.y * (M_PI / 180.0);//fmodf(a0, M_PI * 4) - M_PI * 2;
+    float a0 = millis / 3000.0 * M_PI;//0;//
+    float a1 = fmodf(a0, M_PI * 4) - M_PI * 2;//rotation.y * (M_PI / 180.0);//
     pax_draw_arc(buffer, color0, 0, 0, 1, a0, a0 + a1);
     pax_push_2d(buffer);
     
@@ -204,7 +206,10 @@ esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffe
     pax_pop_2d(buffer);
 
     pax_pop_2d(buffer);
+    
+    draw_menu(buffer);
 
+    driver_framebuffer_print(NULL, "Hello world", 0, 0, 1, 1, 0xFF00FF, &ocra_22pt7b);
     return ili9341_write(ili9341, framebuffer);
 }
 
@@ -258,6 +263,33 @@ esp_err_t load_file_into_psram(FILE* fd) {
             return res;
         }
         position += amount_read;
+    };
+    free(tx_buffer);
+    return ESP_OK;
+}
+
+esp_err_t load_buffer_into_psram(uint8_t* buffer, uint32_t buffer_length) {
+    const uint8_t write_cmd = 0x02;
+    uint32_t position = 0;
+    uint8_t* tx_buffer = malloc(SPI_MAX_TRANSFER_SIZE);
+    if (tx_buffer == NULL) return ESP_FAIL;
+    while(1) {
+        tx_buffer[0] = write_cmd;
+        tx_buffer[1] = (position >> 16);
+        tx_buffer[2] = (position >> 8) & 0xFF;
+        tx_buffer[3] = position & 0xFF;
+        uint32_t length = buffer_length - position;
+        if (length > SPI_MAX_TRANSFER_SIZE - 4) length = SPI_MAX_TRANSFER_SIZE - 4;
+        memcpy(&tx_buffer[4], &buffer[position], length);
+        if (length == 0) break;
+        ESP_LOGI(TAG, "Writing PSRAM @ %u (%u bytes)", position, length);
+        esp_err_t res = ice40_transaction(ice40, tx_buffer, length + 4, NULL, 0);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Write transaction failed @ %u", position);
+            free(tx_buffer);
+            return res;
+        }
+        position += length;
     };
     free(tx_buffer);
     return ESP_OK;
@@ -460,6 +492,8 @@ void app_main(void) {
     pax_apply_2d(&buffer, matrix_2d_translate(buffer.width / 2.0, buffer.height / 2.0));
     pax_apply_2d(&buffer, matrix_2d_scale(50, 50));
     
+    driver_framebuffer_init(framebuffer);
+    
     button_init();
     
     res = appfs_init();
@@ -474,17 +508,17 @@ void app_main(void) {
     
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card mounted");
-        fpga_test();
+        //fpga_test();
     }
     
     //appfs_test(sdcard_ready);
         
     //
     
-    /*while (1) {
+    while (1) {
         bno055_task(bno055);
         graphics_task(&buffer, ili9341, framebuffer);
-    }*/
+    }
     /*
     uint8_t data_out, data_in;
     

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
+set -u
 
 # Fetch the SDK and all other submodules
 git submodule update --init --recursive || exit 1
