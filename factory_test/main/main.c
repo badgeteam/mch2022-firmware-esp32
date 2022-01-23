@@ -491,7 +491,6 @@ void appfs_boot_app(int fd) {
 }
 
 void appfs_test(bool sdcard_ready) {
-    appfs_store_app();
     appfsDump();
     
     // Try booting the app from appfs
