@@ -3,7 +3,6 @@
 #include <esp_log.h>
 #include <driver/gpio.h>
 #include "managed_i2c.h"
-#include "logo.h"
 #include "sdcard.h"
 
 static const char *TAG = "hardware";
@@ -114,17 +113,10 @@ esp_err_t hardware_init() {
     dev_ili9341.spi_speed = 60000000; // 60MHz
     dev_ili9341.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
     dev_ili9341.callback = NULL; // Callback for changing LCD mode between ESP32 and FPGA
-    
+
     res = ili9341_init(&dev_ili9341);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Initializing LCD failed");
-        return res;
-    }
-    
-    // Hack: show logo while the other hardware components initialize
-    res = ili9341_write(&dev_ili9341, logo);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write logo to LCD");
         return res;
     }
     
@@ -135,8 +127,6 @@ esp_err_t hardware_init() {
         ESP_LOGE(TAG, "Initializing BNO055 failed");
         return res;
     }
-    
-    //res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
 
     return res;
 }

@@ -30,43 +30,47 @@ bno055_vector_t rotation_offset = {.x = 0, .y = 0, .z = 0};
 
 bno055_vector_t acceleration, magnetism, orientation, rotation, linear_acceleration, gravity;
 
+uint8_t selected_item = 0;
+
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
         case PCA9555_PIN_BTN_JOY_LEFT:
             printf("Joystick horizontal %s\n", value ? "left" : "center");
-            ili9341_set_partial_scanning(ili9341, 60, ILI9341_WIDTH - 61);
+            //ili9341_set_partial_scanning(ili9341, 60, ILI9341_WIDTH - 61);
             break;
         case PCA9555_PIN_BTN_JOY_PRESS:
             printf("Joystick %s\n", value ? "pressed" : "released");
             break;
         case PCA9555_PIN_BTN_JOY_DOWN:
             printf("Joystick vertical %s\n", value ? "down" : "center");
-            ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH / 2 - 1);
+            //ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH / 2 - 1);
+            if (value) selected_item += 1;
             break;
         case PCA9555_PIN_BTN_JOY_UP:
             printf("Joy vertical %s\n", value ? "up" : "center");
-            ili9341_set_partial_scanning(ili9341, ILI9341_WIDTH / 2, ILI9341_WIDTH - 1);
+            //ili9341_set_partial_scanning(ili9341, ILI9341_WIDTH / 2, ILI9341_WIDTH - 1);
+            if (value) selected_item -= 1;
             break;
         case PCA9555_PIN_BTN_JOY_RIGHT:
             printf("Joy horizontal %s\n", value ? "right" : "center");
-            ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH - 1);
+            //ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH - 1);
             break;
         case PCA9555_PIN_BTN_HOME:
             printf("Home button %s\n", value ? "pressed" : "released");
-            ili9341_set_tearing_effect_line(ili9341, true);
+            //ili9341_set_tearing_effect_line(ili9341, true);
             break;
         case PCA9555_PIN_BTN_MENU:
             printf("Menu button %s\n", value ? "pressed" : "released");
-            ili9341_set_tearing_effect_line(ili9341, false);
+            //ili9341_set_tearing_effect_line(ili9341, false);
             break;
         case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
-            ili9341_set_idle_mode(ili9341, true);
+            //ili9341_set_idle_mode(ili9341, true);
             break;
         }
         case PCA9555_PIN_BTN_SELECT: {
             printf("Select button %s\n", value ? "pressed" : "released");
-            ili9341_set_idle_mode(ili9341, false);
+            //ili9341_set_idle_mode(ili9341, false);
             break;
         }
         case PCA9555_PIN_BTN_BACK:
@@ -174,42 +178,78 @@ void bno055_task(BNO055* bno055) {
     }
 }
 
+void draw_cursor(pax_buf_t* buffer, float x, float y) {
+    uint64_t millis = esp_timer_get_time() / 1000;
+    pax_col_t color = pax_col_hsv(millis * 255 / 8000, 255, 255);
+    pax_push_2d(buffer);
+    pax_apply_2d(buffer, matrix_2d_translate(x, y));
+    pax_apply_2d(buffer, matrix_2d_scale(10, 10));
+    pax_draw_tri(buffer, color, -1, -1, -1, 1, 1, 0);
+    pax_pop_2d(buffer);
+}
+
+void draw_menu_item(pax_buf_t* buffer, uint8_t position, bool selected, char* text) {
+    float y = 24 + position * 20;
+    if (selected) draw_cursor(buffer, 15, y + 9);
+    pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 24, y, text);
+}
+
 esp_err_t draw_menu(pax_buf_t* buffer) {
     pax_push_2d(buffer);
-    pax_simple_line(buffer, pax_col_rgb(255,0,0), 0, 16, 320, 16);
-    pax_draw_text(buffer, pax_col_rgb(255,255,0), PAX_FONT_DEFAULT, 0.2, 0, 0, "Hello world!");
+        //pax_apply_2d(buffer, matrix_2d_translate(0, 0));
+        //pax_apply_2d(buffer, matrix_2d_scale(1, 1));
+        pax_simple_line(buffer, pax_col_rgb(0,0,0), 0, 20, 320, 20);
+        pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, "Launcher");
+        draw_menu_item(buffer, 0, (selected_item == 0), "Test 1");
+        draw_menu_item(buffer, 1, (selected_item == 1), "Hey, this almost looks like");
+        draw_menu_item(buffer, 2, (selected_item == 2), "a menu list?!");
+        draw_menu_item(buffer, 3, (selected_item == 3), "Woooow!");
+        draw_menu_item(buffer, 4, (selected_item == 4), "Blahblah");
+        draw_menu_item(buffer, 5, (selected_item == 5), "8=======D~~~~~~");
+        draw_menu_item(buffer, 6, (selected_item == 6), "Does this fit on the screen or not?");
     pax_pop_2d(buffer);
     return ESP_OK;
 }
 
-esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffer) {
-    uint64_t millis = esp_timer_get_time() / 1000;
-    pax_background(buffer, 0x000000);
-    pax_col_t color0 = pax_col_hsv(millis * 255 / 8000, 255, 255);
-    pax_col_t color1 = pax_col_hsv(millis * 255 / 8000 + 127, 255, 255);
-    float a0 = millis / 3000.0 * M_PI;//0;//
-    float a1 = fmodf(a0, M_PI * 4) - M_PI * 2;//rotation.y * (M_PI / 180.0);//
-    pax_draw_arc(buffer, color0, 0, 0, 1, a0, a0 + a1);
-    pax_push_2d(buffer);
-    
-    pax_apply_2d(buffer, matrix_2d_rotate(a0));
-    pax_push_2d(buffer);
-    pax_apply_2d(buffer, matrix_2d_translate(1, 0));
-    pax_draw_rect(buffer, color1, -0.25, -0.25, 0.5, 0.5);
-    pax_pop_2d(buffer);
-    
-    pax_apply_2d(buffer, matrix_2d_rotate(a1));
-    pax_push_2d(buffer);
-    pax_apply_2d(buffer, matrix_2d_translate(1, 0));
-    pax_apply_2d(buffer, matrix_2d_rotate(-a0 - a1 + M_PI * 0.5));
-    pax_draw_tri(buffer, color1, 0.25, 0, -0.125, 0.2165, -0.125, -0.2165);
-    pax_pop_2d(buffer);
+pax_col_t regenboogkots(pax_col_t tint, int x, int y, float u, float v, void *args) {
+  return pax_col_hsv(x / 50.0 * 255.0 + y / 150.0 * 255.0, 255, 255);
+}
 
+pax_shader_t kots = {
+    .callback = regenboogkots
+};
+
+esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffer) {
+    pax_background(buffer, 0xFFFFFF);
+    //pax_shade_rect(buffer, 0, &kots, NULL, 0, 0, 320, 240);
+    pax_push_2d(buffer);
+        pax_apply_2d(buffer, matrix_2d_translate(buffer->width / 2.0, buffer->height / 2.0 + 10));
+        pax_apply_2d(buffer, matrix_2d_scale(50, 50));
+        uint64_t millis = esp_timer_get_time() / 1000;
+        pax_col_t color0 = pax_col_hsv(millis * 255 / 8000, 255, 255);
+        //pax_col_t color1 = pax_col_hsv(millis * 255 / 8000 + 127, 255, 255);
+        float a0 = rotation.y * (M_PI / 360.0);//millis / 3000.0 * M_PI;//0;//
+        //printf("%f from %f\n", a0, rotation.y);
+        //float a1 = fmodf(a0, M_PI * 4) - M_PI * 2;////
+        //pax_draw_arc(buffer, color0, 0, 0, 2, a0 + M_PI, a0);
+        /*pax_push_2d(buffer);
+            pax_apply_2d(buffer, matrix_2d_rotate(a0));
+            pax_push_2d(buffer);
+                pax_apply_2d(buffer, matrix_2d_translate(1, 0));
+                pax_draw_rect(buffer, color1, -0.25, -0.25, 0.5, 0.5);
+            pax_pop_2d(buffer);
+            pax_apply_2d(buffer, matrix_2d_rotate(a1));
+            pax_push_2d(buffer);
+                pax_apply_2d(buffer, matrix_2d_translate(1, 0));
+                pax_apply_2d(buffer, matrix_2d_rotate(-a0 - a1 + M_PI * 0.5));
+                pax_draw_tri(buffer, color1, 0.25, 0, -0.125, 0.2165, -0.125, -0.2165);
+            pax_pop_2d(buffer);
+        pax_pop_2d(buffer);*/
     pax_pop_2d(buffer);
-    
+        
     draw_menu(buffer);
 
-    driver_framebuffer_print(NULL, "Hello world", 0, 0, 1, 1, 0xFF00FF, &ocra_22pt7b);
+    //driver_framebuffer_print(NULL, "Hello world", 0, 0, 1, 1, 0xFF00FF, &ocra_22pt7b);
     return ili9341_write(ili9341, framebuffer);
 }
 
@@ -418,6 +458,9 @@ void appfs_store_app(void) {
         ESP_LOGE(TAG, "Failed to load application into RAM");
         return;
     }
+    
+    ESP_LOGI(TAG, "Application size %d", app_size);
+    
     res = appfsCreateFile("gnuboy", app_size, &handle);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
@@ -448,6 +491,7 @@ void appfs_boot_app(int fd) {
 }
 
 void appfs_test(bool sdcard_ready) {
+    appfs_store_app();
     appfsDump();
     
     // Try booting the app from appfs
@@ -460,25 +504,13 @@ void appfs_test(bool sdcard_ready) {
             appfs_test(false); // Recursive, but who cares :D
         }
     } else {
-        ESP_LOGE(TAG, "booting gnuboy from appfs");
+        ESP_LOGE(TAG, "booting gnuboy from appfs (%d)", fd);
         appfs_boot_app(fd);
     }
 }
 
 void app_main(void) {
     esp_err_t res;
-    
-    res = hardware_init();
-    if (res != ESP_OK) {
-        printf("Failed to initialize hardware!\n");
-        restart();
-    }
-    
-    ili9341 = get_ili9341();
-    ice40 = get_ice40();
-    bno055 = get_bno055();
-        
-    print_chip_info();
     
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
@@ -489,10 +521,20 @@ void app_main(void) {
     
     pax_buf_t buffer;
     pax_buf_init(&buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
-    pax_apply_2d(&buffer, matrix_2d_translate(buffer.width / 2.0, buffer.height / 2.0));
-    pax_apply_2d(&buffer, matrix_2d_scale(50, 50));
-    
     driver_framebuffer_init(framebuffer);
+    
+    res = hardware_init();
+    
+    if (res != ESP_OK) {
+        printf("Failed to initialize hardware!\n");
+        restart();
+    }
+    
+    ili9341 = get_ili9341();
+    ice40 = get_ice40();
+    bno055 = get_bno055();
+        
+    //print_chip_info();
     
     button_init();
     
@@ -506,19 +548,22 @@ void app_main(void) {
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     
+    ili9341_deinit(ili9341);
+    ili9341_select(ili9341, true);
+    
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card mounted");
         //fpga_test();
     }
     
-    //appfs_test(sdcard_ready);
+    appfs_test(sdcard_ready);
         
     //
     
-    while (1) {
+    /*while (1) {
         bno055_task(bno055);
         graphics_task(&buffer, ili9341, framebuffer);
-    }
+    }*/
     /*
     uint8_t data_out, data_in;
     

@@ -1,13 +1,5 @@
-/*
- * ----------------------------------------------------------------------------
- * "THE BEER-WARE LICENSE" (Revision 42):
- * Jeroen Domburg <jeroen@spritesmods.com> wrote this file. As long as you retain 
- * this notice you can do whatever you want with this stuff. If we meet some day, 
- * and you think this stuff is worth it, you can buy me a beer in return. 
- * ----------------------------------------------------------------------------
- */
-
-#pragma once
+#ifndef APPFS_H
+#define APPFS_H
 
 #include "esp_err.h"
 #include <stdint.h>
@@ -230,7 +222,7 @@ void appfsDump();
 
 
 #ifdef BOOTLOADER_BUILD
-#include "bootloader_flash.h"
+#include "bootloader_flash_priv.h"
 
 /**
   * @brief Appfs bootloader support: struct to hold a region of a file to map
@@ -286,4 +278,7 @@ esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions);
 
 #ifdef __cplusplus
 }
+#endif
+
+
 #endif
