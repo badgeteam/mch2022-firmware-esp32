@@ -255,6 +255,13 @@ IRAM_ATTR __attribute__ ((weak)) void appfs_bootloader_munmap(const void *mappin
 	bootloader_munmap(mapping);
 }
 
+IRAM_ATTR __attribute__ ((weak)) esp_err_t appfs_bootloader_flash_read(size_t src_addr, void *dest, size_t size, bool allow_decrypt)  {
+	return bootloader_flash_read(src_addr, dest, size, allow_decrypt);
+}
+
+static uint8_t next_page_for[256];
+static int keep_meta_mapped=0;
+
 esp_err_t appfsBlInit(uint32_t offset, uint32_t len) {
 	//Compile-time sanity check on size of structs
 	_Static_assert(sizeof(AppfsHeader)==APPFS_META_DESC_SZ, "sizeof AppfsHeader != 128bytes");
@@ -268,30 +275,36 @@ esp_err_t appfsBlInit(uint32_t offset, uint32_t len) {
 		ESP_LOGE(TAG, "No valid meta info found. Bailing out.");
 		return ESP_ERR_NOT_FOUND;
 	}
+	for (int i=0; i<256; i++) {
+		next_page_for[i]=appfsMeta[appfsActiveMeta].page[i].next;
+	}
 	appfsPartOffset=offset;
+	keep_meta_mapped=1;
 	ESP_LOGD(TAG, "Initialized.");
 	return ESP_OK;
 }
 
 void appfsBlDeinit() {
 	ESP_LOGI(TAG, "Appfs deinit");
-	appfs_bootloader_munmap(appfsMeta);
+	if (appfsMeta) appfs_bootloader_munmap(appfsMeta);
+	appfsMeta=NULL;
+	keep_meta_mapped=0;
 }
 
 #define MMU_BLOCK0_VADDR  0x3f400000
 #define MMU_BLOCK50_VADDR 0x3f720000
 
 IRAM_ATTR esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions) {
-	if (appfsMeta==NULL) ESP_LOGE(TAG, "EEK! appfsBlMapRegions called without meta mapped");
 	uint8_t pages[255];
-	int pageCt=0;
+	int page_count=0;
 	int page=fd;
 	do {
-		pages[pageCt++]=page;
-		page=appfsMeta[appfsActiveMeta].page[page].next;
-	} while (page!=0);
-	//Okay, we have our info.
-	appfs_bootloader_munmap(appfsMeta);
+		pages[page_count++]=page;
+		page=next_page_for[page];
+	} while (page!=0 && page_count<255);
+	
+	if (appfsMeta) appfs_bootloader_munmap(appfsMeta);
+	appfsMeta=NULL;
 	
 	Cache_Read_Disable( 0 );
 	Cache_Flush( 0 );
@@ -314,6 +327,7 @@ IRAM_ATTR esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int n
 			}
 			d+=APPFS_SECTOR_SZ;
 			p++;
+			if (p>page_count) return ESP_ERR_NO_MEM;
 		}
 	}
 	DPORT_REG_CLR_BIT( DPORT_PRO_CACHE_CTRL1_REG, (DPORT_PRO_CACHE_MASK_IRAM0) | (DPORT_PRO_CACHE_MASK_IRAM1 & 0) | (DPORT_PRO_CACHE_MASK_IROM0 & 0) | DPORT_PRO_CACHE_MASK_DROM0 | DPORT_PRO_CACHE_MASK_DRAM1 );
@@ -323,39 +337,25 @@ IRAM_ATTR esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int n
 }
 
 IRAM_ATTR void* appfsBlMmap(int fd) {
-	//We want to mmap() the pages of the file into memory. However, to do that we need to kill the mmap for the 
-	//meta info. To do this, we collect the pages before unmapping the meta info.
-	if (appfsMeta==NULL) ESP_LOGE(TAG, "EEK! appfsBlMmap called without meta mapped");
-	uint8_t pages[255];
-	int pageCt=0;
-	int page=fd;
-	do {
-		pages[pageCt++]=page;
-		page=appfsMeta[appfsActiveMeta].page[page].next;
-	} while (page!=0);
-//	ESP_LOGI(TAG, "File %d has %d pages.", fd, pageCt);
-	
-	if (pageCt>50) {
-		ESP_LOGE(TAG, "appfsBlMmap: file too big to mmap");
-		return NULL;
-	}
-	
-	//Okay, we have our info.
-	appfs_bootloader_munmap(appfsMeta);
+	if (appfsMeta) appfs_bootloader_munmap(appfsMeta);
+	appfsMeta=NULL;
 	//Bootloader_mmap only allows mapping of one consecutive memory range. We need more than that, so we essentially
 	//replicate the function here.
 	
 	Cache_Read_Disable(0);
 	Cache_Flush(0);
-	for (int i=0; i<pageCt; i++) {
+	int page=fd;
+	for (int i=0; i<50; i++) {
 //		ESP_LOGI(TAG, "Mapping flash addr %X to mem addr %X for page %d", appfsPartOffset+((pages[i]+1)*APPFS_SECTOR_SZ), MMU_BLOCK0_VADDR+(i*APPFS_SECTOR_SZ), pages[i]);
 		int e = cache_flash_mmu_set(0, 0, MMU_BLOCK0_VADDR+(i*APPFS_SECTOR_SZ), 
-						appfsPartOffset+((pages[i]+1)*APPFS_SECTOR_SZ), 64, 1);
+						appfsPartOffset+((page+1)*APPFS_SECTOR_SZ), 64, 1);
 		if (e != 0) {
 			ESP_LOGE(TAG, "cache_flash_mmu_set failed: %d", e);
 			Cache_Read_Enable(0);
 			return NULL;
 		}
+		page=next_page_for[page];
+		if (page==0) break;
 	}
 	Cache_Read_Enable(0);
 	return (void *)(MMU_BLOCK0_VADDR);
@@ -366,8 +366,34 @@ IRAM_ATTR void appfsBlMunmap() {
 	Cache_Read_Disable(0);
 	Cache_Flush(0);
 	mmu_init(0);
-	//Map meta page
-	appfsMeta=appfs_bootloader_mmap(appfsPartOffset, APPFS_SECTOR_SZ);
+	if (keep_meta_mapped) {
+		appfsMeta=appfs_bootloader_mmap(appfsPartOffset, APPFS_SECTOR_SZ);
+	}
+}
+
+IRAM_ATTR esp_err_t appfs_bootloader_read(int fd, size_t src_addr, void *dest, size_t size)  {
+	int page=fd;
+	int pos=0;
+	int have_read=0;
+	uint8_t *destp=(uint8_t*)dest;
+	int offset_in_page=src_addr&(APPFS_SECTOR_SZ-1);
+	for (int i=0; i<255; i++) {
+		if (pos+APPFS_SECTOR_SZ-1>=src_addr) {
+			size_t rsize=APPFS_SECTOR_SZ-offset_in_page;
+			if (rsize>size) rsize=size;
+			esp_err_t r=appfs_bootloader_flash_read(appfsPartOffset+((page+1)*APPFS_SECTOR_SZ)+offset_in_page, destp+have_read, rsize, true);
+			if (r!=ESP_OK) return r;
+			offset_in_page=0;
+			have_read+=rsize;
+			if (have_read>=size) {
+				return ESP_OK;
+			}
+		}
+		page=next_page_for[page];
+		if (page==0) break;
+		pos+=APPFS_SECTOR_SZ;
+	}
+	return ESP_OK;
 }
 
 #else //so if !BOOTLOADER_BUILD

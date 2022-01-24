@@ -24,6 +24,9 @@ in the loader segment instead of in random IRAM.
 #include "soc/soc_memory_types.h"
 #include "soc/soc_caps.h"
 #include <string.h>
+#include "soc/dport_reg.h"
+#include "esp32/rom/cache.h"
+
 
 static const char *TAG="appfs_wrapper";
 
@@ -51,7 +54,7 @@ static bool was_mmapped_to_appfs=false;
 
 IRAM_ATTR const void *__wrap_bootloader_mmap(uint32_t src_addr, uint32_t size) {
 	if (file_handle!=APPFS_INVALID_FD && src_addr>=ovl_start && src_addr+size<ovl_start+ovl_size) {
-		ESP_LOGI(TAG, "__wrap_bootloader_mmap: redirecting map to 0x%X", src_addr);
+		ESP_LOGD(TAG, "__wrap_bootloader_mmap: redirecting map to 0x%X", src_addr);
 		uint8_t *f=appfsBlMmap(file_handle);
 		return &f[src_addr-ovl_start];
 	} else {
@@ -61,6 +64,7 @@ IRAM_ATTR const void *__wrap_bootloader_mmap(uint32_t src_addr, uint32_t size) {
 
 IRAM_ATTR void __wrap_bootloader_munmap(const void *mapping) {
 	if (file_handle!=APPFS_INVALID_FD && was_mmapped_to_appfs) {
+		ESP_LOGD(TAG, "__wrap_bootloader_munmap");
 		appfsBlMunmap();
 		was_mmapped_to_appfs=false;
 	} else {
@@ -71,11 +75,8 @@ IRAM_ATTR void __wrap_bootloader_munmap(const void *mapping) {
 
 IRAM_ATTR esp_err_t __wrap_bootloader_flash_read(size_t src_addr, void *dest, size_t size, bool allow_decrypt) {
 	if (file_handle!=APPFS_INVALID_FD && src_addr>=ovl_start && src_addr+size<ovl_start+ovl_size) {
-		uint8_t *f=appfsBlMmap(file_handle);
-		ESP_LOGI(TAG, "__wrap_bootloader_flash_read: 0x%X->0x%X, %d bytes", src_addr, (int)dest, size);
-		memcpy(dest, &f[src_addr-ovl_start], size);
-		appfsBlMunmap();
-		return ESP_OK;
+		ESP_LOGD(TAG, "__wrap_bootloader_flash_read: 0x%X->0x%X, %d bytes", src_addr, (int)dest, size);
+		return appfs_bootloader_read(file_handle, src_addr-ovl_start, dest, size);
 	} else {
 		return __real_bootloader_flash_read(src_addr, dest, size, allow_decrypt);
 	}
@@ -90,13 +91,25 @@ IRAM_ATTR static bool should_map(uint32_t load_addr) {
 //mapping. That is done, but with wrong addresses. We need to re-do that here and then call into
 //the app.
 static IRAM_ATTR void mmap_and_start_app() {
-	ESP_LOGI(TAG, "mmap_and_start_app()");
+	ESP_LOGD(TAG, "mmap_and_start_app()");
+	//First, check if we actually need to do this. If loading the appfs app failed (e.g. because it
+	//got corrupted), the previous routine will fall back to e.g. the factory app. If we would
+	//adjust the MMU assuming the appfs app had loaded, we would crash.
+	//Note that this is ESP32-specific.
+	for (int i = 0; i < DPORT_FLASH_MMU_TABLE_SIZE; i++) {
+		if (DPORT_PRO_FLASH_MMU_TABLE[i] != DPORT_FLASH_MMU_TABLE_INVALID_VAL) {
+			int page=DPORT_PRO_FLASH_MMU_TABLE[i]&255;
+			int addr=page*0x10000;
+			if (addr<ovl_start || addr>ovl_start+ovl_size) {
+				ESP_LOGI(TAG, "Not booting appfs app; not adjusting mmu.");
+				return;
+			}
+		}
+	}
+
 	//Undo bootloader mapping. If we don't call this, the rest of the code thinks there's still
 	//something mapped. Note that for now the address doesn't matter, we feed it 0.
 	__real_bootloader_munmap(0);
-	//Appfs is not gonna like that its metadata is not mmapped. We call this routine as what it does
-	//'under the hood' is clear the mmu and reset it to mmap only the appfs meta info.
-	appfsBlMunmap();
 
 	//Map the executable file so we can read its header.
 	uint8_t *appBytes=appfsBlMmap(file_handle);
@@ -123,11 +136,11 @@ static IRAM_ATTR void mmap_and_start_app() {
 		p+=l;
 	}
 
-	ESP_LOGI(TAG, "Unmap");
+	ESP_LOGD(TAG, "Unmap");
 	appfsBlMunmap();
 	appfsBlMapRegions(file_handle, mapRegions, noMaps);
 
-	ESP_LOGD(TAG, "start: 0x%08x", entry_addr);
+	ESP_LOGD(TAG, "Appfs MMU adjustments done. Starting app at 0x%08x", entry_addr);
 	typedef void (*entry_t)(void);
 	entry_t entry = ((entry_t) entry_addr);
 	(*entry)();
@@ -155,5 +168,10 @@ IRAM_ATTR const void* appfs_bootloader_mmap(uint32_t src_addr, uint32_t size) {
 IRAM_ATTR void appfs_bootloader_munmap(const void *mapping) {
 	return __real_bootloader_munmap(mapping);
 }
+
+IRAM_ATTR esp_err_t appfs_bootloader_flash_read(size_t src_addr, void *dest, size_t size, bool allow_decrypt)  {
+	return __real_bootloader_flash_read(src_addr, dest, size, allow_decrypt);
+}
+
 
 #endif

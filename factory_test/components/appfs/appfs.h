@@ -242,7 +242,8 @@ typedef struct {
 esp_err_t appfsBlInit(uint32_t offset, uint32_t len);
 
 /**
- * @brief Bootloader only: de-init appfs
+ * @brief Bootloader only: de-init appfs. Note that if you have a file handle, you can still
+ *        read/mmap it. This guarantees that the metadata for the appfs is not mapped anymore.
  */
 void appfsBlDeinit();
 /**
@@ -261,6 +262,18 @@ void* appfsBlMmap(int fd);
  * @brief Bootloader only: Un-mmap a file
  */
 void appfsBlMunmap();
+
+
+/**
+ * @brief Bootloader only: read data from a file
+ *
+ * @param fs File descriptor to read from
+ * @param src_addr Offset in file
+ * @param dest Dest buffer
+ * @param size Length to read
+ * @return ESP_OK if OK
+ */
+esp_err_t appfs_bootloader_read(int fd, size_t src_addr, void *dest, size_t size);
 
 /*
  * @brief Bootloader only: map multiple regions within a file to various memory addressed.
