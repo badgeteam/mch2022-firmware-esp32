@@ -7,7 +7,7 @@ export IDF_PATH="$PWD/esp-idf"
 export IDF_EXPORT_QUIET=0
 source "$IDF_PATH"/export.sh
 
-cd factory_test/build
+cd build
 
 # Create an empty file, 16MB in size
 dd if=/dev/zero bs=1M count=16 of=flash.bin

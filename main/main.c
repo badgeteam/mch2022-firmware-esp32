@@ -4,7 +4,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <esp_system.h>
-#include <esp_spi_flash.h>
+//#include <esp_spi_flash.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include "hardware.h"
@@ -18,6 +18,8 @@
 #include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
 
+#include "rp2040.h"
+
 static const char *TAG = "main";
 
 bool calibrate = true;
@@ -25,6 +27,7 @@ bool display_bno_value = false;
 ILI9341* ili9341 = NULL;
 ICE40* ice40 = NULL;
 BNO055* bno055 = NULL;
+RP2040* rp2040 = NULL;
 
 bno055_vector_t rotation_offset = {.x = 0, .y = 0, .z = 0};
 
@@ -200,13 +203,13 @@ esp_err_t draw_menu(pax_buf_t* buffer) {
         //pax_apply_2d(buffer, matrix_2d_scale(1, 1));
         pax_simple_line(buffer, pax_col_rgb(0,0,0), 0, 20, 320, 20);
         pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, "Launcher");
-        draw_menu_item(buffer, 0, (selected_item == 0), "Test 1");
-        draw_menu_item(buffer, 1, (selected_item == 1), "Hey, this almost looks like");
-        draw_menu_item(buffer, 2, (selected_item == 2), "a menu list?!");
-        draw_menu_item(buffer, 3, (selected_item == 3), "Woooow!");
-        draw_menu_item(buffer, 4, (selected_item == 4), "Blahblah");
-        draw_menu_item(buffer, 5, (selected_item == 5), "8=======D~~~~~~");
-        draw_menu_item(buffer, 6, (selected_item == 6), "Does this fit on the screen or not?");
+        draw_menu_item(buffer, 0, (selected_item == 0), "Item 1");
+        draw_menu_item(buffer, 1, (selected_item == 1), "Item 2");
+        draw_menu_item(buffer, 2, (selected_item == 2), "Item 3");
+        draw_menu_item(buffer, 3, (selected_item == 3), "Item 4");
+        draw_menu_item(buffer, 4, (selected_item == 4), "Item 5");
+        draw_menu_item(buffer, 5, (selected_item == 5), "Item 6");
+        draw_menu_item(buffer, 6, (selected_item == 6), "Item 7");
     pax_pop_2d(buffer);
     return ESP_OK;
 }
@@ -250,6 +253,12 @@ esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffe
     draw_menu(buffer);
 
     //driver_framebuffer_print(NULL, "Hello world", 0, 0, 1, 1, 0xFF00FF, &ocra_22pt7b);
+    return ili9341_write(ili9341, framebuffer);
+}
+
+esp_err_t draw_message(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffer, char* message) {
+    pax_background(buffer, 0xFFFFFF);
+    pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, message);
     return ili9341_write(ili9341, framebuffer);
 }
 
@@ -431,12 +440,18 @@ void fpga_test(void) {
     size_t fpga_app_bitstream_length;
     uint8_t* fpga_app_bitstream = load_file_to_ram(fpga_app, &fpga_app_bitstream_length);
     fclose(fpga_app);
+
+    ili9341_deinit(ili9341);
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    ili9341_select(ili9341, true);
+
     ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
     res = ice40_load_bitstream(ice40, fpga_app_bitstream, fpga_app_bitstream_length);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to load app bitstream into FPGA (%d)", res);
         return;
     }
+    
     free(fpga_app_bitstream);
 }
 
@@ -522,7 +537,7 @@ void app_main(void) {
     pax_buf_init(&buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
     driver_framebuffer_init(framebuffer);
     
-    res = hardware_init();
+    res = board_init();
     
     if (res != ESP_OK) {
         printf("Failed to initialize hardware!\n");
@@ -532,11 +547,14 @@ void app_main(void) {
     ili9341 = get_ili9341();
     ice40 = get_ice40();
     bno055 = get_bno055();
+    rp2040 = get_rp2040();
         
     //print_chip_info();
     
+    draw_message(&buffer, ili9341, framebuffer, "Button init...");
     button_init();
     
+    draw_message(&buffer, ili9341, framebuffer, "AppFS init...");
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
@@ -544,18 +562,20 @@ void app_main(void) {
     }
     ESP_LOGI(TAG, "AppFS initialized");
     
+    draw_message(&buffer, ili9341, framebuffer, "Mount SD card...");
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     
-    ili9341_deinit(ili9341);
-    ili9341_select(ili9341, true);
-    
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card mounted");
-        //fpga_test();
+        
+        draw_message(&buffer, ili9341, framebuffer, "FPGA init...");
+        fpga_test();
+    } else {
+        draw_message(&buffer, ili9341, framebuffer, "No SD card?");
     }
     
-    appfs_test(sdcard_ready);
+    //appfs_test(sdcard_ready);
         
     //
     
@@ -684,4 +704,30 @@ void app_main(void) {
     
     free(framebuffer);
     ESP_LOGW(TAG, "End of main function, goodbye!");
+    
+    rp2040_set_led_mode(rp2040, true, true);
+    
+    for (uint8_t led = 0; led < 5; led++) {
+        rp2040_set_led_value(rp2040, led, 0, 0, 0);
+    }
+    
+    for (uint8_t value = 0; value < 255; value++) {
+        rp2040_set_lcd_backlight(rp2040, 254 - value);
+    }
+    
+    for (uint8_t value = 0; value < 255; value++) {
+        rp2040_set_lcd_backlight(rp2040, value);
+    }
+
+    while (1) {
+        for (uint8_t led = 0; led < 5; led++) {
+                rp2040_set_led_value(rp2040, led, 255, 0, 0    );
+                vTaskDelay(50 / portTICK_PERIOD_MS);
+                rp2040_set_led_value(rp2040, led, 0,   255, 0  );
+                vTaskDelay(50 / portTICK_PERIOD_MS);
+                rp2040_set_led_value(rp2040, led, 0,   0,   255);
+                vTaskDelay(50 / portTICK_PERIOD_MS);
+                rp2040_set_led_value(rp2040, led, 0,   0,   0  );
+        }
+    }
 }

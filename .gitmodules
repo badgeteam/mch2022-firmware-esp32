@@ -1,24 +1,24 @@
 [submodule "esp-idf"]
 	path = esp-idf
 	url = https://github.com/espressif/esp-idf.git
-[submodule "factory_test/components/bus-i2c"]
-	path = factory_test/components/bus-i2c
+[submodule "components/bus-i2c"]
+	path = components/bus-i2c
 	url = git@github.com:Nicolai-Electronics/esp32-component-bus-i2c.git
-[submodule "factory_test/components/i2c-pca9555"]
-	path = factory_test/components/i2c-pca9555
+[submodule "components/i2c-pca9555"]
+	path = components/i2c-pca9555
 	url = git@github.com:Nicolai-Electronics/esp32-component-i2c-pca9555.git
-[submodule "factory_test/components/i2c-bno055"]
-	path = factory_test/components/i2c-bno055
+[submodule "components/i2c-bno055"]
+	path = components/i2c-bno055
 	url = git@github.com:Nicolai-Electronics/esp32-component-i2c-bno055.git
-[submodule "factory_test/components/spi-ili9341"]
-	path = factory_test/components/spi-ili9341
+[submodule "components/spi-ili9341"]
+	path = components/spi-ili9341
 	url = git@github.com:Nicolai-Electronics/esp32-component-spi-ili9341.git
-[submodule "factory_test/components/spi-ice40"]
-	path = factory_test/components/spi-ice40
+[submodule "components/spi-ice40"]
+	path = components/spi-ice40
 	url = git@github.com:Nicolai-Electronics/esp32-component-spi-ice40.git
-[submodule "factory_test/components/sdcard"]
-	path = factory_test/components/sdcard
+[submodule "components/sdcard"]
+	path = components/sdcard
 	url = git@github.com:Nicolai-Electronics/esp32-component-sdcard.git
-[submodule "factory_test/components/pax-graphics"]
-	path = factory_test/components/pax-graphics
+[submodule "components/pax-graphics"]
+	path = components/pax-graphics
 	url = https://github.com/robotman2412/pax-graphics.git

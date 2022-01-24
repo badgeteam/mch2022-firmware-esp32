@@ -1,1 +1,2 @@
-# MCH2022 firmware for ESP32
+# Factory test firmware
+
