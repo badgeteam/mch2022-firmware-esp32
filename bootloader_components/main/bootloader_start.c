@@ -109,6 +109,9 @@ void __attribute__((noreturn)) call_start_cpu0(void)
 
 	ESP_LOGI(TAG, "Wrapping flash functions and booting app...");
 	appfs_wrapper_init(handle, appfs_pos, appfs_len);
+	//De-init the high-level parts of appfs. Reading/mmap'ping a file handle still is explicitly
+	//allowed after this, though.
+	appfsBlDeinit();
 	//Note that the rest of the bootloader code has no clue about appfs, and as such won't try
 	//to boot it. We 'fix' that by chucking the appfs partition (which is now wrapped so the rest
 	//of the bootloader reads from the selected file when it thinks it loads from the app) into
