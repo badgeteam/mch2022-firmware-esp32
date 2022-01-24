@@ -33,7 +33,24 @@ bno055_vector_t rotation_offset = {.x = 0, .y = 0, .z = 0};
 
 bno055_vector_t acceleration, magnetism, orientation, rotation, linear_acceleration, gravity;
 
+typedef enum action {
+    ACTION_NONE,
+    ACTION_INSTALLER
+} menu_action_t;
+
+typedef struct _menu_item {
+    const char* name;
+    appfs_handle_t fd;
+    menu_action_t action;
+    struct _menu_item* next;
+} menu_item_t;
+
 uint8_t selected_item = 0;
+uint8_t amount_of_items = 0;
+bool start_selected = false;
+menu_item_t* first_menu_item = NULL;
+
+const char installer_name[] = "Install app...";
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
@@ -47,42 +64,43 @@ void button_handler(uint8_t pin, bool value) {
         case PCA9555_PIN_BTN_JOY_DOWN:
             printf("Joystick vertical %s\n", value ? "down" : "center");
             //ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH / 2 - 1);
-            if (value) selected_item += 1;
+            if (value && (!start_selected)) {
+                if (selected_item < amount_of_items - 1) {
+                    selected_item += 1;
+                }
+            }
             break;
         case PCA9555_PIN_BTN_JOY_UP:
             printf("Joy vertical %s\n", value ? "up" : "center");
-            //ili9341_set_partial_scanning(ili9341, ILI9341_WIDTH / 2, ILI9341_WIDTH - 1);
-            if (value) selected_item -= 1;
+            if (value && (!start_selected)) {
+                if (selected_item > 0) {
+                    selected_item -= 1;
+                }
+            }
             break;
         case PCA9555_PIN_BTN_JOY_RIGHT:
             printf("Joy horizontal %s\n", value ? "right" : "center");
-            //ili9341_set_partial_scanning(ili9341, 0, ILI9341_WIDTH - 1);
             break;
         case PCA9555_PIN_BTN_HOME:
             printf("Home button %s\n", value ? "pressed" : "released");
-            //ili9341_set_tearing_effect_line(ili9341, true);
             break;
         case PCA9555_PIN_BTN_MENU:
             printf("Menu button %s\n", value ? "pressed" : "released");
-            //ili9341_set_tearing_effect_line(ili9341, false);
             break;
         case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
-            //ili9341_set_idle_mode(ili9341, true);
             break;
         }
         case PCA9555_PIN_BTN_SELECT: {
             printf("Select button %s\n", value ? "pressed" : "released");
-            //ili9341_set_idle_mode(ili9341, false);
             break;
         }
         case PCA9555_PIN_BTN_BACK:
             printf("Back button %s\n", value ? "pressed" : "released");
-            display_bno_value = value;
             break;
         case PCA9555_PIN_BTN_ACCEPT:
             printf("Accept button %s\n", value ? "pressed" : "released");
-            if (value) calibrate = true;
+            if (value) start_selected = true;
             break;
         default:
             printf("Unknown button %d %s\n", pin, value ? "pressed" : "released");
@@ -203,13 +221,13 @@ esp_err_t draw_menu(pax_buf_t* buffer) {
         //pax_apply_2d(buffer, matrix_2d_scale(1, 1));
         pax_simple_line(buffer, pax_col_rgb(0,0,0), 0, 20, 320, 20);
         pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, "Launcher");
-        draw_menu_item(buffer, 0, (selected_item == 0), "Item 1");
-        draw_menu_item(buffer, 1, (selected_item == 1), "Item 2");
-        draw_menu_item(buffer, 2, (selected_item == 2), "Item 3");
-        draw_menu_item(buffer, 3, (selected_item == 3), "Item 4");
-        draw_menu_item(buffer, 4, (selected_item == 4), "Item 5");
-        draw_menu_item(buffer, 5, (selected_item == 5), "Item 6");
-        draw_menu_item(buffer, 6, (selected_item == 6), "Item 7");
+        menu_item_t* item = first_menu_item;
+        for (uint8_t index = 0; index < amount_of_items; index++) {
+            if (item != NULL) {
+                draw_menu_item(buffer, index, (selected_item == index), item->name);
+            }
+            item = item->next;
+        }
     pax_pop_2d(buffer);
     return ESP_OK;
 }
@@ -506,10 +524,6 @@ void appfs_boot_app(int fd) {
 }
 
 void appfs_test(bool sdcard_ready) {
-    appfsDump();
-    
-    // Try booting the app from appfs
-    
     appfs_handle_t fd = appfsOpen("gnuboy");
     if (fd < 0) {
         ESP_LOGW(TAG, "gnuboy not found in appfs");
@@ -566,23 +580,75 @@ void app_main(void) {
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     
-    if (sdcard_ready) {
+    /*if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card mounted");
-        
+        draw_message(&buffer, ili9341, framebuffer, "AppFS test...");
+        appfs_test(sdcard_ready);
         draw_message(&buffer, ili9341, framebuffer, "FPGA init...");
         fpga_test();
     } else {
         draw_message(&buffer, ili9341, framebuffer, "No SD card?");
-    }
-    
-    //appfs_test(sdcard_ready);
+    }*/
         
     //
     
-    /*while (1) {
-        bno055_task(bno055);
+    menu_item_t* current_menu_item = NULL;
+    appfs_handle_t current_fd = APPFS_INVALID_FD;
+    
+    amount_of_items = 0;
+    selected_item = 0;
+    
+    do {
+        current_fd = appfsNextEntry(current_fd);
+        if (current_fd != APPFS_INVALID_FD) {
+            menu_item_t* next_menu_item = malloc(sizeof(menu_item_t));
+            if (current_menu_item != NULL) {
+                current_menu_item->next = next_menu_item;
+            } else {
+                first_menu_item = next_menu_item;
+            }
+            current_menu_item = next_menu_item;
+            appfsEntryInfo(current_fd, &current_menu_item->name, NULL);
+            current_menu_item->fd = current_fd;
+            current_menu_item->action = ACTION_NONE;
+            current_menu_item->next = NULL;
+            printf("Building menu list %u: %s\r\n", amount_of_items, current_menu_item->name);
+            amount_of_items++;
+        }
+    } while (current_fd != APPFS_INVALID_FD);
+    printf("Building menu list done, %u items\r\n", amount_of_items);
+    
+    menu_item_t* next_menu_item = malloc(sizeof(menu_item_t));
+    if (current_menu_item != NULL) {
+        current_menu_item->next = next_menu_item;
+    } else {
+        first_menu_item = next_menu_item;
+    }
+    current_menu_item = next_menu_item;
+    current_menu_item->fd = APPFS_INVALID_FD;
+    current_menu_item->action = ACTION_INSTALLER;
+    current_menu_item->name = installer_name;
+    current_menu_item->next = NULL;
+    amount_of_items++;
+    
+    
+    while (1) {
+        //bno055_task(bno055);
         graphics_task(&buffer, ili9341, framebuffer);
-    }*/
+        printf("Selected: %u of %u\r\n", selected_item + 1, amount_of_items);
+        if (start_selected) {
+            current_menu_item = first_menu_item;
+            for (uint8_t index = 0; index < selected_item; index++) {
+                current_menu_item = current_menu_item->next;
+            }
+            if (current_menu_item->action == ACTION_INSTALLER) {
+                draw_message(&buffer, ili9341, framebuffer, "Starting installer...");
+            } else {
+                draw_message(&buffer, ili9341, framebuffer, "Starting app...");
+                appfs_boot_app(current_menu_item->fd);
+            }
+        }
+    }
     /*
     uint8_t data_out, data_in;
     
