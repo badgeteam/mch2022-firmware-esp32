@@ -1,0 +1,10 @@
+#pragma once
+
+#define FB_SIZE 320*240*2
+#define FB_WIDTH 320
+#define FB_HEIGHT 240
+#define FB_TYPE_16BPP
+#define PIXEL_SIZE 16
+#define FB_ALPHA_ENABLED
+#define COLOR_FILL_DEFAULT 0x000000
+#define COLOR_TEXT_DEFAULT 0xFFFFFF

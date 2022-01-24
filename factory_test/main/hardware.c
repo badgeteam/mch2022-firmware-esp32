@@ -3,15 +3,14 @@
 #include <esp_log.h>
 #include <driver/gpio.h>
 #include "managed_i2c.h"
-#include "logo.h"
 #include "sdcard.h"
 
 static const char *TAG = "hardware";
 
-PCA9555 dev_pca9555 = {0};
-BNO055  dev_bno055   = {0};
-ILI9341 dev_ili9341 = {0};
-ICE40   dev_ice40 = {0};
+static PCA9555 dev_pca9555 = {0};
+static BNO055  dev_bno055   = {0};
+static ILI9341 dev_ili9341 = {0};
+static ICE40   dev_ice40 = {0};
 
 // Wrapper functions for linking the ICE40 component to the PCA9555 component
 esp_err_t ice40_get_done_wrapper(bool* done) { return pca9555_get_gpio_value(&dev_pca9555, PCA9555_PIN_FPGA_CDONE, done); }
@@ -74,6 +73,19 @@ esp_err_t hardware_init() {
         return res;
     }
     
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_START, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_SELECT, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_MENU, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_HOME, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_LEFT, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_PRESS, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_DOWN, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_UP, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_RIGHT, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_BACK, true);
+    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_ACCEPT, true);
+    dev_pca9555.pin_state = 0; // Reset all pin states so that the interrupt function doesn't trigger all the handlers because we inverted the polarity
+    
     // FPGA
     dev_ice40.spi_bus = SPI_BUS;
     dev_ice40.pin_cs = GPIO_SPI_CS_FPGA;
@@ -101,17 +113,10 @@ esp_err_t hardware_init() {
     dev_ili9341.spi_speed = 60000000; // 60MHz
     dev_ili9341.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
     dev_ili9341.callback = NULL; // Callback for changing LCD mode between ESP32 and FPGA
-    
+
     res = ili9341_init(&dev_ili9341);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Initializing LCD failed");
-        return res;
-    }
-    
-    // Hack: show logo while the other hardware components initialize
-    res = ili9341_write(&dev_ili9341, logo);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to write logo to LCD");
         return res;
     }
     
@@ -122,8 +127,6 @@ esp_err_t hardware_init() {
         ESP_LOGE(TAG, "Initializing BNO055 failed");
         return res;
     }
-    
-    //res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
 
     return res;
 }

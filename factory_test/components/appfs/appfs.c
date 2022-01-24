@@ -1,13 +1,4 @@
 /*
- * ----------------------------------------------------------------------------
- * "THE BEER-WARE LICENSE" (Revision 42):
- * Jeroen Domburg <jeroen@spritesmods.com> wrote this file. As long as you retain 
- * this notice you can do whatever you want with this stuff. If we meet some day, 
- * and you think this stuff is worth it, you can buy me a beer in return. 
- * ----------------------------------------------------------------------------
- */
-
-/*
 Theory of operation:
 An appfs filesystem is meant to store executable applications (=ESP32 programs) alongside other
 data that is mmap()-able as a contiguous file.
@@ -58,13 +49,13 @@ is implemented as a singleton.
 #include <stdbool.h>
 #include <string.h>
 #include <alloca.h>
-#include "esp32/rom/crc.h"
-#include "esp32/rom/cache.h"
+#include <rom/crc.h>
 #include "esp_spi_flash.h"
 #include "esp_partition.h"
 #include "esp_log.h"
 #include "esp_err.h"
 #include "appfs.h"
+#include "rom/cache.h"
 #include "sdkconfig.h"
 
 
@@ -177,7 +168,9 @@ static esp_err_t findActiveMeta() {
 	return ESP_OK;
 }
 
-
+#ifdef BOOTLOADER_BUILD
+IRAM_ATTR
+#endif
 static int appfsGetFirstPageFor(const char *filename) {
 	for (int j=0; j<APPFS_PAGES; j++) {
 		if (appfsMeta[appfsActiveMeta].page[j].used==APPFS_USE_DATA && strcmp(appfsMeta[appfsActiveMeta].page[j].name, filename)==0) {
@@ -241,11 +234,26 @@ size_t appfsGetFreeMem() {
 
 #ifdef BOOTLOADER_BUILD
 
-#include "bootloader_flash.h"
+/*
+Note that IRAM_ATTR is used here to make sure the functions that are used when/after the app loadable
+segments are loaded, won't be overwritten. The IRAM_ATTR in the bootloader code dumps the function
+in the loader segment instead of in random IRAM.
+*/
+
+#include "bootloader_flash_priv.h"
 #include "soc/soc.h"
-#include "soc/cpu.h"
+#include "esp_cpu.h"
 #include "soc/rtc.h"
 #include "soc/dport_reg.h"
+
+//These can be overridden if we need a custom implementation of bootloader_mmap/munmap.
+IRAM_ATTR __attribute__ ((weak)) const void *appfs_bootloader_mmap(uint32_t src_addr, uint32_t size)  {
+	return bootloader_mmap(src_addr, size);
+}
+
+IRAM_ATTR __attribute__ ((weak)) void appfs_bootloader_munmap(const void *mapping) {
+	bootloader_munmap(mapping);
+}
 
 esp_err_t appfsBlInit(uint32_t offset, uint32_t len) {
 	//Compile-time sanity check on size of structs
@@ -253,7 +261,7 @@ esp_err_t appfsBlInit(uint32_t offset, uint32_t len) {
 	_Static_assert(sizeof(AppfsPageInfo)==APPFS_META_DESC_SZ, "sizeof AppfsPageInfo != 128bytes");
 	_Static_assert(sizeof(AppfsMeta)==APPFS_META_SZ, "sizeof AppfsMeta != APPFS_META_SZ");
 	//Map meta page
-	appfsMeta=bootloader_mmap(offset, APPFS_SECTOR_SZ);
+	appfsMeta=appfs_bootloader_mmap(offset, APPFS_SECTOR_SZ);
 	if (!appfsMeta) return ESP_ERR_NOT_FOUND;
 	if (findActiveMeta()!=ESP_OK) {
 		//No valid metadata half-sector found. Initialize the first sector.
@@ -266,15 +274,15 @@ esp_err_t appfsBlInit(uint32_t offset, uint32_t len) {
 }
 
 void appfsBlDeinit() {
-	bootloader_munmap(appfsMeta);
+	ESP_LOGI(TAG, "Appfs deinit");
+	appfs_bootloader_munmap(appfsMeta);
 }
 
 #define MMU_BLOCK0_VADDR  0x3f400000
 #define MMU_BLOCK50_VADDR 0x3f720000
-#define MMU_FLASH_MASK    0xffff0000
-#define MMU_BLOCK_SIZE    0x00010000
 
-esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions) {
+IRAM_ATTR esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions) {
+	if (appfsMeta==NULL) ESP_LOGE(TAG, "EEK! appfsBlMapRegions called without meta mapped");
 	uint8_t pages[255];
 	int pageCt=0;
 	int page=fd;
@@ -283,7 +291,7 @@ esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions) 
 		page=appfsMeta[appfsActiveMeta].page[page].next;
 	} while (page!=0);
 	//Okay, we have our info.
-	bootloader_munmap(appfsMeta);
+	appfs_bootloader_munmap(appfsMeta);
 	
 	Cache_Read_Disable( 0 );
 	Cache_Flush( 0 );
@@ -314,9 +322,10 @@ esp_err_t appfsBlMapRegions(int fd, AppfsBlRegionToMap *regions, int noRegions) 
 	return ESP_OK;
 }
 
-void* appfsBlMmap(int fd) {
+IRAM_ATTR void* appfsBlMmap(int fd) {
 	//We want to mmap() the pages of the file into memory. However, to do that we need to kill the mmap for the 
 	//meta info. To do this, we collect the pages before unmapping the meta info.
+	if (appfsMeta==NULL) ESP_LOGE(TAG, "EEK! appfsBlMmap called without meta mapped");
 	uint8_t pages[255];
 	int pageCt=0;
 	int page=fd;
@@ -324,7 +333,7 @@ void* appfsBlMmap(int fd) {
 		pages[pageCt++]=page;
 		page=appfsMeta[appfsActiveMeta].page[page].next;
 	} while (page!=0);
-	ESP_LOGI(TAG, "File %d has %d pages.", fd, pageCt);
+//	ESP_LOGI(TAG, "File %d has %d pages.", fd, pageCt);
 	
 	if (pageCt>50) {
 		ESP_LOGE(TAG, "appfsBlMmap: file too big to mmap");
@@ -332,14 +341,14 @@ void* appfsBlMmap(int fd) {
 	}
 	
 	//Okay, we have our info.
-	bootloader_munmap(appfsMeta);
+	appfs_bootloader_munmap(appfsMeta);
 	//Bootloader_mmap only allows mapping of one consecutive memory range. We need more than that, so we essentially
 	//replicate the function here.
 	
 	Cache_Read_Disable(0);
 	Cache_Flush(0);
 	for (int i=0; i<pageCt; i++) {
-		ESP_LOGI(TAG, "Mapping flash addr %X to mem addr %X for page %d", appfsPartOffset+((pages[i]+1)*APPFS_SECTOR_SZ), MMU_BLOCK0_VADDR+(i*APPFS_SECTOR_SZ), pages[i]);
+//		ESP_LOGI(TAG, "Mapping flash addr %X to mem addr %X for page %d", appfsPartOffset+((pages[i]+1)*APPFS_SECTOR_SZ), MMU_BLOCK0_VADDR+(i*APPFS_SECTOR_SZ), pages[i]);
 		int e = cache_flash_mmu_set(0, 0, MMU_BLOCK0_VADDR+(i*APPFS_SECTOR_SZ), 
 						appfsPartOffset+((pages[i]+1)*APPFS_SECTOR_SZ), 64, 1);
 		if (e != 0) {
@@ -352,13 +361,13 @@ void* appfsBlMmap(int fd) {
 	return (void *)(MMU_BLOCK0_VADDR);
 }
 
-void appfsBlMunmap() {
+IRAM_ATTR void appfsBlMunmap() {
 	/* Full MMU reset */
 	Cache_Read_Disable(0);
 	Cache_Flush(0);
 	mmu_init(0);
 	//Map meta page
-	appfsMeta=bootloader_mmap(appfsPartOffset, APPFS_SECTOR_SZ);
+	appfsMeta=appfs_bootloader_mmap(appfsPartOffset, APPFS_SECTOR_SZ);
 }
 
 #else //so if !BOOTLOADER_BUILD
