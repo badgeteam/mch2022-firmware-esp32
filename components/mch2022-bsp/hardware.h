@@ -7,15 +7,10 @@
 #include "bno055.h"
 #include "ili9341.h"
 #include "ice40.h"
-
-esp_err_t hardware_init();
-PCA9555* get_pca9555();
-BNO055* get_bno055();
-ILI9341* get_ili9341();
-ICE40* get_ice40();
+#include "rp2040.h"
 
 // Interrupts
-#define GPIO_INT_STM32   0
+#define GPIO_INT_RP2040  0
 #define GPIO_INT_PCA9555 34
 #define GPIO_INT_BNO055  36
 #define GPIO_INT_FPGA    39
@@ -38,25 +33,28 @@ ICE40* get_ice40();
 #define I2C_SPEED_SYS    20000 // 20 kHz
 
 // PCA9555 IO expander
-#define PCA9555_ADDR              0x26
-#define PCA9555_PIN_STM32_RESET   0
-#define PCA9555_PIN_STM32_BOOT0   1
-#define PCA9555_PIN_FPGA_RESET    2
-#define PCA9555_PIN_FPGA_CDONE    3
-#define PCA9555_PIN_BTN_START     5
-#define PCA9555_PIN_BTN_SELECT    6
-#define PCA9555_PIN_BTN_MENU      7
-#define PCA9555_PIN_BTN_HOME      8
-#define PCA9555_PIN_BTN_JOY_LEFT  9
-#define PCA9555_PIN_BTN_JOY_PRESS 10
-#define PCA9555_PIN_BTN_JOY_DOWN  11
-#define PCA9555_PIN_BTN_JOY_UP    12
-#define PCA9555_PIN_BTN_JOY_RIGHT 13
-#define PCA9555_PIN_BTN_BACK      14
-#define PCA9555_PIN_BTN_ACCEPT    15
+#define PCA9555_ADDR               0x26
+#define PCA9555_PIN_RP2040_RESET   0
+#define PCA9555_PIN_RP2040_BOOTSEL 1
+#define PCA9555_PIN_FPGA_RESET     2
+#define PCA9555_PIN_FPGA_CDONE     3
+#define PCA9555_PIN_BTN_START      5
+#define PCA9555_PIN_BTN_SELECT     6
+#define PCA9555_PIN_BTN_MENU       7
+#define PCA9555_PIN_BTN_HOME       8
+#define PCA9555_PIN_BTN_JOY_LEFT   9
+#define PCA9555_PIN_BTN_JOY_PRESS  10
+#define PCA9555_PIN_BTN_JOY_DOWN   11
+#define PCA9555_PIN_BTN_JOY_UP     12
+#define PCA9555_PIN_BTN_JOY_RIGHT  13
+#define PCA9555_PIN_BTN_BACK       14
+#define PCA9555_PIN_BTN_ACCEPT     15
+
+// RP2040 co-processor
+#define RP2040_ADDR 0x17
 
 // BNO055 sensor
-#define BNO055_ADDR               0x28
+#define BNO055_ADDR 0x28
 
 // User I2C bus
 #define GPIO_I2C_EXT_SCL 25
@@ -68,10 +66,18 @@ ICE40* get_ice40();
 #define GPIO_SPI_CLK          18
 #define GPIO_SPI_MOSI         23
 #define GPIO_SPI_MISO         35
-#define GPIO_SPI_CS_STM32     19
+#define GPIO_SPI_CS_RP2040    19
 #define GPIO_SPI_CS_FPGA      27
 #define GPIO_SPI_CS_LCD       32
 #define GPIO_SPI_DC_LCD       33
 #define SPI_BUS               VSPI_HOST
 #define SPI_MAX_TRANSFER_SIZE 4094
 #define SPI_DMA_CHANNEL       2
+
+esp_err_t board_init();
+
+PCA9555* get_pca9555();
+BNO055* get_bno055();
+ILI9341* get_ili9341();
+ICE40* get_ice40();
+RP2040* get_rp2040();
