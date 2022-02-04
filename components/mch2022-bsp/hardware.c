@@ -25,7 +25,6 @@ esp_err_t ice40_set_reset_wrapper(bool reset) {
 void ili9341_set_lcd_mode(bool mode) {
     ESP_LOGI(TAG, "LCD mode switch to %s", mode ? "FPGA" : "ESP32");
     rp2040_set_lcd_mode(&dev_rp2040, (lcd_mode_t) mode);
-    vTaskDelay(100 / portTICK_PERIOD_MS);
 }
 
 static esp_err_t _bus_init() {

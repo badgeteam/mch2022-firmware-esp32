@@ -20,6 +20,8 @@
 
 #include "rp2040.h"
 
+#include "fpga.h"
+
 static const char *TAG = "main";
 
 bool calibrate = true;
@@ -29,13 +31,17 @@ ICE40* ice40 = NULL;
 BNO055* bno055 = NULL;
 RP2040* rp2040 = NULL;
 
+uint8_t* framebuffer = NULL;
+pax_buf_t* pax_buffer = NULL;
+
 bno055_vector_t rotation_offset = {.x = 0, .y = 0, .z = 0};
 
 bno055_vector_t acceleration, magnetism, orientation, rotation, linear_acceleration, gravity;
 
 typedef enum action {
     ACTION_NONE,
-    ACTION_INSTALLER
+    ACTION_INSTALLER,
+    ACTION_FPGA
 } menu_action_t;
 
 typedef struct _menu_item {
@@ -50,16 +56,29 @@ uint8_t amount_of_items = 0;
 bool start_selected = false;
 menu_item_t* first_menu_item = NULL;
 
+bool reset_to_menu = false;
+bool reload_fpga = false;
+
 const char installer_name[] = "Install app...";
+const char fpga_name[] = "Test FPGA";
 
 void button_handler(uint8_t pin, bool value) {
     switch(pin) {
         case PCA9555_PIN_BTN_JOY_LEFT:
             printf("Joystick horizontal %s\n", value ? "left" : "center");
-            //ili9341_set_partial_scanning(ili9341, 60, ILI9341_WIDTH - 61);
+            if (value) {
+                for (uint8_t led = 0; led < 5; led++) {
+                    rp2040_set_led_value(rp2040, led, 0, 255, 0);
+                }
+            }
             break;
         case PCA9555_PIN_BTN_JOY_PRESS:
             printf("Joystick %s\n", value ? "pressed" : "released");
+            if (value) {
+                for (uint8_t led = 0; led < 5; led++) {
+                    rp2040_set_led_value(rp2040, led, 0, 0, 255);
+                }
+            }
             break;
         case PCA9555_PIN_BTN_JOY_DOWN:
             printf("Joystick vertical %s\n", value ? "down" : "center");
@@ -80,15 +99,22 @@ void button_handler(uint8_t pin, bool value) {
             break;
         case PCA9555_PIN_BTN_JOY_RIGHT:
             printf("Joy horizontal %s\n", value ? "right" : "center");
+            if (value) {
+                for (uint8_t led = 0; led < 5; led++) {
+                    rp2040_set_led_value(rp2040, led, 255, 0, 0);
+                }
+            }
             break;
         case PCA9555_PIN_BTN_HOME:
             printf("Home button %s\n", value ? "pressed" : "released");
             break;
         case PCA9555_PIN_BTN_MENU:
             printf("Menu button %s\n", value ? "pressed" : "released");
+            if (value) reset_to_menu = true;
             break;
         case PCA9555_PIN_BTN_START: {
             printf("Start button %s\n", value ? "pressed" : "released");
+            if (value) reload_fpga = true;
             break;
         }
         case PCA9555_PIN_BTN_SELECT: {
@@ -274,9 +300,9 @@ esp_err_t graphics_task(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffe
     return ili9341_write(ili9341, framebuffer);
 }
 
-esp_err_t draw_message(pax_buf_t* buffer, ILI9341* ili9341, uint8_t* framebuffer, char* message) {
-    pax_background(buffer, 0xFFFFFF);
-    pax_draw_text(buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, message);
+esp_err_t draw_message(char* message) {
+    pax_background(pax_buffer, 0xFFFFFF);
+    pax_draw_text(pax_buffer, pax_col_rgb(0,0,0), PAX_FONT_DEFAULT, 18, 0, 0, message);
     return ili9341_write(ili9341, framebuffer);
 }
 
@@ -410,12 +436,14 @@ esp_err_t verify_file_in_psram(FILE* fd) {
 
 void fpga_test(void) {
     esp_err_t res;
+    /*draw_message("Loading passthrough...");
     FILE* fpga_passthrough = fopen("/sd/pt.bin", "rb");
     if (fpga_passthrough == NULL) {
         ESP_LOGE(TAG, "Failed to open passthrough firmware (pt.bin) from the SD card");
         return;
     }
 
+    draw_message("Loading RAM...");
     ESP_LOGI(TAG, "Loading passthrough bitstream into RAM buffer...");
     size_t fpga_passthrough_bitstream_length;
     uint8_t* fpga_passthrough_bitstream = load_file_to_ram(fpga_passthrough, &fpga_passthrough_bitstream_length);
@@ -446,9 +474,10 @@ void fpga_test(void) {
         ESP_LOGE(TAG, "Failed to verify PSRAM contents (%d)", res);
         fclose(ram_contents);
         return;
-    }
+    }*/
     
-    FILE* fpga_app = fopen("/sd/app.bin", "rb");
+    //draw_message("Loading app...");
+    /*FILE* fpga_app = fopen("/sd/app.bin", "rb");
     if (fpga_app == NULL) {
         ESP_LOGE(TAG, "Failed to open app.bin");
         return;
@@ -457,20 +486,35 @@ void fpga_test(void) {
     ESP_LOGI(TAG, "Loading app bitstream into RAM buffer...");
     size_t fpga_app_bitstream_length;
     uint8_t* fpga_app_bitstream = load_file_to_ram(fpga_app, &fpga_app_bitstream_length);
-    fclose(fpga_app);
-
-    ili9341_deinit(ili9341);
-    vTaskDelay(10 / portTICK_PERIOD_MS);
-    ili9341_select(ili9341, true);
-
-    ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
-    res = ice40_load_bitstream(ice40, fpga_app_bitstream, fpga_app_bitstream_length);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to load app bitstream into FPGA (%d)", res);
-        return;
-    }
+    fclose(fpga_app);*/
     
-    free(fpga_app_bitstream);
+    do {
+        reload_fpga = false;
+        ili9341_deinit(ili9341);
+        ili9341_select(ili9341, false);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        ili9341_select(ili9341, true);
+
+        ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
+        //res = ice40_load_bitstream(ice40, fpga_app_bitstream, fpga_app_bitstream_length);
+        res = ice40_load_bitstream(ice40, proto2_bin, proto2_bin_len);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to load app bitstream into FPGA (%d)", res);
+            return;
+        }
+        
+        //free(fpga_app_bitstream);
+        
+        reset_to_menu = false;
+        
+        while (!reset_to_menu) {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            if (reload_fpga) break;
+        }
+        
+        ice40_disable(ice40);
+        ili9341_init(ili9341);
+    } while (reload_fpga);
 }
 
 esp_err_t appfs_init(void) {
@@ -540,15 +584,21 @@ void appfs_test(bool sdcard_ready) {
 void app_main(void) {
     esp_err_t res;
     
-    uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
+    framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate framebuffer");
         restart();
     }
     memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
     
-    pax_buf_t buffer;
-    pax_buf_init(&buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
+    pax_buffer = malloc(sizeof(pax_buf_t));
+    if (framebuffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate pax buffer");
+        restart();
+    }
+    memset(pax_buffer, 0, sizeof(pax_buf_t));
+    
+    pax_buf_init(pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
     driver_framebuffer_init(framebuffer);
     
     res = board_init();
@@ -565,10 +615,12 @@ void app_main(void) {
         
     //print_chip_info();
     
-    draw_message(&buffer, ili9341, framebuffer, "Button init...");
+    draw_message("Button init...");
     button_init();
     
-    draw_message(&buffer, ili9341, framebuffer, "AppFS init...");
+    rp2040_set_led_mode(rp2040, true, true);
+    
+    draw_message("AppFS init...");
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
@@ -576,18 +628,18 @@ void app_main(void) {
     }
     ESP_LOGI(TAG, "AppFS initialized");
     
-    draw_message(&buffer, ili9341, framebuffer, "Mount SD card...");
+    draw_message("Mount SD card...");
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     
     /*if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card mounted");
-        draw_message(&buffer, ili9341, framebuffer, "AppFS test...");
-        appfs_test(sdcard_ready);
-        draw_message(&buffer, ili9341, framebuffer, "FPGA init...");
+        //draw_message("AppFS test...");
+        //appfs_test(sdcard_ready);
+        draw_message("FPGA init...");
         fpga_test();
-    } else {
-        draw_message(&buffer, ili9341, framebuffer, "No SD card?");
+        ESP_LOGW(TAG, "End of main function, goodbye!");
+        return;
     }*/
         
     //
@@ -618,7 +670,9 @@ void app_main(void) {
     } while (current_fd != APPFS_INVALID_FD);
     printf("Building menu list done, %u items\r\n", amount_of_items);
     
-    menu_item_t* next_menu_item = malloc(sizeof(menu_item_t));
+    menu_item_t* next_menu_item;
+    
+    /*next_menu_item = malloc(sizeof(menu_item_t));
     if (current_menu_item != NULL) {
         current_menu_item->next = next_menu_item;
     } else {
@@ -629,22 +683,40 @@ void app_main(void) {
     current_menu_item->action = ACTION_INSTALLER;
     current_menu_item->name = installer_name;
     current_menu_item->next = NULL;
+    amount_of_items++;*/
+    
+    next_menu_item = malloc(sizeof(menu_item_t));
+    if (current_menu_item != NULL) {
+        current_menu_item->next = next_menu_item;
+    } else {
+        first_menu_item = next_menu_item;
+    }
+    current_menu_item = next_menu_item;
+    current_menu_item->fd = APPFS_INVALID_FD;
+    current_menu_item->action = ACTION_FPGA;
+    current_menu_item->name = fpga_name;
+    current_menu_item->next = NULL;
     amount_of_items++;
     
     
     while (1) {
         //bno055_task(bno055);
-        graphics_task(&buffer, ili9341, framebuffer);
-        printf("Selected: %u of %u\r\n", selected_item + 1, amount_of_items);
+        graphics_task(pax_buffer, ili9341, framebuffer);
+        //printf("Selected: %u of %u\r\n", selected_item + 1, amount_of_items);
         if (start_selected) {
             current_menu_item = first_menu_item;
             for (uint8_t index = 0; index < selected_item; index++) {
                 current_menu_item = current_menu_item->next;
             }
             if (current_menu_item->action == ACTION_INSTALLER) {
-                draw_message(&buffer, ili9341, framebuffer, "Starting installer...");
+                draw_message("Not yet implemented");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                start_selected = false;
+            } else  if (current_menu_item->action == ACTION_FPGA) {
+                fpga_test();
+                start_selected = false;
             } else {
-                draw_message(&buffer, ili9341, framebuffer, "Starting app...");
+                draw_message("Starting app...");
                 appfs_boot_app(current_menu_item->fd);
             }
         }
@@ -769,7 +841,7 @@ void app_main(void) {
     printf("%u bytes in %lld microseconds = %llu kB/s\r\n", size_of_ram, rx_done_time - rx_start_time, result);*/
     
     free(framebuffer);
-    ESP_LOGW(TAG, "End of main function, goodbye!");
+    //ESP_LOGW(TAG, "End of main function, goodbye!");
     
     rp2040_set_led_mode(rp2040, true, true);
     
