@@ -73,7 +73,15 @@ esp_err_t rp2040_get_lcd_mode(RP2040* device, lcd_mode_t* mode) {
 }
 
 esp_err_t rp2040_set_lcd_mode(RP2040* device, lcd_mode_t mode) {
-    return i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_REG_LCD_MODE, (uint8_t*) &mode, 1);
+    esp_err_t res;
+    lcd_mode_t verification;
+    do {
+        res = i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_REG_LCD_MODE, (uint8_t*) &mode, 1);
+        if (res != ESP_OK) return res;
+        res = rp2040_get_lcd_mode(device, &verification);
+        if (res != ESP_OK) return res;
+    } while (verification != mode);
+    return res;
 }
 
 esp_err_t rp2040_get_lcd_backlight(RP2040* device, uint8_t* brightness) {

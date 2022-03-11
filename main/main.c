@@ -492,7 +492,7 @@ void fpga_test(void) {
         reload_fpga = false;
         ili9341_deinit(ili9341);
         ili9341_select(ili9341, false);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
         ili9341_select(ili9341, true);
 
         ESP_LOGI(TAG, "Loading app bitstream into FPGA...");
