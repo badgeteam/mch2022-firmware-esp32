@@ -16,7 +16,7 @@ dd if=/dev/zero bs=1M count=16 of=flash.bin
 dd if=bootloader/bootloader.bin bs=1 seek=$((0x1000)) of=flash.bin conv=notrunc
 
 # Copy the partition table into the file
-dd if=partition_table/partition-table.bin bs=1 seek=$((0x8000)) of=flash.bin conv=notrunc
+dd if=partition_table/partition-table.bin bs=1 seek=$((0x9000)) of=flash.bin conv=notrunc
 
 # Copy the firmware into the file
 dd if=main.bin bs=1 seek=$((0x10000)) of=flash.bin conv=notrunc
