@@ -37,6 +37,7 @@ bool menu_navigate_to(menu_t* aMenu, size_t aPosition);
 void menu_navigate_previous(menu_t* aMenu);
 void menu_navigate_next(menu_t* aMenu);
 size_t menu_get_position(menu_t* aMenu);
+size_t menu_get_length(menu_t* aMenu);
 void* menu_get_callback_args(menu_t* aMenu, size_t aPosition);
 void menu_debug(menu_t* aMenu);
 void menu_render(pax_buf_t *aBuffer, menu_t *aMenu, float aPosX, float aPosY, float aWidth, float aHeight);

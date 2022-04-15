@@ -22,9 +22,9 @@ menu_t* menu_alloc(const char* aTitle) {
 
 void _menu_free_item(menu_item_t* aMenuItem) {
     free(aMenuItem->label);
-    if (aMenuItem->callbackArgs != NULL) {
-        free(aMenuItem->callbackArgs);
-    }
+    //if (aMenuItem->callbackArgs != NULL) {
+    //    free(aMenuItem->callbackArgs);
+    //}
     free(aMenuItem);
 }
 
@@ -147,6 +147,10 @@ size_t menu_get_position(menu_t* aMenu) {
     return aMenu->position;
 }
 
+size_t menu_get_length(menu_t* aMenu) {
+    return aMenu->length;
+}
+
 void* menu_get_callback_args(menu_t* aMenu, size_t aPosition) {
     menu_item_t* item = _menu_find_item(aMenu, aPosition);
     if (item == NULL) return NULL;
@@ -174,17 +178,15 @@ void menu_debug(menu_t* aMenu) {
 }
 
 void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight) {
-    size_t itemOffset = 0;
     pax_col_t fgColor = 0xFF000000;
     pax_col_t bgColor = 0xFFFFFFFF;
     pax_col_t borderColor = 0xFF000000;
     pax_col_t titleColor = 0xFFFFFFFF;
-    float  scroll       = 0;
+    pax_col_t scrollbarBgColor = 0xFF555555;
+    pax_col_t scrollbarFgColor = 0xFFCCCCCC;
+    pax_col_t scrollbarSlColor = 0xFFFFFFFF;
     float  entry_height = 18 + 2;
-    size_t maxItems = aBuffer->height / entry_height;
-
-    size_t entry_offset = scroll / entry_height;
-    scroll -= entry_offset * entry_height;
+    size_t maxItems = aHeight / entry_height;
     
     float posY = aPosY;
     
@@ -202,8 +204,11 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     pax_clip(aBuffer, aPosX, posY, aWidth, aHeight);
     pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
     
-    
-    posY -= scroll;
+    size_t itemOffset = 0;
+    if (aMenu->position >= maxItems) {
+        itemOffset = aMenu->position - maxItems + 1;
+    }
+
     for (size_t index = itemOffset; (index < itemOffset + maxItems) && (index < aMenu->length); index++) {
         menu_item_t* item = _menu_find_item(aMenu, index);
         if (item == NULL) {
@@ -213,16 +218,32 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
         if (index == aMenu->position) {
             pax_clip(aBuffer, aPosX, posY, aWidth, entry_height);
             pax_simple_rect(aBuffer, fgColor, aPosX + 1, posY, aWidth - 2, entry_height);
-            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 2, entry_height - 2);
+            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
             pax_draw_text(aBuffer, bgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
         } else {
-            pax_clip(aBuffer, aPosX, posY, aWidth, entry_height);
+            pax_clip(aBuffer, aPosX, posY, aWidth, entry_height - 1);
             pax_simple_rect(aBuffer, bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
-            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 2, entry_height - 2);
+            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
             pax_draw_text(aBuffer, fgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
         }
         posY += entry_height;
     }
+    
+    pax_clip(aBuffer, aPosX + aWidth - 5, aPosY + entry_height, 4, aHeight - 1 - entry_height);
+    
+    float fractionStart = itemOffset / (aMenu->length * 1.0);
+    float fractionSelected = aMenu->position / (aMenu->length * 1.0);
+    float fractionEnd = (itemOffset + maxItems) / (aMenu->length * 1.0);
+    if (fractionEnd > 1.0) fractionEnd = 1.0;
+    
+    float scrollbarHeight = aHeight - entry_height;
+    float scrollbarStart = scrollbarHeight * fractionStart;
+    float scrollbarSelected = scrollbarHeight * fractionSelected;
+    float scrollbarEnd = scrollbarHeight * fractionEnd;
+    
+    pax_simple_rect(aBuffer, scrollbarBgColor, aPosX + aWidth - 5, aPosY + entry_height - 1, 4, scrollbarHeight);
+    pax_simple_rect(aBuffer, scrollbarFgColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarStart, 4, scrollbarEnd - scrollbarStart);
+    pax_simple_rect(aBuffer, scrollbarSlColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarSelected, 4, scrollbarHeight / aMenu->length);
 
     pax_noclip(aBuffer);
 }
