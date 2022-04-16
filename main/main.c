@@ -23,6 +23,8 @@
 #include "system_wrapper.h"
 #include "graphics_wrapper.h"
 #include "appfs_wrapper.h"
+#include "settings.h"
+#include "pax_keyboard.h"
 
 static const char *TAG = "main";
 
@@ -32,7 +34,11 @@ typedef enum action {
     ACTION_INSTALLER,
     ACTION_SETTINGS,
     ACTION_OTA,
-    ACTION_FPGA
+    ACTION_FPGA,
+    ACTION_WIFI_SCAN,
+    ACTION_WIFI_MANUAL,
+    ACTION_WIFI_LIST,
+    ACTION_BACK
 } menu_action_t;
 
 typedef struct _menu_args {
@@ -63,7 +69,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     
     menu_args_t* settings_args = malloc(sizeof(menu_args_t));
     settings_args->action = ACTION_SETTINGS;
-    menu_insert_item(menu, "System settings", NULL, settings_args, -1);
+    menu_insert_item(menu, "WiFi settings", NULL, settings_args, -1);
     
     menu_args_t* ota_args = malloc(sizeof(menu_args_t));
     ota_args->action = ACTION_OTA;
@@ -71,13 +77,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
     menu_args_t* fpga_args = malloc(sizeof(menu_args_t));
     fpga_args->action = ACTION_FPGA;
-    menu_insert_item(menu, "FPGA", NULL, fpga_args, -1);
-
-    for (uint8_t i = 0; i < 30; i++) {
-        menu_args_t* dummy_args = malloc(sizeof(menu_args_t));
-        dummy_args->action = ACTION_NONE;
-        menu_insert_item(menu, "Dummy menu item", NULL, dummy_args, -1);
-    }
+    menu_insert_item(menu, "FPGA test", NULL, fpga_args, -1);
 
     bool render = true;
     menu_args_t* menuArgs = NULL;
@@ -118,7 +118,6 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         if (menuArgs != NULL) {
             *appfs_fd = menuArgs->fd;
             *menu_action = menuArgs->action;
-            graphics_task(pax_buffer, ili9341, framebuffer, menu, "Please wait...");
             break;
         }
     }
@@ -128,6 +127,160 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     }
     
     menu_free(menu);
+}
+
+void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_action_t* menu_action) {
+    menu_t* menu = menu_alloc("WiFi settings");
+    *menu_action = ACTION_NONE;
+
+    menu_args_t* wifi_scan_args = malloc(sizeof(menu_args_t));
+    wifi_scan_args->action = ACTION_WIFI_SCAN;
+    menu_insert_item(menu, "Add by scan...", NULL, wifi_scan_args, -1);
+    
+    menu_args_t* wifi_manual_args = malloc(sizeof(menu_args_t));
+    wifi_manual_args->action = ACTION_WIFI_MANUAL;
+    menu_insert_item(menu, "Add manually...", NULL, wifi_manual_args, -1);
+    
+    menu_args_t* wifi_list_args = malloc(sizeof(menu_args_t));
+    wifi_list_args->action = ACTION_WIFI_LIST;
+    menu_insert_item(menu, "List known networks", NULL, wifi_list_args, -1);
+    
+    menu_args_t* back_args = malloc(sizeof(menu_args_t));
+    back_args->action = ACTION_BACK;
+    menu_insert_item(menu, "< Back", NULL, back_args, -1);
+
+    bool render = true;
+    menu_args_t* menuArgs = NULL;
+
+    while (1) {
+        button_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin = buttonMessage.button;
+            bool value = buttonMessage.state;
+            switch(pin) {
+                case PCA9555_PIN_BTN_JOY_DOWN:
+                    if (value) {
+                        menu_navigate_next(menu);
+                        render = true;
+                    }
+                    break;
+                case PCA9555_PIN_BTN_JOY_UP:
+                    if (value) {
+                        menu_navigate_previous(menu);
+                        render = true;
+                    }
+                    break;
+                case PCA9555_PIN_BTN_ACCEPT:
+                    if (value) {
+                        menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (render) {
+            graphics_task(pax_buffer, ili9341, framebuffer, menu, NULL);
+            render = false;
+        }
+        
+        if (menuArgs != NULL) {
+            *menu_action = menuArgs->action;
+            break;
+        }
+    }
+    
+    for (size_t index = 0; index < menu_get_length(menu); index++) {
+        free(menu_get_callback_args(menu, index));
+    }
+    
+    menu_free(menu);
+}
+
+void keyboard_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer) {
+    pkb_ctx_t kb_ctx;
+    pkb_init(pax_buffer, &kb_ctx);
+    bool running = true;
+    while (running) {
+        button_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin = buttonMessage.button;
+            bool value = buttonMessage.state;
+            switch(pin) {
+                case PCA9555_PIN_BTN_JOY_DOWN:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_DOWN);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_DOWN);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_JOY_UP:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_UP);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_UP);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_JOY_LEFT:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_LEFT);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_LEFT);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_JOY_RIGHT:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_RIGHT);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_RIGHT);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_JOY_PRESS:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_SHIFT);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_SHIFT);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_ACCEPT:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_CHARSELECT);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_CHARSELECT);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_BACK:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_DELETE_BEFORE);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_DELETE_BEFORE);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_SELECT:
+                    if (value) {
+                        pkb_press(&kb_ctx, PKB_MODESELECT);
+                    } else {
+                        pkb_release(&kb_ctx, PKB_MODESELECT);
+                    }
+                    break;
+                case PCA9555_PIN_BTN_HOME:
+                    if (value) {
+                        running = false;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        pkb_loop(&kb_ctx);
+        if (kb_ctx.dirty) {
+            pkb_redraw(pax_buffer, &kb_ctx);
+            ili9341_write(ili9341, framebuffer);
+        }
+        
+    }
+    pkb_destroy(&kb_ctx);
 }
 
 void app_main(void) {
@@ -184,9 +337,19 @@ void app_main(void) {
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "AppFS init failed!");
         return;
     }
     ESP_LOGI(TAG, "AppFS initialized");
+    
+    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "NVS init...");
+    res = nvs_init();
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "NVS init failed: %d", res);
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "NVS init failed!");
+        return;
+    }
+    ESP_LOGI(TAG, "NVS initialized");
     
     graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Mount SD card...");
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
@@ -208,8 +371,15 @@ void app_main(void) {
         } else if (menu_action == ACTION_INSTALLER) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "INSTALLER");
             //appfs_store_app();
+        } else if (menu_action == ACTION_OTA) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
+        } else if (menu_action == ACTION_SETTINGS) {
+            menu_wifi_settings(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action);
+            if (menu_action == ACTION_WIFI_MANUAL) {
+                keyboard_test(buttonQueue, pax_buffer, ili9341, framebuffer);
+            }
         }
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Loop!");
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Please wait...");
     }
 
     
