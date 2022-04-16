@@ -30,10 +30,20 @@
 /* ==== Miscellaneous ==== */
 
 // Initialise the context with default settings.
-void pkb_init(pax_buf_t *buf, pkb_ctx_t *ctx) {
+void pkb_init(pax_buf_t *buf, pkb_ctx_t *ctx, char* data) {
 	// Allocate a bufffer.
-	char *buffer = malloc(4);
-	memset(buffer, 0, 4);
+	char *buffer = NULL;
+	
+	if (data == NULL) {
+		buffer = malloc(4);
+		memset(buffer, 0, 4);
+	} else {
+		size_t length = strlen(data);
+		if (length < 4) length = 4;
+		buffer = malloc(length);
+		memset(buffer, 0, length);
+		strcpy(buffer, data);
+	}
 	
 	// Some defaults.
 	*ctx = (pkb_ctx_t) {

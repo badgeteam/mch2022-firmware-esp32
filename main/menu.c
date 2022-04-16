@@ -215,13 +215,12 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
             printf("Render error: item is NULL at %u\n", index);
             break;
         }
+        pax_clip(aBuffer, aPosX, posY, aWidth, entry_height);
         if (index == aMenu->position) {
-            pax_clip(aBuffer, aPosX, posY, aWidth, entry_height);
             pax_simple_rect(aBuffer, fgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
             pax_draw_text(aBuffer, bgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
         } else {
-            pax_clip(aBuffer, aPosX, posY, aWidth, entry_height - 1);
             pax_simple_rect(aBuffer, bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
             pax_draw_text(aBuffer, fgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);

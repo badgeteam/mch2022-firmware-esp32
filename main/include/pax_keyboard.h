@@ -127,7 +127,7 @@ typedef struct {
 } pkb_ctx_t;
 
 // Initialise the context with default settings.
-void pkb_init   (pax_buf_t *buf, pkb_ctx_t *ctx);
+void pkb_init   (pax_buf_t *buf, pkb_ctx_t *ctx, char* data);
 // Free any memory associated with the context.
 void pkb_destroy(pkb_ctx_t *ctx);
 

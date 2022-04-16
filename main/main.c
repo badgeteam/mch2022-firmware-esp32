@@ -7,6 +7,8 @@
 #include <esp_system.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <nvs_flash.h>
+#include <nvs.h>
 #include "hardware.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
@@ -198,9 +200,46 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
     menu_free(menu);
 }
 
-void keyboard_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer) {
+bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, uint8_t* framebuffer, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize) {
+    bool accepted = false;
     pkb_ctx_t kb_ctx;
-    pkb_init(pax_buffer, &kb_ctx);
+    pkb_init(aBuffer, &kb_ctx, aOutput);
+    
+    pax_col_t fgColor = 0xFF000000;
+    pax_col_t bgColor = 0xFFFFFFFF;
+    pax_col_t shadowColor = 0xFFC0C3C8;
+    pax_col_t borderColor = 0xFF0000AA;
+    pax_col_t titleBgColor = 0xFF080764;
+    pax_col_t titleColor = 0xFFFFFFFF;
+    pax_col_t selColor = 0xff007fff;
+    
+    kb_ctx.text_col       = borderColor;
+    kb_ctx.sel_text_col   = selColor;
+    kb_ctx.sel_col        = selColor;
+    kb_ctx.bg_col         = bgColor;
+    
+    kb_ctx.kb_font_size = 18;
+    
+    float titleHeight = 20;
+    float hintHeight = 14;
+    
+    pax_noclip(aBuffer);
+    pax_simple_rect(aBuffer, shadowColor, aPosX+5, aPosY+5, aWidth, aHeight);
+    pax_simple_rect(aBuffer, bgColor, aPosX, aPosY, aWidth, aHeight);
+    pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
+    pax_simple_rect(aBuffer, titleBgColor, aPosX, aPosY, aWidth, titleHeight);
+    pax_simple_line(aBuffer, titleColor, aPosX + 1, aPosY + titleHeight, aPosX + aWidth - 2, aPosY + titleHeight - 1);
+    pax_clip(aBuffer, aPosX + 1, aPosY + 1, aWidth - 2, titleHeight - 2);
+    pax_draw_text(aBuffer, titleColor, NULL, titleHeight - 2, aPosX + 1, aPosY + 1, aTitle);
+    pax_clip(aBuffer, aPosX + 1, aPosY + aHeight - hintHeight, aWidth - 2, hintHeight);
+    pax_draw_text(aBuffer, borderColor, NULL, hintHeight - 2, aPosX + 1, aPosY + aHeight - hintHeight, aHint);
+    pax_noclip(aBuffer);
+
+    kb_ctx.x = aPosX + 1;
+    kb_ctx.y = aPosY + titleHeight + 1 ;
+    kb_ctx.width = aWidth - 2;
+    kb_ctx.height = aHeight - 3 - titleHeight - hintHeight;
+
     bool running = true;
     while (running) {
         button_message_t buttonMessage = {0};
@@ -275,12 +314,18 @@ void keyboard_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
         pkb_loop(&kb_ctx);
         if (kb_ctx.dirty) {
-            pkb_redraw(pax_buffer, &kb_ctx);
+            pkb_redraw(aBuffer, &kb_ctx);
             ili9341_write(ili9341, framebuffer);
         }
-        
+        if (kb_ctx.input_accepted) {
+            memset(aOutput, 0, aOutputSize);
+            strncpy(aOutput, kb_ctx.content, aOutputSize - 1);
+            running = false;
+            accepted = true;
+        }
     }
     pkb_destroy(&kb_ctx);
+    return accepted;
 }
 
 void app_main(void) {
@@ -376,7 +421,24 @@ void app_main(void) {
         } else if (menu_action == ACTION_SETTINGS) {
             menu_wifi_settings(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action);
             if (menu_action == ACTION_WIFI_MANUAL) {
-                keyboard_test(buttonQueue, pax_buffer, ili9341, framebuffer);
+                nvs_handle_t handle;
+                nvs_open("system", NVS_READWRITE, &handle);
+                char ssid[33];
+                char password[33];
+                size_t requiredSize;
+                nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
+                if (requiredSize < sizeof(ssid)) {
+                    nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
+                }
+                nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
+                if (requiredSize < sizeof(password)) {
+                    nvs_get_str(handle, "wifi.password", password, &requiredSize);
+                }
+                keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
+                keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
+                nvs_set_str(handle, "wifi.ssid", ssid);
+                nvs_set_str(handle, "wifi.password", password);
+                nvs_close(&handle);
             }
         }
         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Please wait...");
