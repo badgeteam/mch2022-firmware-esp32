@@ -419,29 +419,70 @@ void app_main(void) {
         } else if (menu_action == ACTION_OTA) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
         } else if (menu_action == ACTION_SETTINGS) {
-            menu_wifi_settings(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action);
-            if (menu_action == ACTION_WIFI_MANUAL) {
-                nvs_handle_t handle;
-                nvs_open("system", NVS_READWRITE, &handle);
-                char ssid[33];
-                char password[33];
-                size_t requiredSize;
-                nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
-                if (requiredSize < sizeof(ssid)) {
-                    nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
+            while (true) {
+                menu_wifi_settings(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action);
+                if (menu_action == ACTION_WIFI_MANUAL) {
+                    nvs_handle_t handle;
+                    nvs_open("system", NVS_READWRITE, &handle);
+                    char ssid[33];
+                    char password[33];
+                    size_t requiredSize;
+                    esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
+                    if (res != ESP_OK) {
+                        strcpy(ssid, "");
+                        strcpy(password, "");
+                    } else if (requiredSize < sizeof(ssid)) {
+                        res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
+                        if (res != ESP_OK) strcpy(ssid, "");
+                        res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
+                        if (res != ESP_OK) {
+                            strcpy(password, "");
+                        } else if (requiredSize < sizeof(password)) {
+                            res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
+                            if (res != ESP_OK) strcpy(password, "");
+                        }
+                    }
+                    bool accepted = keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
+                    if (accepted) {
+                        accepted = keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
+                    }
+                    if (accepted) {
+                        nvs_set_str(handle, "wifi.ssid", ssid);
+                        nvs_set_str(handle, "wifi.password", password);
+                        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "WiFi settings stored");
+                    } else {
+                        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Canceled");
+                    }
+                    nvs_close(&handle);
+                } else if (menu_action == ACTION_WIFI_LIST) {
+                    nvs_handle_t handle;
+                    nvs_open("system", NVS_READWRITE, &handle);
+                    char ssid[33];
+                    char password[33];
+                    size_t requiredSize;
+                    esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
+                    if (res != ESP_OK) {
+                        strcpy(ssid, "");
+                    } else if (requiredSize < sizeof(ssid)) {
+                        res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
+                        if (res != ESP_OK) strcpy(ssid, "");
+                        res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
+                        if (res != ESP_OK) {
+                            strcpy(password, "");
+                        } else if (requiredSize < sizeof(password)) {
+                            res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
+                            if (res != ESP_OK) strcpy(password, "");
+                        }
+                    }
+                    nvs_close(&handle);
+                    char buffer[300];
+                    snprintf(buffer, sizeof(buffer), "SSID is %s\nPassword is %s", ssid, password);
+                    graphics_task(pax_buffer, ili9341, framebuffer, NULL, buffer);
+                } else {
+                    break;
                 }
-                nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
-                if (requiredSize < sizeof(password)) {
-                    nvs_get_str(handle, "wifi.password", password, &requiredSize);
-                }
-                keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
-                keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
-                nvs_set_str(handle, "wifi.ssid", ssid);
-                nvs_set_str(handle, "wifi.password", password);
-                nvs_close(&handle);
             }
         }
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Please wait...");
     }
 
     
