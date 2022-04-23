@@ -29,7 +29,7 @@ void rp2040_intr_task(void *arg) {
                 ESP_LOGE(TAG, "RP2040 interrupt task failed to read from RP2040");
                 continue;
             }
-            ESP_LOGW(TAG, "RP2040 input state %08x", state);
+            //ESP_LOGW(TAG, "RP2040 input state %08x", state);
             uint16_t interrupt = state >> 16;
             uint16_t values    = state & 0xFFFF;
             for (uint8_t index = 0; index < 16; index++) {

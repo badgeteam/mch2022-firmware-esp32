@@ -144,19 +144,19 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
             if (xQueueReceive(buttonQueue, &buttonMessage, portMAX_DELAY) == pdTRUE) {
                 printf("Button: %u, %u\n", buttonMessage.input, buttonMessage.state);
                 if (buttonMessage.state) {
-                    /*switch(buttonMessage.button) {
-                        case PCA9555_PIN_BTN_HOME:
-                        case PCA9555_PIN_BTN_MENU:
-                        case PCA9555_PIN_BTN_BACK:
+                    switch(buttonMessage.input) {
+                        case RP2040_INPUT_BUTTON_HOME:
+                        case RP2040_INPUT_BUTTON_MENU:
+                        case RP2040_INPUT_BUTTON_BACK:
                             waitForChoice = false;
                             break;
-                        case PCA9555_PIN_BTN_ACCEPT:
+                        case RP2040_INPUT_BUTTON_ACCEPT:
                             reload_fpga = true;
                             waitForChoice = false;
                             break;
                         default:
                             break;
-                    }*/
+                    }
                 }
             }
         }
