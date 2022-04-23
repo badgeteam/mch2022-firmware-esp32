@@ -5,7 +5,6 @@ idf_component_register(
         "appfs"
         "bus-i2c"
         "i2c-bno055"
-        "i2c-pca9555"
         "pax-graphics"
         "renze-graphics"
         "sdcard"

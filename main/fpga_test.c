@@ -7,8 +7,8 @@
 #include "fpga.h"
 #include "ili9341.h"
 #include "ice40.h"
+#include "rp2040.h"
 #include "hardware.h"
-#include "button_wrapper.h"
 
 static const char *TAG = "fpga_test";
 
@@ -139,12 +139,12 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
         
         bool waitForChoice = true;
         while (waitForChoice) {
-            button_message_t buttonMessage = {0};
+            rp2040_input_message_t buttonMessage = {0};
             printf("Waiting for button press...\n");
             if (xQueueReceive(buttonQueue, &buttonMessage, portMAX_DELAY) == pdTRUE) {
-                printf("Button: %u, %u\n", buttonMessage.button, buttonMessage.state);
+                printf("Button: %u, %u\n", buttonMessage.input, buttonMessage.state);
                 if (buttonMessage.state) {
-                    switch(buttonMessage.button) {
+                    /*switch(buttonMessage.button) {
                         case PCA9555_PIN_BTN_HOME:
                         case PCA9555_PIN_BTN_MENU:
                         case PCA9555_PIN_BTN_BACK:
@@ -156,7 +156,7 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
                             break;
                         default:
                             break;
-                    }
+                    }*/
                 }
             }
         }

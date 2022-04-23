@@ -8,7 +8,6 @@
 #include "ili9341.h"
 #include "ice40.h"
 #include "hardware.h"
-#include "button_wrapper.h"
 
 static const char *TAG = "settings";
 

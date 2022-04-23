@@ -2,7 +2,7 @@
 #include "graphics_wrapper.h"
 #include "hardware.h"
 #include "pax_keyboard.h"
-#include "button_wrapper.h"
+#include "rp2040.h"
 
 void render_message(pax_buf_t *aBuffer, char* message, float aPosX, float aPosY, float aWidth, float aHeight) {
     pax_col_t fgColor = 0xFFFF0000;
@@ -70,68 +70,68 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, ui
 
     bool running = true;
     while (running) {
-        button_message_t buttonMessage = {0};
+        rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.button;
+            uint8_t pin = buttonMessage.input;
             bool value = buttonMessage.state;
             switch(pin) {
-                case PCA9555_PIN_BTN_JOY_DOWN:
+                case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_DOWN);
                     } else {
                         pkb_release(&kb_ctx, PKB_DOWN);
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_UP:
+                case RP2040_INPUT_JOYSTICK_UP:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_UP);
                     } else {
                         pkb_release(&kb_ctx, PKB_UP);
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_LEFT:
+                case RP2040_INPUT_JOYSTICK_LEFT:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_LEFT);
                     } else {
                         pkb_release(&kb_ctx, PKB_LEFT);
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_RIGHT:
+                case RP2040_INPUT_JOYSTICK_RIGHT:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_RIGHT);
                     } else {
                         pkb_release(&kb_ctx, PKB_RIGHT);
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_PRESS:
+                case RP2040_INPUT_JOYSTICK_PRESS:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_SHIFT);
                     } else {
                         pkb_release(&kb_ctx, PKB_SHIFT);
                     }
                     break;
-                case PCA9555_PIN_BTN_ACCEPT:
+                case RP2040_INPUT_BUTTON_ACCEPT:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_CHARSELECT);
                     } else {
                         pkb_release(&kb_ctx, PKB_CHARSELECT);
                     }
                     break;
-                case PCA9555_PIN_BTN_BACK:
+                case RP2040_INPUT_BUTTON_BACK:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_DELETE_BEFORE);
                     } else {
                         pkb_release(&kb_ctx, PKB_DELETE_BEFORE);
                     }
                     break;
-                case PCA9555_PIN_BTN_SELECT:
+                case RP2040_INPUT_BUTTON_SELECT:
                     if (value) {
                         pkb_press(&kb_ctx, PKB_MODESELECT);
                     } else {
                         pkb_release(&kb_ctx, PKB_MODESELECT);
                     }
                     break;
-                case PCA9555_PIN_BTN_HOME:
+                case RP2040_INPUT_BUTTON_HOME:
                     if (value) {
                         running = false;
                     }

@@ -21,12 +21,13 @@
 #include "fpga_test.h"
 
 #include "menu.h"
-#include "button_wrapper.h"
 #include "system_wrapper.h"
 #include "graphics_wrapper.h"
 #include "appfs_wrapper.h"
 #include "settings.h"
 #include "wifi_connection.h"
+
+#include "ws2812.h"
 
 static const char *TAG = "main";
 
@@ -85,24 +86,24 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* menuArgs = NULL;
 
     while (1) {
-        button_message_t buttonMessage = {0};
+        rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.button;
+            uint8_t pin = buttonMessage.input;
             bool value = buttonMessage.state;
             switch(pin) {
-                case PCA9555_PIN_BTN_JOY_DOWN:
+                case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);
                         render = true;
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_UP:
+                case RP2040_INPUT_JOYSTICK_UP:
                     if (value) {
                         menu_navigate_previous(menu);
                         render = true;
                     }
                     break;
-                case PCA9555_PIN_BTN_ACCEPT:
+                case RP2040_INPUT_BUTTON_ACCEPT:
                     if (value) {
                         menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
                     }
@@ -155,24 +156,24 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
     menu_args_t* menuArgs = NULL;
 
     while (1) {
-        button_message_t buttonMessage = {0};
+        rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.button;
+            uint8_t pin = buttonMessage.input;
             bool value = buttonMessage.state;
             switch(pin) {
-                case PCA9555_PIN_BTN_JOY_DOWN:
+                case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);
                         render = true;
                     }
                     break;
-                case PCA9555_PIN_BTN_JOY_UP:
+                case RP2040_INPUT_JOYSTICK_UP:
                     if (value) {
                         menu_navigate_previous(menu);
                         render = true;
                     }
                     break;
-                case PCA9555_PIN_BTN_ACCEPT:
+                case RP2040_INPUT_BUTTON_ACCEPT:
                     if (value) {
                         menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
                     }
@@ -204,15 +205,6 @@ void app_main(void) {
     esp_err_t res;
     
     /* Initialize memory */
-    
-    xQueueHandle buttonQueue = xQueueCreate(10, sizeof(button_message_t));
-    
-    if (buttonQueue == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate queue");
-        restart();
-    }
-    
-    
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate framebuffer");
@@ -232,9 +224,14 @@ void app_main(void) {
     
     /* Initialize hardware */
     
-    res = board_init();
+    bool lcdReady = false;
+    res = board_init(&lcdReady);
     
     if (res != ESP_OK) {
+        if (lcdReady) {
+            ILI9341* ili9341 = get_ili9341();
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "HARDWARE ERROR");
+        }
         printf("Failed to initialize hardware!\n");
         restart();
     }
@@ -243,13 +240,7 @@ void app_main(void) {
     ICE40* ice40 = get_ice40();
     BNO055* bno055 = get_bno055();
     RP2040* rp2040 = get_rp2040();
-    PCA9555* pca9555 = get_pca9555();
 
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Button init...");
-    button_init(pca9555, buttonQueue);
-    
-    rp2040_set_led_mode(rp2040, true, true);
-    
     graphics_task(pax_buffer, ili9341, framebuffer, NULL, "AppFS init...");
     res = appfs_init();
     if (res != ESP_OK) {
@@ -275,16 +266,38 @@ void app_main(void) {
     if (sdcard_ready) {
         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "SD card mounted");
     }
+    
+    ws2812_init(GPIO_LED_DATA);
+    uint8_t ledBuffer[15] = {50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+    
+    //fpga_test(ili9341, ice40, rp2040->queue);
+    
+    /*while (true) {
+        uint16_t state;
+        rp2040_read_buttons(rp2040, &state);
+        printf("Button state: %04X\n", state);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        ledBuffer[1] = 255;
+        ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+        ledBuffer[1] = 0;
+        ledBuffer[0] = 255;
+        ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+        fpga_test(ili9341, ice40, rp2040->queue);
+        ledBuffer[0] = 0;
+        ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+    }*/
 
     while (true) {
         menu_action_t menu_action;
         appfs_handle_t appfs_fd;
-        menu_launcher(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action, &appfs_fd);
+        menu_launcher(rp2040->queue, pax_buffer, ili9341, framebuffer, &menu_action, &appfs_fd);
         if (menu_action == ACTION_APPFS) {
             appfs_boot_app(appfs_fd);
         } else if (menu_action == ACTION_FPGA) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "FPGA TEST");
-            fpga_test(ili9341, ice40, buttonQueue);
+            fpga_test(ili9341, ice40, rp2040->queue);
         } else if (menu_action == ACTION_INSTALLER) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "INSTALLER");
             //appfs_store_app();
@@ -313,7 +326,7 @@ void app_main(void) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
         } else if (menu_action == ACTION_SETTINGS) {
             while (true) {
-                menu_wifi_settings(buttonQueue, pax_buffer, ili9341, framebuffer, &menu_action);
+                menu_wifi_settings(rp2040->queue, pax_buffer, ili9341, framebuffer, &menu_action);
                 if (menu_action == ACTION_WIFI_MANUAL) {
                     nvs_handle_t handle;
                     nvs_open("system", NVS_READWRITE, &handle);
@@ -335,9 +348,9 @@ void app_main(void) {
                             if (res != ESP_OK) strcpy(password, "");
                         }
                     }
-                    bool accepted = keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
+                    bool accepted = keyboard(rp2040->queue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
                     if (accepted) {
-                        accepted = keyboard(buttonQueue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
+                        accepted = keyboard(rp2040->queue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
                     }
                     if (accepted) {
                         nvs_set_str(handle, "wifi.ssid", ssid);

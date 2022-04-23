@@ -8,39 +8,42 @@
 
 static const char *TAG = "hardware";
 
-static PCA9555 dev_pca9555 = {0};
 static BNO055  dev_bno055  = {0};
 static ILI9341 dev_ili9341 = {0};
 static ICE40   dev_ice40   = {0};
 static RP2040  dev_rp2040  = {0};
 
 esp_err_t ice40_get_done_wrapper(bool* done) {
-    return pca9555_get_gpio_value(&dev_pca9555, PCA9555_PIN_FPGA_CDONE, done);
+    uint8_t buttons[2];
+    esp_err_t res = rp2040_read_buttons(&dev_rp2040, buttons);
+    if (res != ESP_OK) return res;
+    *done = !((buttons[0] >> 5) & 0x01);
+    printf("FPGA done is %u\n", *done);
+    return ESP_OK;
 }
 
 esp_err_t ice40_set_reset_wrapper(bool reset) {
-    return pca9555_set_gpio_value(&dev_pca9555, PCA9555_PIN_FPGA_RESET, reset);
+    printf("FPGA reset set to %u\n", reset);
+    esp_err_t res = rp2040_set_fpga(&dev_rp2040, reset);
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    return res;
 }
 
 void ili9341_set_lcd_mode(bool mode) {
     ESP_LOGI(TAG, "LCD mode switch to %s", mode ? "FPGA" : "ESP32");
-    rp2040_set_lcd_mode(&dev_rp2040, (lcd_mode_t) mode);
+    esp_err_t res = gpio_set_level(GPIO_LCD_MODE, mode);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Setting LCD mode failed");
+    }
 }
 
 static esp_err_t _bus_init() {
     esp_err_t res;
 
-    // System I2C bus
+    // I2C bus
     res = i2c_init(I2C_BUS_SYS, GPIO_I2C_SYS_SDA, GPIO_I2C_SYS_SCL, I2C_SPEED_SYS, false, false);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Initializing system I2C bus failed");
-        return res;
-    }
-    
-    // User I2C bus
-    res = i2c_init(I2C_BUS_EXT, GPIO_I2C_EXT_SDA, GPIO_I2C_EXT_SCL, I2C_SPEED_EXT, false, false);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Initializing user I2C bus failed");
         return res;
     }
 
@@ -63,7 +66,8 @@ static esp_err_t _bus_init() {
 
 // Board init
 
-esp_err_t board_init() {
+esp_err_t board_init(bool* aLcdReady) {
+    if (aLcdReady != NULL) *aLcdReady = false;
     esp_err_t res;
 
     // Interrupts
@@ -77,10 +81,36 @@ esp_err_t board_init() {
     res = _bus_init();
     if (res != ESP_OK) return res;
     
+    // LCD display
+    dev_ili9341.spi_bus   = SPI_BUS;
+    dev_ili9341.pin_cs    = GPIO_SPI_CS_LCD;
+    dev_ili9341.pin_dcx   = GPIO_SPI_DC_LCD;
+    dev_ili9341.pin_reset = GPIO_LCD_RESET;
+    dev_ili9341.rotation  = 1;
+    dev_ili9341.color_mode = true; // Blue and red channels are swapped
+    dev_ili9341.spi_speed = 60000000; // 60MHz
+    dev_ili9341.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
+    dev_ili9341.callback = ili9341_set_lcd_mode; // Callback for changing LCD mode between ESP32 and FPGA
+    
+    res = gpio_set_direction(GPIO_LCD_MODE, GPIO_MODE_OUTPUT);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Initializing LCD mode GPIO failed");
+        return res;
+    }
+
+    res = ili9341_init(&dev_ili9341);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Initializing LCD failed");
+        return res;
+    }
+    
+    if (aLcdReady != NULL) *aLcdReady = true;
+
     // RP2040 co-processor
     dev_rp2040.i2c_bus = I2C_BUS_SYS;
     dev_rp2040.i2c_address = RP2040_ADDR;
     dev_rp2040.pin_interrupt = GPIO_INT_RP2040;
+    dev_rp2040.queue = xQueueCreate(8, sizeof(rp2040_input_message_t));
     
     res = rp2040_init(&dev_rp2040);
     if (res != ESP_OK) {
@@ -88,45 +118,13 @@ esp_err_t board_init() {
         return res;
     }
 
-    // PCA9555 IO expander on system I2C bus
-    res = pca9555_init(&dev_pca9555, I2C_BUS_SYS, PCA9555_ADDR, GPIO_INT_PCA9555);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Initializing PCA9555 failed");
-        return res;
-    }
-
-    res = pca9555_set_gpio_direction(&dev_pca9555, PCA9555_PIN_FPGA_RESET, true);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Setting the FPGA reset pin on the PCA9555 to output failed");
-        return res;
-    }
-
-    res = pca9555_set_gpio_value(&dev_pca9555, PCA9555_PIN_FPGA_RESET, false);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Setting the FPGA reset pin on the PCA9555 to low failed");
-        return res;
-    }
-
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_START, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_SELECT, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_MENU, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_HOME, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_LEFT, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_PRESS, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_DOWN, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_UP, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_JOY_RIGHT, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_BACK, true);
-    pca9555_set_gpio_polarity(&dev_pca9555, PCA9555_PIN_BTN_ACCEPT, true);
-    dev_pca9555.pin_state = 0;
-
     // FPGA
     dev_ice40.spi_bus = SPI_BUS;
     dev_ice40.pin_cs = GPIO_SPI_CS_FPGA;
     dev_ice40.pin_done = -1;
     dev_ice40.pin_reset = -1;
     dev_ice40.pin_int = GPIO_INT_FPGA;
-    dev_ice40.spi_speed = 23000000; // 23MHz
+    dev_ice40.spi_speed = 10000000; // 10 MHz //23000000; // 23MHz
     dev_ice40.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
     dev_ice40.get_done = ice40_get_done_wrapper;
     dev_ice40.set_reset = ice40_set_reset_wrapper;
@@ -134,23 +132,6 @@ esp_err_t board_init() {
     res = ice40_init(&dev_ice40);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Initializing FPGA failed");
-        return res;
-    }
-
-    // LCD display
-    dev_ili9341.spi_bus   = SPI_BUS;
-    dev_ili9341.pin_cs    = GPIO_SPI_CS_LCD;
-    dev_ili9341.pin_dcx   = GPIO_SPI_DC_LCD;
-    dev_ili9341.pin_reset = -1;
-    dev_ili9341.rotation  = 1;
-    dev_ili9341.color_mode = true; // Blue and red channels are swapped
-    dev_ili9341.spi_speed = 60000000; // 60MHz
-    dev_ili9341.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
-    dev_ili9341.callback = ili9341_set_lcd_mode; // Callback for changing LCD mode between ESP32 and FPGA
-
-    res = ili9341_init(&dev_ili9341);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Initializing LCD failed");
         return res;
     }
 
@@ -162,10 +143,6 @@ esp_err_t board_init() {
         return res;
     }
     return res;
-}
-
-PCA9555* get_pca9555() {
-    return &dev_pca9555;
 }
 
 BNO055* get_bno055() {
