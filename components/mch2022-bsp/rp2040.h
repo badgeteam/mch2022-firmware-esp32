@@ -25,6 +25,7 @@ enum {
     RP2040_REG_ADC_VALUE_VBAT1,
     RP2040_REG_ADC_VALUE_VBAT2,
     RP2040_REG_USB,
+    RP2040_REG_BL_TRIGGER,
     RP2040_REG_SCRATCH0, // Used by the ESP32 to store boot parameters, can also be read and written to from WebUSB
     RP2040_REG_SCRATCH1,
     RP2040_REG_SCRATCH2,
@@ -92,6 +93,13 @@ enum {
 };
 
 enum {
+    RP2040_BL_REG_FW_VER,
+    RP2040_BL_REG_BL_VER,
+    RP2040_BL_REG_BL_STATE,
+    RP2040_BL_REG_BL_CTRL
+};
+
+enum {
     RP2040_INPUT_BUTTON_HOME = 0,
     RP2040_INPUT_BUTTON_MENU,
     RP2040_INPUT_BUTTON_START,
@@ -119,6 +127,7 @@ typedef struct {
     xSemaphoreHandle _intr_trigger;
     uint8_t          _gpio_direction;
     uint8_t          _gpio_value;
+    uint8_t          _fw_version;
 } RP2040;
 
 typedef struct _rp2040_input_message {
@@ -129,6 +138,11 @@ typedef struct _rp2040_input_message {
 esp_err_t rp2040_init(RP2040* device);
 
 esp_err_t rp2040_get_firmware_version(RP2040* device, uint8_t* version);
+
+esp_err_t rp2040_get_bootloader_version(RP2040* device, uint8_t* version);
+esp_err_t rp2040_get_bootloader_state(RP2040* device, uint8_t* state);
+esp_err_t rp2040_set_bootloader_ctrl(RP2040* device, uint8_t action);
+esp_err_t rp2040_reboot_to_bootloader(RP2040* device);
 
 esp_err_t rp2040_get_gpio_dir(RP2040* device, uint8_t gpio, bool* direction);
 esp_err_t rp2040_set_gpio_dir(RP2040* device, uint8_t gpio, bool direction);

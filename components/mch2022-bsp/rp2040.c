@@ -51,15 +51,14 @@ void rp2040_intr_handler(void *arg) {
 esp_err_t rp2040_init(RP2040* device) {
     esp_err_t res;
 
-    uint8_t firmware_version;
-    res = rp2040_get_firmware_version(device, &firmware_version);
+    res = rp2040_get_firmware_version(device, &device->_fw_version);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read firmware version");
         return res;
     }
 
-    if (firmware_version != 1) {
-        ESP_LOGE(TAG, "Unsupported RP2040 firmware version (%u) found", firmware_version);
+    if (device->_fw_version < 1) {
+        ESP_LOGE(TAG, "Unsupported RP2040 firmware version (%u) found", device->_fw_version);
         return ESP_ERR_INVALID_VERSION;
     }
 
@@ -106,13 +105,36 @@ esp_err_t rp2040_get_firmware_version(RP2040* device, uint8_t* version) {
     return i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_REG_FW_VER, version, 1);
 }
 
+esp_err_t rp2040_get_bootloader_version(RP2040* device, uint8_t* version) {
+    if (device->_fw_version != 0xFF) return ESP_FAIL;
+    return i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_BL_REG_BL_VER, version, 1);
+}
+
+esp_err_t rp2040_get_bootloader_state(RP2040* device, uint8_t* state) {
+    if (device->_fw_version != 0xFF) return ESP_FAIL;
+    return i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_BL_REG_BL_STATE, state, 1);
+}
+
+esp_err_t rp2040_set_bootloader_ctrl(RP2040* device, uint8_t action) {
+    if (device->_fw_version != 0xFF) return ESP_FAIL;
+    return i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_BL_REG_BL_CTRL, &action, 1);
+}
+
+esp_err_t rp2040_reboot_to_bootloader(RP2040* device) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
+    uint8_t value = 0xBE;
+    return i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_REG_BL_TRIGGER, &value, 1);
+}
+
 esp_err_t rp2040_get_gpio_dir(RP2040* device, uint8_t gpio, bool* direction) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     esp_err_t res = i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_REG_GPIO_DIR, &device->_gpio_direction, 1);
     if (res != ESP_OK) return res;
     *direction = (device->_gpio_direction >> gpio) & 0x01;
     return ESP_OK;
 }
 esp_err_t rp2040_set_gpio_dir(RP2040* device, uint8_t gpio, bool direction) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     if (direction) {
         device->_gpio_direction |= 1UL << gpio;
     } else {
@@ -122,6 +144,7 @@ esp_err_t rp2040_set_gpio_dir(RP2040* device, uint8_t gpio, bool direction) {
 }
 
 esp_err_t rp2040_get_gpio_value(RP2040* device, uint8_t gpio, bool* value) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     uint8_t reg_value;
     esp_err_t res = i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_REG_GPIO_IN, &reg_value, 1);
     if (res != ESP_OK) return res;
@@ -130,6 +153,7 @@ esp_err_t rp2040_get_gpio_value(RP2040* device, uint8_t gpio, bool* value) {
 }
 
 esp_err_t rp2040_set_gpio_value(RP2040* device, uint8_t gpio, bool value) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     if (value) {
         device->_gpio_value |= 1UL << gpio;
     } else {
@@ -139,18 +163,22 @@ esp_err_t rp2040_set_gpio_value(RP2040* device, uint8_t gpio, bool value) {
 }
 
 esp_err_t rp2040_get_lcd_backlight(RP2040* device, uint8_t* brightness) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     return i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_REG_LCD_BACKLIGHT, brightness, 1);
 }
 
 esp_err_t rp2040_set_lcd_backlight(RP2040* device, uint8_t brightness) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_OK; // Ignore if unsupported
     return i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_REG_LCD_BACKLIGHT, &brightness, 1);
 }
 
 esp_err_t rp2040_set_fpga(RP2040* device, bool enabled) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     uint8_t value = enabled ? 0x01 : 0x00;
     return i2c_write_reg_n(device->i2c_bus, device->i2c_address, RP2040_REG_FPGA, &value, 1);
 }
 
 esp_err_t rp2040_read_buttons(RP2040* device, uint16_t* value) {
+    if ((device->_fw_version < 0x01) && (device->_fw_version >= 0xFF)) return ESP_FAIL;
     return i2c_read_reg(device->i2c_bus, device->i2c_address, RP2040_REG_INPUT1, (uint8_t*) value, 2);
 }

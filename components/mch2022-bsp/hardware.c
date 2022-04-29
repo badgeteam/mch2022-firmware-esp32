@@ -117,22 +117,30 @@ esp_err_t board_init(bool* aLcdReady) {
         ESP_LOGE(TAG, "Initializing RP2040 failed");
         return res;
     }
+    
+    uint8_t rp2040_fw_version;
+    if (rp2040_get_firmware_version(&dev_rp2040, &rp2040_fw_version) != ESP_OK) {
+        ESP_LOGE(TAG, "Initializing RP2040 failed to read firmware version");
+        return ESP_FAIL;
+    }
+    
+    if (rp2040_fw_version != 0xFF) { // Only init FPGA when RP2040 is not in bootloader mode
+        // FPGA
+        dev_ice40.spi_bus = SPI_BUS;
+        dev_ice40.pin_cs = GPIO_SPI_CS_FPGA;
+        dev_ice40.pin_done = -1;
+        dev_ice40.pin_reset = -1;
+        dev_ice40.pin_int = GPIO_INT_FPGA;
+        dev_ice40.spi_speed = 23000000; // 23MHz
+        dev_ice40.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
+        dev_ice40.get_done = ice40_get_done_wrapper;
+        dev_ice40.set_reset = ice40_set_reset_wrapper;
 
-    // FPGA
-    dev_ice40.spi_bus = SPI_BUS;
-    dev_ice40.pin_cs = GPIO_SPI_CS_FPGA;
-    dev_ice40.pin_done = -1;
-    dev_ice40.pin_reset = -1;
-    dev_ice40.pin_int = GPIO_INT_FPGA;
-    dev_ice40.spi_speed = 10000000; // 10 MHz //23000000; // 23MHz
-    dev_ice40.spi_max_transfer_size = SPI_MAX_TRANSFER_SIZE;
-    dev_ice40.get_done = ice40_get_done_wrapper;
-    dev_ice40.set_reset = ice40_set_reset_wrapper;
-
-    res = ice40_init(&dev_ice40);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Initializing FPGA failed");
-        return res;
+        res = ice40_init(&dev_ice40);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "Initializing FPGA failed");
+            return res;
+        }
     }
 
     // BNO055 sensor on system I2C bus

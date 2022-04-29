@@ -268,10 +268,44 @@ void app_main(void) {
     }
     
     ws2812_init(GPIO_LED_DATA);
-    uint8_t ledBuffer[15] = {50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
     
-    //fpga_test(ili9341, ice40, rp2040->queue);
+    uint8_t fw_version;
+    if (rp2040_get_firmware_version(rp2040, &fw_version) != ESP_OK) {
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 FW VERSION READ FAILED");
+        restart();
+    }
+    
+    if (fw_version == 0xFF) {
+        // RP2040 is in bootloader mode
+        char buffer[255] = {0};
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL");
+        uint8_t bl_version;
+        if (rp2040_get_bootloader_version(rp2040, &bl_version) != ESP_OK) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL VERSION READ FAILED");
+            restart();
+        }
+        while (true) {
+            uint8_t bl_state;
+            if (rp2040_get_bootloader_state(rp2040, &bl_state) != ESP_OK) {
+                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL STATE READ FAILED");
+                restart();
+            }
+            snprintf(buffer, sizeof(buffer), "RP2040 BL (%02X): %02X", bl_version, bl_state);
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, buffer);
+            vTaskDelay(200 / portTICK_PERIOD_MS);
+            if (bl_state == 0xB0) {
+                printf("SYNC");
+            }
+        }
+        return;
+    }
+    
+    /*while (true) {
+        fpga_test(ili9341, ice40, rp2040->queue);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    }*/
     
     /*while (true) {
         uint16_t state;
@@ -297,7 +331,9 @@ void app_main(void) {
             appfs_boot_app(appfs_fd);
         } else if (menu_action == ACTION_FPGA) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "FPGA TEST");
-            fpga_test(ili9341, ice40, rp2040->queue);
+            //fpga_test(ili9341, ice40, rp2040->queue);
+            rp2040_reboot_to_bootloader(rp2040);
+            restart();
         } else if (menu_action == ACTION_INSTALLER) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "INSTALLER");
             //appfs_store_app();
