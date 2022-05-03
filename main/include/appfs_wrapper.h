@@ -13,5 +13,4 @@
 
 esp_err_t appfs_init(void);
 uint8_t* load_file_to_ram(FILE* fd, size_t* fsize);
-void appfs_store_app(void);
 void appfs_boot_app(int fd);

@@ -17,51 +17,6 @@ uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
     return file;
 }
 
-/*void appfs_store_app(void) {
-    draw_message("Installing app...");
-    esp_err_t res;
-    appfs_handle_t handle;
-    FILE* app_fd = fopen("/sd/gnuboy.bin", "rb");
-    if (app_fd == NULL) {
-        draw_message("Failed to open gnuboy.bin");
-        ESP_LOGE(TAG, "Failed to open gnuboy.bin");
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        return;
-    }
-    size_t app_size;
-    uint8_t* app = load_file_to_ram(app_fd, &app_size);
-    if (app == NULL) {
-        draw_message("Failed to load app to RAM");
-        ESP_LOGE(TAG, "Failed to load application into RAM");
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        return;
-    }
-    
-    ESP_LOGI(TAG, "Application size %d", app_size);
-    
-    res = appfsCreateFile("gnuboy", app_size, &handle);
-    if (res != ESP_OK) {
-        draw_message("Failed to create on AppFS");
-        ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        free(app);
-        return;
-    }
-    res = appfsWrite(handle, 0, app, app_size);
-    if (res != ESP_OK) {
-        draw_message("Failed to write to AppFS");
-        ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        free(app);
-        return;
-    }
-    free(app);
-    ESP_LOGI(TAG, "Application is now stored in AppFS");
-    draw_message("App installed!");
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    return;
-}*/
-
 void appfs_boot_app(int fd) {
     if (fd<0 || fd>255) {
         REG_WRITE(RTC_CNTL_STORE0_REG, 0);

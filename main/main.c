@@ -9,6 +9,7 @@
 #include <esp_log.h>
 #include <nvs_flash.h>
 #include <nvs.h>
+#include "driver/uart.h"
 #include "hardware.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
@@ -29,6 +30,8 @@
 
 #include "ws2812.h"
 
+#include "rp2040firmware.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -38,6 +41,8 @@ typedef enum action {
     ACTION_SETTINGS,
     ACTION_OTA,
     ACTION_FPGA,
+    ACTION_RP2040_BL,
+    ACTION_WIFI_CONNECT,
     ACTION_WIFI_SCAN,
     ACTION_WIFI_MANUAL,
     ACTION_WIFI_LIST,
@@ -48,6 +53,51 @@ typedef struct _menu_args {
     appfs_handle_t fd;
     menu_action_t action;
 } menu_args_t;
+
+void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer) {
+    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Installing app...");
+    esp_err_t res;
+    appfs_handle_t handle;
+    FILE* app_fd = fopen("/sd/gnuboy.bin", "rb");
+    if (app_fd == NULL) {
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to open gnuboy.bin");
+        ESP_LOGE(TAG, "Failed to open gnuboy.bin");
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        return;
+    }
+    size_t app_size;
+    uint8_t* app = load_file_to_ram(app_fd, &app_size);
+    if (app == NULL) {
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to load app to RAM");
+        ESP_LOGE(TAG, "Failed to load application into RAM");
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        return;
+    }
+    
+    ESP_LOGI(TAG, "Application size %d", app_size);
+    
+    res = appfsCreateFile("gnuboy", app_size, &handle);
+    if (res != ESP_OK) {
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to create on AppFS");
+        ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        free(app);
+        return;
+    }
+    res = appfsWrite(handle, 0, app, app_size);
+    if (res != ESP_OK) {
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to write to AppFS");
+        ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        free(app);
+        return;
+    }
+    free(app);
+    ESP_LOGI(TAG, "Application is now stored in AppFS");
+    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "App installed!");
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+    return;
+}
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_action_t* menu_action, appfs_handle_t* appfs_fd) {
     menu_t* menu = menu_alloc("Main menu");
@@ -81,6 +131,14 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* fpga_args = malloc(sizeof(menu_args_t));
     fpga_args->action = ACTION_FPGA;
     menu_insert_item(menu, "FPGA test", NULL, fpga_args, -1);
+    
+    menu_args_t* rp2040bl_args = malloc(sizeof(menu_args_t));
+    rp2040bl_args->action = ACTION_RP2040_BL;
+    menu_insert_item(menu, "RP2040 bootloader", NULL, rp2040bl_args, -1);
+    
+    menu_args_t* wifi_connect_args = malloc(sizeof(menu_args_t));
+    wifi_connect_args->action = ACTION_WIFI_CONNECT;
+    menu_insert_item(menu, "WiFi connect", NULL, wifi_connect_args, -1);
 
     bool render = true;
     menu_args_t* menuArgs = NULL;
@@ -201,7 +259,113 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
     menu_free(menu);
 }
 
+void flush_stdin() {
+    while (true) {
+        char in = getc(stdin);
+        if (in == 0xFF) {
+            break;
+        }
+    }
+}
+
+bool read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
+    uint8_t index = 0;
+    uint32_t timeout_counter = 0;
+    while (index < len) {
+        char in = getc(stdin);
+        if (in != 0xFF) {
+            buffer[index] = in;
+            index++;
+        } else {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            timeout_counter+=10;
+            if (timeout_counter > timeout) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool rp2040_bl_get_info(uint32_t* flash_start, uint32_t* flash_size, uint32_t* erase_size, uint32_t* write_size, uint32_t* max_data_len) {
+    flush_stdin();
+    printf("INFO");
+    uint8_t rx_buffer[4 * 6];
+    read_stdin(rx_buffer, sizeof(rx_buffer), 1000);
+    if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
+    memcpy((uint8_t*) flash_start,  &rx_buffer[4 * 1], 4);
+    memcpy((uint8_t*) flash_size,   &rx_buffer[4 * 2], 4);
+    memcpy((uint8_t*) erase_size,   &rx_buffer[4 * 3], 4);
+    memcpy((uint8_t*) write_size,   &rx_buffer[4 * 4], 4);
+    memcpy((uint8_t*) max_data_len, &rx_buffer[4 * 5], 4);
+    return true;
+}
+
+bool rp2040_bl_erase(uint32_t address, uint32_t length) {
+    printf("ERAS");
+    uint8_t* addres_u8 = &address;
+    putc(addres_u8[0], stdout);
+    putc(addres_u8[1], stdout);
+    putc(addres_u8[2], stdout);
+    putc(addres_u8[3], stdout);
+    uint8_t* length_u8 = &length;
+    putc(length_u8[0], stdout);
+    putc(length_u8[1], stdout);
+    putc(length_u8[2], stdout);
+    putc(length_u8[3], stdout);
+    flush_stdin();
+    uint8_t rx_buffer[4];
+    read_stdin(rx_buffer, sizeof(rx_buffer), 10000);
+    if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
+    return true;
+}
+
+bool rp2040_bl_write(uint32_t address, uint32_t length, uint8_t* data, uint32_t* crc) {
+    flush_stdin();
+    printf("WRIT");
+    uint8_t* addres_u8 = &address;
+    putc(addres_u8[0], stdout);
+    putc(addres_u8[1], stdout);
+    putc(addres_u8[2], stdout);
+    putc(addres_u8[3], stdout);
+    uint8_t* length_u8 = &length;
+    putc(length_u8[0], stdout);
+    putc(length_u8[1], stdout);
+    putc(length_u8[2], stdout);
+    putc(length_u8[3], stdout);
+    
+    for (uint32_t index = 0; index < length; index++) {
+        putc(data[index], stdout);
+    }
+    
+    uint8_t rx_buffer[8];
+    uint16_t timeout = 0;
+    
+    uint8_t index = 0;
+    while (index < sizeof(rx_buffer)) {
+        char in = getc(stdin);
+        if (in != 0xFF) {
+            rx_buffer[index] = in;
+            index++;
+        } else {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+            timeout++;
+            if (timeout > 500) {
+                return false;
+            }
+        }
+    }
+    
+    if (memcmp(rx_buffer, "OKOK", 4) != 0) {
+        return false;
+    }
+    
+    memcpy((uint8_t*) crc, &rx_buffer[4 * 1], 4);
+    return true;
+}
+
 void app_main(void) {
+    flush_stdin();
     esp_err_t res;
     
     /* Initialize memory */
@@ -230,7 +394,7 @@ void app_main(void) {
     if (res != ESP_OK) {
         if (lcdReady) {
             ILI9341* ili9341 = get_ili9341();
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "HARDWARE ERROR");
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Hardware error!");
         }
         printf("Failed to initialize hardware!\n");
         restart();
@@ -280,13 +444,149 @@ void app_main(void) {
     if (fw_version == 0xFF) {
         // RP2040 is in bootloader mode
         char buffer[255] = {0};
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL");
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Updating RP2040...");
+        vTaskDelay(1 / portTICK_PERIOD_MS);
         uint8_t bl_version;
         if (rp2040_get_bootloader_version(rp2040, &bl_version) != ESP_OK) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL VERSION READ FAILED");
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Communication error (1)");
             restart();
         }
+        if (bl_version != 0x01) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Unknown BL version");
+            restart();
+        }
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Waiting for bootloader...");
         while (true) {
+            vTaskDelay(1 / portTICK_PERIOD_MS);
+            uint8_t bl_state;
+            if (rp2040_get_bootloader_state(rp2040, &bl_state) != ESP_OK) {
+                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Communication error (2)");
+                restart();
+            }
+            if (bl_state == 0xB0) {
+                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Bootloader ready");
+                break;
+            }
+            if (bl_state > 0xB0) {
+                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Unknown BL state");
+                restart();
+            }
+        }
+        
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Sync to BL...");
+        char rx_buffer[16];
+        uint8_t rx_buffer_pos = 0;
+        memset(rx_buffer, 0, sizeof(rx_buffer));
+        while (true) {
+            printf("SYNC");
+            
+            char in = 0xFF;
+            do {
+                in = getc(stdin);
+                if (in != 0xFF) {
+                    rx_buffer[rx_buffer_pos] = in;
+                    rx_buffer_pos++;
+                }
+            } while ((in != 0xFF) && (rx_buffer_pos < sizeof(rx_buffer)));
+            
+            if (memcmp(rx_buffer, "PICO", 4) == 0) {
+                break;
+            }
+            
+            if (rx_buffer_pos >= 4) {
+                for (uint8_t i = 0; i < sizeof(rx_buffer) - 1; i++) {
+                    rx_buffer[i] = rx_buffer[i+1];
+                    if (memcmp(rx_buffer, "PICO", 4) == 0) {
+                        break;
+                    }
+                }
+                rx_buffer_pos--;
+            }
+            
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+        }
+        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Synced to BL!");
+        
+        char in = 0xFF;
+        do {
+            in = getc(stdin);
+        } while (in != 0xFF);
+        
+        uint32_t flash_start = 0, flash_size = 0, erase_size = 0, write_size = 0, max_data_len = 0;
+        
+        bool success = rp2040_bl_get_info(&flash_start, &flash_size, &erase_size, &write_size, &max_data_len);
+        
+        if (!success) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "BL INFO FAIL");
+            restart();
+        }
+        
+        pax_noclip(pax_buffer);
+        pax_background(pax_buffer, 0xCCCCCC);
+        char message[64];
+        memset(message, 0, sizeof(message));
+        snprintf(message, sizeof(message) - 1, "Flash start: 0x%08X", flash_start);
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
+        snprintf(message, sizeof(message) - 1, "Flash size : 0x%08X", flash_size);
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
+        snprintf(message, sizeof(message) - 1, "Erase size : 0x%08X", erase_size);
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*2, message);
+        snprintf(message, sizeof(message) - 1, "Write size : 0x%08X", write_size);
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*3, message);
+        snprintf(message, sizeof(message) - 1, "Max data ln: 0x%08X", max_data_len);
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*4, message);
+        ili9341_write(ili9341, framebuffer);
+        
+        bool eraseSuccess = rp2040_bl_erase(flash_start, flash_size - erase_size);
+        snprintf(message, sizeof(message) - 1, "Erase      : %s", eraseSuccess ? "YES" : "NO");
+        pax_draw_text(pax_buffer, eraseSuccess ? 0xFF000000 : 0xFFFF0000, NULL, 18, 0, 20*5, message);
+        ili9341_write(ili9341, framebuffer);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        
+        if (!eraseSuccess) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            restart();
+        }
+        
+        for (uint32_t index = 0; index < sizeof(mch2022_firmware_bin);) {
+            uint32_t crc = 0;
+            uint32_t txLength = write_size;
+            if (txLength > (sizeof(mch2022_firmware_bin) - index)) {
+                txLength = sizeof(mch2022_firmware_bin) - index;
+            }
+            pax_noclip(pax_buffer);
+            pax_background(pax_buffer, 0xCCCCCC);
+            char message[64];
+            memset(message, 0, sizeof(message));
+            snprintf(message, sizeof(message) - 1, "Write to : 0x%08X", 0x10010000 + index);
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
+            snprintf(message, sizeof(message) - 1, "Write len: 0x%08X", txLength);
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
+            ili9341_write(ili9341, framebuffer);
+            bool writeSuccess = rp2040_bl_write(0x10010000 + index, txLength, &mch2022_firmware_bin[index], &crc);
+            if (!writeSuccess) {
+                pax_noclip(pax_buffer);
+                pax_background(pax_buffer, 0xCCCCCC);
+                char message[64];
+                memset(message, 0, sizeof(message));
+                snprintf(message, sizeof(message) - 1, "Write err: 0x%08X", 0x10010000 + index);
+                pax_draw_text(pax_buffer, 0xFFFF0000, NULL, 18, 0, 20*0, message);
+                snprintf(message, sizeof(message) - 1, "Write len: 0x%08X", txLength);
+                pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
+                ili9341_write(ili9341, framebuffer);
+                restart();
+            }
+            index += write_size;
+            vTaskDelay(50 / portTICK_PERIOD_MS);
+        }        
+
+        while (true) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
+        
+        /*while (true) {
             uint8_t bl_state;
             if (rp2040_get_bootloader_state(rp2040, &bl_state) != ESP_OK) {
                 graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL STATE READ FAILED");
@@ -299,8 +599,17 @@ void app_main(void) {
                 printf("SYNC");
             }
         }
-        return;
+        return;*/
     }
+    
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0xCCCCCC);
+    char message[64];
+    memset(message, 0, sizeof(message));
+    snprintf(message, sizeof(message) - 1, "RP2040 firmware: 0x%02X", fw_version);
+    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
+    ili9341_write(ili9341, framebuffer);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     
     /*while (true) {
         fpga_test(ili9341, ice40, rp2040->queue);
@@ -330,13 +639,17 @@ void app_main(void) {
         if (menu_action == ACTION_APPFS) {
             appfs_boot_app(appfs_fd);
         } else if (menu_action == ACTION_FPGA) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "FPGA TEST");
-            //fpga_test(ili9341, ice40, rp2040->queue);
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Loading...");
+            fpga_test(ili9341, ice40, rp2040->queue);
+        } else if (menu_action == ACTION_RP2040_BL) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 update...");
             rp2040_reboot_to_bootloader(rp2040);
-            restart();
+            esp_restart();
         } else if (menu_action == ACTION_INSTALLER) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "INSTALLER");
-            //appfs_store_app();
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Installing...");
+            appfs_store_app(pax_buffer, ili9341, framebuffer);
+         } else if (menu_action == ACTION_WIFI_CONNECT) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Connecting...");
             nvs_handle_t handle;
             nvs_open("system", NVS_READWRITE, &handle);
             char ssid[33];

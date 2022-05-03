@@ -7,11 +7,12 @@
 #include "system_wrapper.h"
 
 void restart() {
-    for (int i = 3; i >= 0; i--) {
+    /*for (int i = 3; i >= 0; i--) {
         printf("Restarting in %d seconds...\n", i);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-    printf("Restarting now.\n");
+    printf("Restarting now.\n");*/
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     fflush(stdout);
     esp_restart();
 }
