@@ -32,6 +32,8 @@
 
 #include "rp2040firmware.h"
 
+#include "esp32/rom/crc.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -260,16 +262,22 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
 }
 
 void flush_stdin() {
-    while (true) {
+    uint8_t* data = malloc(2048);
+    uart_read_bytes(0, data, 2048 - 1, 20 / portTICK_PERIOD_MS);
+    free(data);
+    /*while (true) {
         char in = getc(stdin);
         if (in == 0xFF) {
             break;
         }
-    }
+    }*/
 }
 
 bool read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
-    uint8_t index = 0;
+    int read = uart_read_bytes(0, buffer, len, timeout / portTICK_PERIOD_MS);
+    return (read == len);
+    
+    /*uint8_t index = 0;
     uint32_t timeout_counter = 0;
     while (index < len) {
         char in = getc(stdin);
@@ -284,12 +292,24 @@ bool read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
             }
         }
     }
+    return true;*/
+}
+
+bool rp2040_bl_sync() {
+    flush_stdin();
+    char command[] = "SYNC";
+    uart_write_bytes(0, command, 4);
+    uint8_t rx_buffer[4 * 6];
+    read_stdin(rx_buffer, sizeof(rx_buffer), 1000);
+    if (memcmp(rx_buffer, "PICO", 4) != 0) return false;
     return true;
 }
 
 bool rp2040_bl_get_info(uint32_t* flash_start, uint32_t* flash_size, uint32_t* erase_size, uint32_t* write_size, uint32_t* max_data_len) {
     flush_stdin();
-    printf("INFO");
+    char command[] = "INFO";
+    uart_write_bytes(0, command, 4);
+    /*printf("INFO");*/
     uint8_t rx_buffer[4 * 6];
     read_stdin(rx_buffer, sizeof(rx_buffer), 1000);
     if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
@@ -302,18 +322,23 @@ bool rp2040_bl_get_info(uint32_t* flash_start, uint32_t* flash_size, uint32_t* e
 }
 
 bool rp2040_bl_erase(uint32_t address, uint32_t length) {
-    printf("ERAS");
-    uint8_t* addres_u8 = &address;
+    flush_stdin();
+    char command[12];
+    snprintf(command, 5, "ERAS");
+    memcpy(command + 4, (char*) &address, 4);
+    memcpy(command + 8, (char*) &length, 4);
+    uart_write_bytes(0, command, sizeof(command));
+    /*printf("ERAS");
+    uint8_t* addres_u8 = (uint8_t*) &address;
     putc(addres_u8[0], stdout);
     putc(addres_u8[1], stdout);
     putc(addres_u8[2], stdout);
     putc(addres_u8[3], stdout);
-    uint8_t* length_u8 = &length;
+    uint8_t* length_u8 = (uint8_t*) &length;
     putc(length_u8[0], stdout);
     putc(length_u8[1], stdout);
     putc(length_u8[2], stdout);
-    putc(length_u8[3], stdout);
-    flush_stdin();
+    putc(length_u8[3], stdout);*/
     uint8_t rx_buffer[4];
     read_stdin(rx_buffer, sizeof(rx_buffer), 10000);
     if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
@@ -322,13 +347,18 @@ bool rp2040_bl_erase(uint32_t address, uint32_t length) {
 
 bool rp2040_bl_write(uint32_t address, uint32_t length, uint8_t* data, uint32_t* crc) {
     flush_stdin();
-    printf("WRIT");
-    uint8_t* addres_u8 = &address;
+    char command[12];
+    snprintf(command, 5, "WRIT");
+    memcpy(command + 4, (char*) &address, 4);
+    memcpy(command + 8, (char*) &length, 4);
+    uart_write_bytes(0, command, sizeof(command));
+    /*printf("WRIT");
+    uint8_t* addres_u8 = (uint8_t*) &address;
     putc(addres_u8[0], stdout);
     putc(addres_u8[1], stdout);
     putc(addres_u8[2], stdout);
     putc(addres_u8[3], stdout);
-    uint8_t* length_u8 = &length;
+    uint8_t* length_u8 = (uint8_t*) &length;
     putc(length_u8[0], stdout);
     putc(length_u8[1], stdout);
     putc(length_u8[2], stdout);
@@ -336,31 +366,40 @@ bool rp2040_bl_write(uint32_t address, uint32_t length, uint8_t* data, uint32_t*
     
     for (uint32_t index = 0; index < length; index++) {
         putc(data[index], stdout);
-    }
+    }*/
+    
+    uart_write_bytes(0, data, length);
+    
     
     uint8_t rx_buffer[8];
-    uint16_t timeout = 0;
-    
-    uint8_t index = 0;
-    while (index < sizeof(rx_buffer)) {
-        char in = getc(stdin);
-        if (in != 0xFF) {
-            rx_buffer[index] = in;
-            index++;
-        } else {
-            vTaskDelay(10 / portTICK_PERIOD_MS);
-            timeout++;
-            if (timeout > 500) {
-                return false;
-            }
-        }
-    }
-    
-    if (memcmp(rx_buffer, "OKOK", 4) != 0) {
-        return false;
-    }
+    read_stdin(rx_buffer, sizeof(rx_buffer), 10000);
+    if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
     
     memcpy((uint8_t*) crc, &rx_buffer[4 * 1], 4);
+    return true;
+}
+
+bool rp2040_bl_seal(uint32_t addr, uint32_t vtor, uint32_t length, uint32_t crc) {
+    flush_stdin();
+    char command[20];
+    snprintf(command, 5, "SEAL");
+    memcpy(command + 4, (char*) &addr, 4);
+    memcpy(command + 8, (char*) &vtor, 4);
+    memcpy(command + 12, (char*) &length, 4);
+    memcpy(command + 16, (char*) &crc, 4);
+    uart_write_bytes(0, command, sizeof(command));
+    uint8_t rx_buffer[4];
+    read_stdin(rx_buffer, sizeof(rx_buffer), 10000);
+    if (memcmp(rx_buffer, "OKOK", 4) != 0) return false;
+    return true;
+}
+
+bool rp2040_bl_go(uint32_t vtor) {
+    flush_stdin();
+    char command[8];
+    snprintf(command, 5, "GOGO");
+    memcpy(command + 4, (char*) &vtor, 4);
+    uart_write_bytes(0, command, sizeof(command));
     return true;
 }
 
@@ -455,6 +494,18 @@ void app_main(void) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Unknown BL version");
             restart();
         }
+        
+        ESP_ERROR_CHECK(uart_driver_install(0, 2048, 0, 0, NULL, 0));
+        uart_config_t uart_config = {
+            .baud_rate = 115200,
+            .data_bits = UART_DATA_8_BITS,
+            .parity    = UART_PARITY_DISABLE,
+            .stop_bits = UART_STOP_BITS_1,
+            .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+            .source_clk = UART_SCLK_APB,
+        };
+        ESP_ERROR_CHECK(uart_param_config(0, &uart_config));
+        
         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Waiting for bootloader...");
         while (true) {
             vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -478,22 +529,25 @@ void app_main(void) {
         uint8_t rx_buffer_pos = 0;
         memset(rx_buffer, 0, sizeof(rx_buffer));
         while (true) {
-            printf("SYNC");
+            //printf("SYNC");
             
-            char in = 0xFF;
+            //uint8_t rx_buffer[4];
+            //read_stdin(rx_buffer, sizeof(rx_buffer), 1000);
+            
+            /*char in = 0xFF;
             do {
                 in = getc(stdin);
                 if (in != 0xFF) {
                     rx_buffer[rx_buffer_pos] = in;
                     rx_buffer_pos++;
                 }
-            } while ((in != 0xFF) && (rx_buffer_pos < sizeof(rx_buffer)));
+            } while ((in != 0xFF) && (rx_buffer_pos < sizeof(rx_buffer)));*/
             
-            if (memcmp(rx_buffer, "PICO", 4) == 0) {
-                break;
-            }
+            //if (memcmp(rx_buffer, "PICO", 4) == 0) {
+            //    break;
+            //}
             
-            if (rx_buffer_pos >= 4) {
+            /*if (rx_buffer_pos >= 4) {
                 for (uint8_t i = 0; i < sizeof(rx_buffer) - 1; i++) {
                     rx_buffer[i] = rx_buffer[i+1];
                     if (memcmp(rx_buffer, "PICO", 4) == 0) {
@@ -501,16 +555,20 @@ void app_main(void) {
                     }
                 }
                 rx_buffer_pos--;
-            }
+            }*/
+            
+            flush_stdin();
+            if (rp2040_bl_sync()) break;
             
             vTaskDelay(500 / portTICK_PERIOD_MS);
         }
         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Synced to BL!");
         
-        char in = 0xFF;
+        /*char in = 0xFF;
         do {
             in = getc(stdin);
-        } while (in != 0xFF);
+        } while (in != 0xFF);*/
+        flush_stdin();
         
         uint32_t flash_start = 0, flash_size = 0, erase_size = 0, write_size = 0, max_data_len = 0;
         
@@ -550,56 +608,87 @@ void app_main(void) {
             restart();
         }
         
-        for (uint32_t index = 0; index < sizeof(mch2022_firmware_bin);) {
-            uint32_t crc = 0;
-            uint32_t txLength = write_size;
-            if (txLength > (sizeof(mch2022_firmware_bin) - index)) {
-                txLength = sizeof(mch2022_firmware_bin) - index;
+        uint32_t position = 0;
+        uint32_t txSize = write_size;
+        uint8_t* txBuffer = malloc(write_size);
+        
+        uint32_t blockCrc = 0;
+        uint32_t totalCrc = 0;
+        uint32_t totalLength = 0;
+        
+        while (true) {
+            if ((sizeof(mch2022_firmware_bin) - position) < txSize) {
+                txSize = sizeof(mch2022_firmware_bin) - position;
             }
+            
+            if (txSize == 0) break;
+            
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0xCCCCCC);
-            char message[64];
             memset(message, 0, sizeof(message));
-            snprintf(message, sizeof(message) - 1, "Write to : 0x%08X", 0x10010000 + index);
+            snprintf(message, sizeof(message) - 1, "Write to : 0x%08X", 0x10010000 + position);
             pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
-            snprintf(message, sizeof(message) - 1, "Write len: 0x%08X", txLength);
+            snprintf(message, sizeof(message) - 1, "Write len: 0x%08X", txSize);
             pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
             ili9341_write(ili9341, framebuffer);
-            bool writeSuccess = rp2040_bl_write(0x10010000 + index, txLength, &mch2022_firmware_bin[index], &crc);
-            if (!writeSuccess) {
-                pax_noclip(pax_buffer);
-                pax_background(pax_buffer, 0xCCCCCC);
-                char message[64];
-                memset(message, 0, sizeof(message));
-                snprintf(message, sizeof(message) - 1, "Write err: 0x%08X", 0x10010000 + index);
-                pax_draw_text(pax_buffer, 0xFFFF0000, NULL, 18, 0, 20*0, message);
-                snprintf(message, sizeof(message) - 1, "Write len: 0x%08X", txLength);
-                pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
-                ili9341_write(ili9341, framebuffer);
-                restart();
+            uint32_t checkCrc = 0;
+            memset(txBuffer, 0, write_size);
+            memcpy(txBuffer, &mch2022_firmware_bin[position], txSize);
+            blockCrc = crc32_le(0, txBuffer, write_size);
+            totalCrc = crc32_le(totalCrc, txBuffer, write_size);
+            totalLength += write_size;
+            bool writeSuccess = rp2040_bl_write(0x10010000 + position, write_size, txBuffer, &checkCrc);
+            snprintf(message, sizeof(message) - 1, "Write res: %s", writeSuccess ? "YES" : "NO");
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*2, message);
+            snprintf(message, sizeof(message) - 1, "CRC      : %08X", blockCrc);
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*3, message);
+            snprintf(message, sizeof(message) - 1, "CRC CHECK: %08X", checkCrc);
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*4, message);
+            snprintf(message, sizeof(message) - 1, "CRC OK?  : %s", (blockCrc == checkCrc) ? "YES" : "NO");
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*5, message);
+            snprintf(message, sizeof(message) - 1, "CRC TOTAL: %08X", totalCrc);
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*7, message);
+            ili9341_write(ili9341, framebuffer);
+            if (writeSuccess && (blockCrc == checkCrc)) {
+                vTaskDelay(10 / portTICK_PERIOD_MS);
+                position += txSize;
+            } else {
+                while (!rp2040_bl_sync()) {
+                    flush_stdin();
+                    vTaskDelay(20 / portTICK_PERIOD_MS);
+                }
             }
-            index += write_size;
-            vTaskDelay(50 / portTICK_PERIOD_MS);
-        }        
+        }
+        
+        free(txBuffer);
+        
+        pax_noclip(pax_buffer);
+        pax_background(pax_buffer, 0xCCCCCC);
+        memset(message, 0, sizeof(message));
+        snprintf(message, sizeof(message) - 1, "Sealing...");
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
+        ili9341_write(ili9341, framebuffer);
+        
+        bool sealRes = rp2040_bl_seal(0x10010000, 0x10010000, totalLength, totalCrc);
+        
+        snprintf(message, sizeof(message) - 1, "Result: %s", sealRes ? "OK" : "FAIL");
+        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
+        ili9341_write(ili9341, framebuffer);
+        
+        if (sealRes) {
+            vTaskDelay(2000 / portTICK_PERIOD_MS);
+            pax_noclip(pax_buffer);
+            pax_background(pax_buffer, 0xCCCCCC);
+            memset(message, 0, sizeof(message));
+            snprintf(message, sizeof(message) - 1, "Waiting for reset...");
+            pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
+            ili9341_write(ili9341, framebuffer);
+            rp2040_bl_go(0x10010000);
+        }
 
         while (true) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
-        
-        /*while (true) {
-            uint8_t bl_state;
-            if (rp2040_get_bootloader_state(rp2040, &bl_state) != ESP_OK) {
-                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 BL STATE READ FAILED");
-                restart();
-            }
-            snprintf(buffer, sizeof(buffer), "RP2040 BL (%02X): %02X", bl_version, bl_state);
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, buffer);
-            vTaskDelay(200 / portTICK_PERIOD_MS);
-            if (bl_state == 0xB0) {
-                printf("SYNC");
-            }
-        }
-        return;*/
     }
     
     pax_noclip(pax_buffer);
