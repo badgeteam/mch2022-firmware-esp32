@@ -5,6 +5,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include "fpga.h"
+#include "selftest.h"
 #include "ili9341.h"
 #include "ice40.h"
 #include "rp2040.h"
@@ -113,9 +114,43 @@ esp_err_t verify_file_in_psram(ICE40* ice40, FILE* fd) {
     return ESP_OK;
 }
 
+void test_spi(ICE40* ice40) {
+    esp_err_t res;
+    uint8_t r1[8], r2[8];
+    uint8_t data0[8] = {0x01, 0x23, 0x45, 0x67, 0x01, 0x23, 0x45, 0x67};
+    uint8_t data1[8] = {0x89, 0xab, 0xcd, 0xef, 0x89, 0xab, 0xcd, 0xef};
+
+    res = ice40_send(ice40, data0, 8);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Transaction 1 failed");
+        return;
+    }
+
+    res = ice40_transaction(ice40, data1, 8, r1, 8);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Transaction 2 failed");
+        return;
+    }
+
+    printf("Transaction 2 result: ");
+    for (uint8_t i = 0; i < 8; i++) printf("%02X ", r1[i]);
+    printf("\n");
+
+    res = ice40_receive(ice40, r2, 8);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Transaction 3 failed");
+        return;
+    }
+
+    printf("Transaction 3 result: ");
+    for (uint8_t i = 0; i < 8; i++) printf("%02X ", r2[i]);
+    printf("\n");
+}
+
 void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
     esp_err_t res;
     bool reload_fpga = false;
+    bool load_old_bitstream = false;
     do {
         printf("Start FPGA test...\n");
         reload_fpga = false;
@@ -129,13 +164,19 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
         ili9341_select(ili9341, true);
 
         printf("FPGA load...\n");
-        res = ice40_load_bitstream(ice40, proto2_bin, proto2_bin_len);
+        if (load_old_bitstream) {
+            res = ice40_load_bitstream(ice40, proto2_bin, sizeof(proto2_bin));
+        } else {
+            res = ice40_load_bitstream(ice40, selftest_sw_bin, sizeof(selftest_sw_bin));
+        }
         if (res != ESP_OK) {
             printf("Failed to load app bitstream into FPGA (%d)\n", res);
             return;
         } else {
             printf("Bitstream loaded succesfully!\n");
         }
+
+        test_spi(ice40);
         
         bool waitForChoice = true;
         while (waitForChoice) {
@@ -147,11 +188,16 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
                     switch(buttonMessage.input) {
                         case RP2040_INPUT_BUTTON_HOME:
                         case RP2040_INPUT_BUTTON_MENU:
+                            waitForChoice = false;
+                            break;
                         case RP2040_INPUT_BUTTON_BACK:
+                            reload_fpga = true;
+                            load_old_bitstream = true;
                             waitForChoice = false;
                             break;
                         case RP2040_INPUT_BUTTON_ACCEPT:
                             reload_fpga = true;
+                            load_old_bitstream = false;
                             waitForChoice = false;
                             break;
                         default:
