@@ -4,9 +4,6 @@
 [submodule "components/bus-i2c"]
 	path = components/bus-i2c
 	url = git@github.com:Nicolai-Electronics/esp32-component-bus-i2c.git
-[submodule "components/i2c-pca9555"]
-	path = components/i2c-pca9555
-	url = git@github.com:Nicolai-Electronics/esp32-component-i2c-pca9555.git
 [submodule "components/i2c-bno055"]
 	path = components/i2c-bno055
 	url = git@github.com:Nicolai-Electronics/esp32-component-i2c-bno055.git
