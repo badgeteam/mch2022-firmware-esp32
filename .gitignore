@@ -3,3 +3,4 @@ main/build
 sdkconfig.old
 *.bak
 *.old
+.vscode
