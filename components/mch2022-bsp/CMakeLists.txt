@@ -6,7 +6,6 @@ idf_component_register(
         "bus-i2c"
         "i2c-bno055"
         "pax-graphics"
-        "renze-graphics"
         "sdcard"
         "spi-ice40"
         "spi-ili9341"
