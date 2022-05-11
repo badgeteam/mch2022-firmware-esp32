@@ -15,7 +15,6 @@
 #include "pax_gfx.h"
 #include "sdcard.h"
 #include "appfs.h"
-#include "driver_framebuffer.h"
 
 #include "rp2040.h"
 #include "rp2040bl.h"
@@ -280,7 +279,6 @@ void app_main(void) {
     memset(pax_buffer, 0, sizeof(pax_buf_t));
     
     pax_buf_init(pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
-    driver_framebuffer_init(framebuffer);
     
     /* Initialize hardware */
     
