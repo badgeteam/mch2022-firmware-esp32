@@ -22,6 +22,9 @@
 [submodule "components/mch2022-rp2040"]
 	path = components/mch2022-rp2040
 	url = https://github.com/badgeteam/esp32-component-mch2022-rp2040.git
+[submodule "components/esp32-component-appfs"]
+	path = components/appfs
+	url = https://github.com/badgeteam/esp32-component-appfs.git
 [submodule "components/ws2812"]
 	path = components/ws2812
 	url = https://github.com/badgeteam/esp32-component-ws2812.git
