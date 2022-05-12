@@ -33,13 +33,13 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         restart();
     }
     
-    pax_noclip(pax_buffer);
+    /*pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xCCCCCC);
     memset(message, 0, sizeof(message));
     snprintf(message, sizeof(message) - 1, "RP2040 firmware: 0x%02X", fw_version);
     pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
     ili9341_write(ili9341, framebuffer);
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    vTaskDelay(100 / portTICK_PERIOD_MS);*/
     
     if (fw_version < 0x01) { // Update required
         pax_noclip(pax_buffer);
