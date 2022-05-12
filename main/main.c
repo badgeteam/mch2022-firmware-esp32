@@ -33,6 +33,8 @@
 
 #include "esp32/rom/crc.h"
 
+#include "efuse.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -282,6 +284,8 @@ void app_main(void) {
     
     /* Initialize hardware */
     
+    efuse_protect();
+
     bool lcdReady = false;
     res = board_init(&lcdReady);
     
@@ -299,6 +303,7 @@ void app_main(void) {
     BNO055* bno055 = get_bno055();
     RP2040* rp2040 = get_rp2040();
 
+    /* Start AppFS */
     graphics_task(pax_buffer, ili9341, framebuffer, NULL, "AppFS init...");
     res = appfs_init();
     if (res != ESP_OK) {
@@ -308,6 +313,7 @@ void app_main(void) {
     }
     ESP_LOGI(TAG, "AppFS initialized");
     
+    /* Start NVS */
     graphics_task(pax_buffer, ili9341, framebuffer, NULL, "NVS init...");
     res = nvs_init();
     if (res != ESP_OK) {
@@ -317,6 +323,7 @@ void app_main(void) {
     }
     ESP_LOGI(TAG, "NVS initialized");
     
+    /* Start SD card */
     graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Mount SD card...");
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
@@ -325,12 +332,15 @@ void app_main(void) {
         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "SD card mounted");
     }
     
+    /* Start LEDs */
     ws2812_init(GPIO_LED_DATA);
     uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
     
+    /* Start RP2040 firmware update check */
     rp2040_updater(rp2040, pax_buffer, ili9341, framebuffer);
 
+    /* Launcher menu */
     while (true) {
         menu_action_t menu_action;
         appfs_handle_t appfs_fd;

@@ -8,7 +8,38 @@
 #include "esp_efuse_table.h"
 #include "esp_efuse_custom_table.h"
 
-void print_state() {
+static const char *TAG = "efuse";
+
+void halt(const char* reason) {
+    ESP_LOGE(TAG, "Failed efuse write operation: %s", reason);
+    while (true) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void efuse_protect() {
+    // XPD settings
+    if (esp_efuse_write_field_bit(ESP_EFUSE_XPD_SDIO_REG) != ESP_OK) halt("XPD_SDIO_REG"); // Enable the VDD_SDIO voltage regulator
+    if (esp_efuse_write_field_bit(ESP_EFUSE_SDIO_TIEH)    != ESP_OK) halt("SDIO_TIEH");    // Set VDD_SDIO voltage regulator output to 3.3v
+    if (esp_efuse_write_field_bit(ESP_EFUSE_SDIO_FORCE)   != ESP_OK) halt("SDIO_FORCE");   // Enable VDD_SDIO efuse override
+    
+    // Debug settings
+    if (esp_efuse_write_field_bit(ESP_EFUSE_CONSOLE_DEBUG_DISABLE) != ESP_OK) halt("CONSOLE_DEBUG_DISABLE"); // Disable BASIC ROM console
+
+    // Write protect
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_FLASH_CRYPT_CNT)                    != ESP_OK) halt("WR_DIS_FLASH_CRYPT_CNT");                    // Prevent disabling UART download mode
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_MAC_AND_CHIP_INFO)                  != ESP_OK) halt("WR_DIS_MAC_AND_CHIP_INFO");                  // Prevent writing to MAC address fuses
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_XPD)                                != ESP_OK) halt("WR_DIS_XPD");                                // Write protect XPD settings
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_SPI_PAD)                            != ESP_OK) halt("WR_DIS_SPI_PAD");                            // Pin mapping for SPI flash and PSRAM
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_SCHEME_KEY_CRYPT)                   != ESP_OK) halt("WR_DIS_SCHEME_KEY_CRYPT");                   // Disable flash encryption
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_ABS_DONE_0)                         != ESP_OK) halt("WR_DIS_ABS_DONE_0");                         // Disable secure boot V1
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_ABS_DONE_1)                         != ESP_OK) halt("WR_DIS_ABS_DONE_1");                         // Disable secure boot V2
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_CONSOLE_DEBUG_AND_DISABLE_DL_CRYPT) != ESP_OK) halt("WR_DIS_CONSOLE_DEBUG_AND_DISABLE_DL_CRYPT"); // Write protect download mode functions
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_BLK3)                               != ESP_OK) halt("WR_DIS_BLK3");                               // Write protect block 3 (to prevent changing MAC version)
+    if (esp_efuse_write_field_bit(ESP_EFUSE_WR_DIS_EFUSE_RD_DISABLE)                   != ESP_OK) halt("WR_DIS_EFUSE_RD_DISABLE");                   // Write protect read disable and ADC vref
+}
+
+void efuse_print_state() {
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
     uint8_t mac_address[6];
@@ -71,8 +102,4 @@ void print_state() {
     printf("Read disabled for EFUSE block 2:                             %s\n", rd_blk2 ? "yes" : "no");
     printf("Read disabled for EFUSE block 3:                             %s\n", rd_blk3 ? "yes" : "no");
     fflush(stdout);
-}
-
-void app_main(void) {
-    print_state();
 }
