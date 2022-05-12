@@ -6,6 +6,8 @@ SHELL := /usr/bin/env bash
 
 .PHONY: prepare clean build flash erase monitor menuconfig image qemu install
 
+all: prepare build flash
+
 prepare:
 	git submodule update --init --recursive
 	cd esp-idf; bash install.sh
