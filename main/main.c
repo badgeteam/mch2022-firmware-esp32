@@ -379,6 +379,9 @@ void app_main(void) {
     ws2812_init(GPIO_LED_DATA);
     uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+    
+    /* Start WiFi */
+    wifi_init();
 
     /* Launcher menu */
     while (true) {
@@ -419,7 +422,7 @@ void app_main(void) {
                 }
             }
             nvs_close(&handle);
-            wifi_init(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+            wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
         } else if (menu_action == ACTION_OTA) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
         } else if (menu_action == ACTION_SETTINGS) {
