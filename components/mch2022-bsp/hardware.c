@@ -164,7 +164,7 @@ esp_err_t bsp_ice40_init() {
     if (!bsp_ready) return ESP_FAIL;
     if (!rp2040_ready) return ESP_FAIL;
     if (rp2040_fw_version == 0xFF) return ESP_FAIL; // The ICE40 FPGA can only be controlled when the RP2040 is not in bootloader mode
-    if (rp2040_ready) return ESP_OK;
+    if (ice40_ready) return ESP_OK;
 
     dev_ice40.spi_bus = SPI_BUS;
     dev_ice40.pin_cs = GPIO_SPI_CS_FPGA;

@@ -309,6 +309,11 @@ void app_main(void) {
     }
     
     ILI9341* ili9341 = get_ili9341();
+    if (ili9341 == NULL) {
+        ESP_LOGE(TAG, "ili9341 is NULL");
+        esp_restart();
+    }
+
     
     display_boot_screen(pax_buffer, ili9341);
     
@@ -319,6 +324,10 @@ void app_main(void) {
     }
     
     RP2040* rp2040 = get_rp2040();
+    if (rp2040 == NULL) {
+        ESP_LOGE(TAG, "rp2040 is NULL");
+        esp_restart();
+    }
 
     rp2040_updater(rp2040, pax_buffer, ili9341, framebuffer); // Handle RP2040 firmware update & bootloader mode
     
@@ -329,6 +338,10 @@ void app_main(void) {
     }
     
     ICE40* ice40 = get_ice40();
+    if (ice40 == NULL) {
+        ESP_LOGE(TAG, "ice40 is NULL");
+        esp_restart();
+    }
     
     if (bsp_bno055_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BNO055 position sensor");
@@ -337,6 +350,10 @@ void app_main(void) {
     }
 
     BNO055* bno055 = get_bno055();
+    if (bno055 == NULL) {
+        ESP_LOGE(TAG, "bno055 is NULL");
+        esp_restart();
+    }
 
     /* Start AppFS */
     res = appfs_init();
