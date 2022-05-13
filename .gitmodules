@@ -28,3 +28,6 @@
 [submodule "components/ws2812"]
 	path = components/ws2812
 	url = https://github.com/badgeteam/esp32-component-ws2812.git
+[submodule "components/mch2022-efuse"]
+	path = components/mch2022-efuse
+	url = https://github.com/badgeteam/esp32-component-mch2022-efuse.git
