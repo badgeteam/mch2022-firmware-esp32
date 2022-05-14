@@ -37,6 +37,8 @@
 
 #include "wifi_ota.h"
 
+#include "esp_vfs.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -51,7 +53,9 @@ typedef enum action {
     ACTION_WIFI_SCAN,
     ACTION_WIFI_MANUAL,
     ACTION_WIFI_LIST,
-    ACTION_BACK
+    ACTION_BACK,
+    ACTION_FILE_BROWSER,
+    ACTION_UNINSTALL
 } menu_action_t;
 
 typedef struct _menu_args {
@@ -59,21 +63,21 @@ typedef struct _menu_args {
     menu_action_t action;
 } menu_args_t;
 
-void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer) {
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Installing app...");
+void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* label) {
+    graphics_task(pax_buffer, ili9341, NULL, "Installing app...");
     esp_err_t res;
     appfs_handle_t handle;
-    FILE* app_fd = fopen("/sd/gnuboy.bin", "rb");
+    FILE* app_fd = fopen(path, "rb");
     if (app_fd == NULL) {
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to open gnuboy.bin");
-        ESP_LOGE(TAG, "Failed to open gnuboy.bin");
+        graphics_task(pax_buffer, ili9341, NULL, "Failed to open file");
+        ESP_LOGE(TAG, "Failed to open file");
         vTaskDelay(100 / portTICK_PERIOD_MS);
         return;
     }
     size_t app_size;
     uint8_t* app = load_file_to_ram(app_fd, &app_size);
     if (app == NULL) {
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to load app to RAM");
+        graphics_task(pax_buffer, ili9341, NULL, "Failed to load app to RAM");
         ESP_LOGE(TAG, "Failed to load application into RAM");
         vTaskDelay(100 / portTICK_PERIOD_MS);
         return;
@@ -81,9 +85,9 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuff
     
     ESP_LOGI(TAG, "Application size %d", app_size);
     
-    res = appfsCreateFile("gnuboy", app_size, &handle);
+    res = appfsCreateFile(label, app_size, &handle);
     if (res != ESP_OK) {
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to create on AppFS");
+        graphics_task(pax_buffer, ili9341, NULL, "Failed to create on AppFS");
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         free(app);
@@ -91,7 +95,7 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuff
     }
     res = appfsWrite(handle, 0, app, app_size);
     if (res != ESP_OK) {
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Failed to write to AppFS");
+        graphics_task(pax_buffer, ili9341, NULL, "Failed to write to AppFS");
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         free(app);
@@ -99,12 +103,12 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuff
     }
     free(app);
     ESP_LOGI(TAG, "Application is now stored in AppFS");
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "App installed!");
+    graphics_task(pax_buffer, ili9341, NULL, "App installed!");
     vTaskDelay(100 / portTICK_PERIOD_MS);
     return;
 }
 
-void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_action_t* menu_action, appfs_handle_t* appfs_fd) {
+void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_action_t* menu_action, appfs_handle_t* appfs_fd) {
     menu_t* menu = menu_alloc("Main menu");
     *appfs_fd = APPFS_INVALID_FD;
     *menu_action = ACTION_NONE;
@@ -144,6 +148,14 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* wifi_connect_args = malloc(sizeof(menu_args_t));
     wifi_connect_args->action = ACTION_WIFI_CONNECT;
     menu_insert_item(menu, "WiFi connect", NULL, wifi_connect_args, -1);
+    
+    menu_args_t* file_browser_args = malloc(sizeof(menu_args_t));
+    file_browser_args->action = ACTION_FILE_BROWSER;
+    menu_insert_item(menu, "File browser", NULL, file_browser_args, -1);
+    
+    menu_args_t* uninstall_args = malloc(sizeof(menu_args_t));
+    uninstall_args->action = ACTION_UNINSTALL;
+    menu_insert_item(menu, "Uninstall app", NULL, uninstall_args, -1);
 
     bool render = true;
     menu_args_t* menuArgs = NULL;
@@ -177,7 +189,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            graphics_task(pax_buffer, ili9341, framebuffer, menu, NULL);
+            graphics_task(pax_buffer, ili9341, menu, NULL);
             render = false;
         }
         
@@ -195,7 +207,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_free(menu);
 }
 
-void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_action_t* menu_action) {
+void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_action_t* menu_action) {
     menu_t* menu = menu_alloc("WiFi settings");
     *menu_action = ACTION_NONE;
 
@@ -247,7 +259,7 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
         }
 
         if (render) {
-            graphics_task(pax_buffer, ili9341, framebuffer, menu, NULL);
+            graphics_task(pax_buffer, ili9341, menu, NULL);
             render = false;
         }
         
@@ -305,6 +317,276 @@ void wifi_connect_to_stored() {
     wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
 }
 
+void list_files_in_folder(const char* path) {
+    DIR* dir = opendir(path);
+    if (dir == NULL) {
+        ESP_LOGE(TAG, "Failed to open directory %s", path);
+        return;
+    }
+    
+    struct dirent *ent;
+    char type;
+    char size[12];
+    char tpath[255];
+    char tbuffer[80];
+    struct stat sb;
+    struct tm *tm_info;
+    char *lpath = NULL;
+    int statok;
+
+    uint64_t total = 0;
+    int nfiles = 0;
+    printf("T  Size      Date/Time         Name\n");
+    printf("-----------------------------------\n");
+    while ((ent = readdir(dir)) != NULL) {
+        sprintf(tpath, path);
+        if (path[strlen(path)-1] != '/') {
+            strcat(tpath,"/");
+        }
+        strcat(tpath,ent->d_name);
+        tbuffer[0] = '\0';
+
+        // Get file stat
+        statok = stat(tpath, &sb);
+
+        if (statok == 0) {
+            tm_info = localtime(&sb.st_mtime);
+            strftime(tbuffer, 80, "%d/%m/%Y %R", tm_info);
+        } else {
+            sprintf(tbuffer, "                ");
+        }
+
+        if (ent->d_type == DT_REG) {
+            type = 'f';
+            nfiles++;
+            if (statok) {
+                strcpy(size, "       ?");
+            } else {
+                total += sb.st_size;
+                if (sb.st_size < (1024*1024)) sprintf(size,"%8d", (int)sb.st_size);
+                else if ((sb.st_size/1024) < (1024*1024)) sprintf(size,"%6dKB", (int)(sb.st_size / 1024));
+                else sprintf(size,"%6dMB", (int)(sb.st_size / (1024 * 1024)));
+            }
+        } else {
+            type = 'd';
+            strcpy(size, "       -");
+        }
+
+        printf("%c  %s  %s  %s\r\n", type, size, tbuffer, ent->d_name);
+    }
+
+    printf("-----------------------------------\n");
+    if (total < (1024*1024)) printf("   %8d", (int)total);
+    else if ((total/1024) < (1024*1024)) printf("   %6dKB", (int)(total / 1024));
+    else printf("   %6dMB", (int)(total / (1024 * 1024)));
+    printf(" in %d file(s)\n", nfiles);
+    printf("-----------------------------------\n");
+
+    closedir(dir);
+    free(lpath);
+}
+
+typedef struct _uninstall_menu_args {
+    appfs_handle_t fd;
+    char name[512];
+} uninstall_menu_args_t;
+
+void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    appfs_handle_t appfs_fd = APPFS_INVALID_FD;
+    menu_t* menu = menu_alloc("Uninstall application");
+    while (1) {
+        appfs_fd = appfsNextEntry(appfs_fd);
+        if (appfs_fd == APPFS_INVALID_FD) break;
+        const char* name = NULL;
+        appfsEntryInfo(appfs_fd, &name, NULL);
+        uninstall_menu_args_t* args = malloc(sizeof(uninstall_menu_args_t));
+        if (args == NULL) {
+            ESP_LOGE(TAG, "Failed to malloc() menu args");
+            return;
+        }
+        args->fd = appfs_fd;
+        sprintf(args->name, name);
+        menu_insert_item(menu, name, NULL, (void*) args, -1);
+    }
+    uninstall_menu_args_t* menuArgs = NULL;
+    bool render = true;
+    bool exit = false;
+    while (1) {
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin = buttonMessage.input;
+            bool value = buttonMessage.state;
+            switch(pin) {
+                case RP2040_INPUT_JOYSTICK_DOWN:
+                    if (value) {
+                        menu_navigate_next(menu);
+                        render = true;
+                    }
+                    break;
+                case RP2040_INPUT_JOYSTICK_UP:
+                    if (value) {
+                        menu_navigate_previous(menu);
+                        render = true;
+                    }
+                    break;
+                case RP2040_INPUT_BUTTON_ACCEPT:
+                    if (value) {
+                        menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
+                    }
+                    break;
+                case RP2040_INPUT_BUTTON_HOME:
+                    if (value) exit = true;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (render) {
+            graphics_task(pax_buffer, ili9341, menu, NULL);
+            render = false;
+        }
+        
+        if (menuArgs != NULL) {
+            char message[1024];
+            sprintf(message, "Uninstalling %s...", menuArgs->name);
+            printf("%s\n", message);
+            graphics_task(pax_buffer, ili9341, menu, message);
+            appfsDeleteFile(menuArgs->name);
+            menuArgs = NULL;
+            break;
+        }
+        
+        if (exit) {
+            break;
+        }
+    }
+    
+    for (size_t index = 0; index < menu_get_length(menu); index++) {
+        free(menu_get_callback_args(menu, index));
+    }
+    
+    menu_free(menu);
+}
+
+typedef struct _file_browser_menu_args {
+    char type;
+    char path[512];
+    char label[512];
+} file_browser_menu_args_t;
+
+void find_parent_dir(char* path, char* parent) {
+    size_t last_separator = 0;
+    for (size_t index = 0; index < strlen(path); index++) {
+        if (path[index] == '/') last_separator = index;
+    }
+    
+    strcpy(parent, path);
+    parent[last_separator] = '\0';
+}
+
+void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    char path[512] = "/sd";
+    while (true) {    
+        menu_t* menu = menu_alloc(path);
+        DIR* dir = opendir(path);
+        if (dir == NULL) {
+            ESP_LOGE(TAG, "Failed to open directory %s", path);
+            return;
+        }
+        struct dirent *ent;
+        file_browser_menu_args_t* pd_args = malloc(sizeof(file_browser_menu_args_t));
+        pd_args->type = 'd';
+        find_parent_dir(path, pd_args->path);
+        printf("Parent dir: %s\n", pd_args->path);
+        menu_insert_item(menu, "../", NULL, pd_args, -1);
+
+        while ((ent = readdir(dir)) != NULL) {
+            file_browser_menu_args_t* args = malloc(sizeof(file_browser_menu_args_t));
+            sprintf(args->path, path);
+            if (path[strlen(path)-1] != '/') {
+                strcat(args->path,"/");
+            }
+            strcat(args->path,ent->d_name);
+
+            if (ent->d_type == DT_REG) {
+                args->type = 'f';
+            } else {
+                args->type = 'd';
+            }
+
+            printf("%c %s %s\r\n", args->type, ent->d_name, args->path);
+
+            snprintf(args->label, sizeof(args->label), "%s%s", ent->d_name, (args->type == 'd') ? "/" : "");
+            menu_insert_item(menu, args->label, NULL, args, -1);
+        }
+        closedir(dir);
+
+        bool render = true;
+        bool exit = false;
+        file_browser_menu_args_t* menuArgs = NULL;
+
+        while (1) {
+            rp2040_input_message_t buttonMessage = {0};
+            if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+                uint8_t pin = buttonMessage.input;
+                bool value = buttonMessage.state;
+                switch(pin) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        if (value) {
+                            menu_navigate_next(menu);
+                            render = true;
+                        }
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        if (value) {
+                            menu_navigate_previous(menu);
+                            render = true;
+                        }
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                        if (value) {
+                            menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
+                        }
+                        break;
+                    case RP2040_INPUT_BUTTON_HOME:
+                        if (value) exit = true;
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            if (render) {
+                graphics_task(pax_buffer, ili9341, menu, NULL);
+                render = false;
+            }
+            
+            if (menuArgs != NULL) {
+                if (menuArgs->type == 'd') {
+                    strcpy(path, menuArgs->path);
+                    break;
+                } else {
+                    printf("File selected: %s\n", menuArgs->path);
+                    appfs_store_app(pax_buffer, ili9341, menuArgs->path, menuArgs->label);
+                }
+                menuArgs = NULL;
+                render = true;
+            }
+            
+            if (exit) {
+                break;
+            }
+        }
+        
+        for (size_t index = 0; index < menu_get_length(menu); index++) {
+            free(menu_get_callback_args(menu, index));
+        }
+        
+        menu_free(menu);
+    }
+}
+
 void app_main(void) {
     esp_err_t res;
     
@@ -355,7 +637,7 @@ void app_main(void) {
         esp_restart();
     }
 
-    rp2040_updater(rp2040, pax_buffer, ili9341, framebuffer); // Handle RP2040 firmware update & bootloader mode
+    rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
     
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
@@ -400,6 +682,9 @@ void app_main(void) {
     /* Start SD card */
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
+    if (sdcard_ready) {
+        list_files_in_folder("/sd");
+    }
 
     /* Start LEDs */
     ws2812_init(GPIO_LED_DATA);
@@ -413,30 +698,33 @@ void app_main(void) {
     while (true) {
         menu_action_t menu_action;
         appfs_handle_t appfs_fd;
-        menu_launcher(rp2040->queue, pax_buffer, ili9341, framebuffer, &menu_action, &appfs_fd);
+        menu_launcher(rp2040->queue, pax_buffer, ili9341, &menu_action, &appfs_fd);
         if (menu_action == ACTION_APPFS) {
             appfs_boot_app(appfs_fd);
         } else if (menu_action == ACTION_FPGA) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Loading...");
+            graphics_task(pax_buffer, ili9341, NULL, "Loading...");
             fpga_test(ili9341, ice40, rp2040->queue);
         } else if (menu_action == ACTION_RP2040_BL) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "RP2040 update...");
+            graphics_task(pax_buffer, ili9341, NULL, "RP2040 update...");
             rp2040_reboot_to_bootloader(rp2040);
             esp_restart();
         } else if (menu_action == ACTION_INSTALLER) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Installing...");
-            appfs_store_app(pax_buffer, ili9341, framebuffer);
+            graphics_task(pax_buffer, ili9341, NULL, "Not implemented");
          } else if (menu_action == ACTION_WIFI_CONNECT) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Connecting...");
+            graphics_task(pax_buffer, ili9341, NULL, "Connecting...");
             wifi_connect_to_stored();
         } else if (menu_action == ACTION_OTA) {
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Connecting...");
+            graphics_task(pax_buffer, ili9341, NULL, "Connecting...");
             wifi_connect_to_stored();
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
+            graphics_task(pax_buffer, ili9341, NULL, "Firmware update...");
             ota_update();
+        } else if (menu_action == ACTION_FILE_BROWSER) {
+            file_browser(rp2040->queue, pax_buffer, ili9341);
+        } else if (menu_action == ACTION_UNINSTALL) {
+            uninstall_browser(rp2040->queue, pax_buffer, ili9341);
         } else if (menu_action == ACTION_SETTINGS) {
             while (true) {
-                menu_wifi_settings(rp2040->queue, pax_buffer, ili9341, framebuffer, &menu_action);
+                menu_wifi_settings(rp2040->queue, pax_buffer, ili9341, &menu_action);
                 if (menu_action == ACTION_WIFI_MANUAL) {
                     nvs_handle_t handle;
                     nvs_open("system", NVS_READWRITE, &handle);
@@ -458,16 +746,16 @@ void app_main(void) {
                             if (res != ESP_OK) strcpy(password, "");
                         }
                     }
-                    bool accepted = keyboard(rp2040->queue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
+                    bool accepted = keyboard(rp2040->queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to exit", ssid, sizeof(ssid));
                     if (accepted) {
-                        accepted = keyboard(rp2040->queue, pax_buffer, ili9341, framebuffer, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
+                        accepted = keyboard(rp2040->queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to exit", password, sizeof(password));
                     }
                     if (accepted) {
                         nvs_set_str(handle, "wifi.ssid", ssid);
                         nvs_set_str(handle, "wifi.password", password);
-                        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "WiFi settings stored");
+                        graphics_task(pax_buffer, ili9341, NULL, "WiFi settings stored");
                     } else {
-                        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Canceled");
+                        graphics_task(pax_buffer, ili9341, NULL, "Canceled");
                     }
                     nvs_close(handle);
                 } else if (menu_action == ACTION_WIFI_LIST) {
@@ -493,7 +781,7 @@ void app_main(void) {
                     nvs_close(handle);
                     char buffer[300];
                     snprintf(buffer, sizeof(buffer), "SSID is %s\nPassword is %s", ssid, password);
-                    graphics_task(pax_buffer, ili9341, framebuffer, NULL, buffer);
+                    graphics_task(pax_buffer, ili9341, NULL, buffer);
                 } else {
                     break;
                 }

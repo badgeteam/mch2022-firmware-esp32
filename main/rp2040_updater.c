@@ -18,7 +18,7 @@
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
 
-void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer) {
+void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     char message[64];
     
     uint8_t fw_version;
@@ -29,7 +29,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
         snprintf(message, sizeof(message) - 1, "Failed to read firmware version");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         restart();
     }
     
@@ -38,7 +38,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
     memset(message, 0, sizeof(message));
     snprintf(message, sizeof(message) - 1, "RP2040 firmware: 0x%02X", fw_version);
     pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
-    ili9341_write(ili9341, framebuffer);
+    ili9341_write(ili9341, pax_buffer->buf);
     vTaskDelay(100 / portTICK_PERIOD_MS);*/
     
     if (fw_version < 0x01) { // Update required
@@ -48,7 +48,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
         snprintf(message, sizeof(message) - 1, "Starting bootloader");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         rp2040_reboot_to_bootloader(rp2040);
         esp_restart();
     }
@@ -58,7 +58,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_background(pax_buffer, 0x325aa8);
         snprintf(message, sizeof(message) - 1, "Updating RP2040...");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
 
         uint8_t bl_version;
         if (rp2040_get_bootloader_version(rp2040, &bl_version) != ESP_OK) {
@@ -68,7 +68,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
             snprintf(message, sizeof(message) - 1, "Communication error (1)");
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
             restart();
         }
         if (bl_version != 0x01) {
@@ -77,7 +77,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
             snprintf(message, sizeof(message) - 1, "Unsupported bootloader version");
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
             restart();
         }
         
@@ -89,7 +89,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
         snprintf(message, sizeof(message) - 1, "Waiting for bootloader");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
 
         while (true) {
             vTaskDelay(1 / portTICK_PERIOD_MS);
@@ -101,14 +101,20 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
                 pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
                 snprintf(message, sizeof(message) - 1, "Communication error (2)");
                 pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-                ili9341_write(ili9341, framebuffer);
+                ili9341_write(ili9341, pax_buffer->buf);
                 restart();
             }
             if (bl_state == 0xB0) {
                 break;
             }
             if (bl_state > 0xB0) {
-                graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Unknown BL state");
+                pax_noclip(pax_buffer);
+                pax_background(pax_buffer, 0xa85a32);
+                snprintf(message, sizeof(message) - 1, "RP2040 update failed");
+                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
+                snprintf(message, sizeof(message) - 1, "Unknown bootloader state");
+                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
+                ili9341_write(ili9341, pax_buffer->buf);
                 restart();
             }
         }
@@ -119,7 +125,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
         snprintf(message, sizeof(message) - 1, "Waiting for bootloader sync");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         
         char rx_buffer[16];
         uint8_t rx_buffer_pos = 0;
@@ -140,7 +146,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
             snprintf(message, sizeof(message) - 1, "Failed to read information");
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
             restart();
         }
         
@@ -150,7 +156,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
         snprintf(message, sizeof(message) - 1, "Erasing flash");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         
         uint32_t erase_length = sizeof(mch2022_firmware_bin);
         erase_length = erase_length + erase_size - (erase_length % erase_size); // Round up to erase size
@@ -168,7 +174,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
             snprintf(message, sizeof(message) - 1, "Failed to erase flash");
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             restart();
         }
@@ -196,7 +202,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, message);
             snprintf(message, sizeof(message) - 1, "Writing @ 0x%08X", 0x10010000 + position);
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
 
             uint32_t checkCrc = 0;
             memset(txBuffer, 0, write_size);
@@ -221,13 +227,13 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
         memset(message, 0, sizeof(message));
         snprintf(message, sizeof(message) - 1, "Sealing...");
         pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         
         bool sealRes = rp2040_bl_seal(0x10010000, 0x10010000, totalLength, totalCrc);
         
         snprintf(message, sizeof(message) - 1, "Result: %s", sealRes ? "OK" : "FAIL");
         pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
-        ili9341_write(ili9341, framebuffer);
+        ili9341_write(ili9341, pax_buffer->buf);
         
         if (sealRes) {
             vTaskDelay(2000 / portTICK_PERIOD_MS);
@@ -236,7 +242,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uin
             memset(message, 0, sizeof(message));
             snprintf(message, sizeof(message) - 1, "Waiting for reset...");
             pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*0, message);
-            ili9341_write(ili9341, framebuffer);
+            ili9341_write(ili9341, pax_buffer->buf);
             rp2040_bl_go(0x10010000);
         }
 

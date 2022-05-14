@@ -10,4 +10,4 @@
 #include "ili9341.h"
 
 
-void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer);
+void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341);
