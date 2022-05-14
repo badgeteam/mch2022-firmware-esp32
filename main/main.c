@@ -262,6 +262,23 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
     menu_free(menu);
 }
 
+void display_boot_screen(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0x325aa8);
+    pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "Starting launcher...");
+    ili9341_write(ili9341, pax_buffer->buf);
+}
+
+void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* line0, const char* line1, const char* line2, const char* line3) {
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0xa85a32);
+    if (line0 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, line0);
+    if (line1 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*1, line1);
+    if (line2 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*2, line2);
+    if (line3 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 12, 0, 20*3, line3);
+    ili9341_write(ili9341, pax_buffer->buf);
+}
+
 void app_main(void) {
     esp_err_t res;
     
@@ -269,14 +286,14 @@ void app_main(void) {
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate framebuffer");
-        restart();
+        esp_restart();
     }
     memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
     
     pax_buf_t* pax_buffer = malloc(sizeof(pax_buf_t));
     if (framebuffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate pax buffer");
-        restart();
+        ESP_LOGE(TAG, "Failed to allocate buffer for PAX graphics library");
+        esp_restart();
     }
     memset(pax_buffer, 0, sizeof(pax_buf_t));
     
@@ -285,60 +302,83 @@ void app_main(void) {
     /* Initialize hardware */
     
     efuse_protect();
-
-    bool lcdReady = false;
-    res = board_init(&lcdReady);
     
-    if (res != ESP_OK) {
-        if (lcdReady) {
-            ILI9341* ili9341 = get_ili9341();
-            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Hardware error!");
-        }
-        printf("Failed to initialize hardware!\n");
-        restart();
+    if (bsp_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize basic board support functions");
+        esp_restart();
     }
     
     ILI9341* ili9341 = get_ili9341();
-    ICE40* ice40 = get_ice40();
-    BNO055* bno055 = get_bno055();
+    if (ili9341 == NULL) {
+        ESP_LOGE(TAG, "ili9341 is NULL");
+        esp_restart();
+    }
+
+    
+    display_boot_screen(pax_buffer, ili9341);
+    
+    if (bsp_rp2040_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "RP2040 co-processor error", NULL, NULL);
+        esp_restart();
+    }
+    
     RP2040* rp2040 = get_rp2040();
+    if (rp2040 == NULL) {
+        ESP_LOGE(TAG, "rp2040 is NULL");
+        esp_restart();
+    }
+
+    rp2040_updater(rp2040, pax_buffer, ili9341, framebuffer); // Handle RP2040 firmware update & bootloader mode
+    
+    if (bsp_ice40_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "ICE40 FPGA error", NULL, NULL);
+        esp_restart();
+    }
+    
+    ICE40* ice40 = get_ice40();
+    if (ice40 == NULL) {
+        ESP_LOGE(TAG, "ice40 is NULL");
+        esp_restart();
+    }
+    
+    if (bsp_bno055_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize the BNO055 position sensor");
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "BNO055 sensor error", "Check I2C bus", "Remove SAO and try again");
+        esp_restart();
+    }
+
+    BNO055* bno055 = get_bno055();
+    if (bno055 == NULL) {
+        ESP_LOGE(TAG, "bno055 is NULL");
+        esp_restart();
+    }
 
     /* Start AppFS */
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "AppFS init...");
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "AppFS init failed!");
-        return;
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
+        esp_restart();
     }
-    ESP_LOGI(TAG, "AppFS initialized");
     
     /* Start NVS */
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "NVS init...");
     res = nvs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "NVS init failed: %d", res);
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "NVS init failed!");
-        return;
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
+        esp_restart();
     }
-    ESP_LOGI(TAG, "NVS initialized");
     
     /* Start SD card */
-    graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Mount SD card...");
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
-  
-    if (sdcard_ready) {
-        graphics_task(pax_buffer, ili9341, framebuffer, NULL, "SD card mounted");
-    }
-    
+
     /* Start LEDs */
     ws2812_init(GPIO_LED_DATA);
     uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
-    
-    /* Start RP2040 firmware update check */
-    rp2040_updater(rp2040, pax_buffer, ili9341, framebuffer);
 
     /* Launcher menu */
     while (true) {

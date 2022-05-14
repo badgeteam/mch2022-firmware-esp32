@@ -55,9 +55,12 @@
 #define GPIO_SPI_CS_LCD       32
 #define GPIO_SPI_DC_LCD       33
 
-esp_err_t board_init(bool* aLcdReady);
+esp_err_t bsp_init();
+esp_err_t bsp_rp2040_init();
+esp_err_t bsp_ice40_init();
+esp_err_t bsp_bno055_init();
 
-BNO055* get_bno055();
 ILI9341* get_ili9341();
-ICE40* get_ice40();
 RP2040* get_rp2040();
+ICE40* get_ice40();
+BNO055* get_bno055();
