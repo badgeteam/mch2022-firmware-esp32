@@ -41,9 +41,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
     }
 }
 
-bool wifi_init(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAuthmode, uint8_t aRetryMax) {
-    gRetryCounter = 0;
-    gRetryMax = aRetryMax;
+void wifi_init() {
     s_wifi_event_group = xEventGroupCreate();
 
     ESP_ERROR_CHECK(esp_netif_init());
@@ -58,7 +56,13 @@ bool wifi_init(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAuthm
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL, &instance_got_ip));
+    
+    ESP_ERROR_CHECK(esp_wifi_stop());
+}
 
+bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAuthmode, uint8_t aRetryMax) {
+    gRetryCounter = 0;
+    gRetryMax = aRetryMax;
     wifi_config_t wifi_config = {0};
     strcpy((char*) wifi_config.sta.ssid, aSsid);
     strcpy((char*) wifi_config.sta.password, aPassword);

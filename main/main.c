@@ -35,6 +35,8 @@
 
 #include "efuse.h"
 
+#include "wifi_ota.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -279,6 +281,30 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
+void wifi_connect_to_stored() {
+    nvs_handle_t handle;
+    nvs_open("system", NVS_READWRITE, &handle);
+    char ssid[33];
+    char password[33];
+    size_t requiredSize;
+    esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
+    if (res != ESP_OK) {
+        strcpy(ssid, "");
+    } else if (requiredSize < sizeof(ssid)) {
+        res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
+        if (res != ESP_OK) strcpy(ssid, "");
+        res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
+        if (res != ESP_OK) {
+            strcpy(password, "");
+        } else if (requiredSize < sizeof(password)) {
+            res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
+            if (res != ESP_OK) strcpy(password, "");
+        }
+    }
+    nvs_close(handle);
+    wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+}
+
 void app_main(void) {
     esp_err_t res;
     
@@ -379,6 +405,9 @@ void app_main(void) {
     ws2812_init(GPIO_LED_DATA);
     uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+    
+    /* Start WiFi */
+    wifi_init();
 
     /* Launcher menu */
     while (true) {
@@ -399,29 +428,12 @@ void app_main(void) {
             appfs_store_app(pax_buffer, ili9341, framebuffer);
          } else if (menu_action == ACTION_WIFI_CONNECT) {
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Connecting...");
-            nvs_handle_t handle;
-            nvs_open("system", NVS_READWRITE, &handle);
-            char ssid[33];
-            char password[33];
-            size_t requiredSize;
-            esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
-            if (res != ESP_OK) {
-                strcpy(ssid, "");
-            } else if (requiredSize < sizeof(ssid)) {
-                res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
-                if (res != ESP_OK) strcpy(ssid, "");
-                res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
-                if (res != ESP_OK) {
-                    strcpy(password, "");
-                } else if (requiredSize < sizeof(password)) {
-                    res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
-                    if (res != ESP_OK) strcpy(password, "");
-                }
-            }
-            nvs_close(&handle);
-            wifi_init(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+            wifi_connect_to_stored();
         } else if (menu_action == ACTION_OTA) {
+            graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Connecting...");
+            wifi_connect_to_stored();
             graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Firmware update...");
+            ota_update();
         } else if (menu_action == ACTION_SETTINGS) {
             while (true) {
                 menu_wifi_settings(rp2040->queue, pax_buffer, ili9341, framebuffer, &menu_action);
@@ -457,7 +469,7 @@ void app_main(void) {
                     } else {
                         graphics_task(pax_buffer, ili9341, framebuffer, NULL, "Canceled");
                     }
-                    nvs_close(&handle);
+                    nvs_close(handle);
                 } else if (menu_action == ACTION_WIFI_LIST) {
                     nvs_handle_t handle;
                     nvs_open("system", NVS_READWRITE, &handle);
@@ -478,7 +490,7 @@ void app_main(void) {
                             if (res != ESP_OK) strcpy(password, "");
                         }
                     }
-                    nvs_close(&handle);
+                    nvs_close(handle);
                     char buffer[300];
                     snprintf(buffer, sizeof(buffer), "SSID is %s\nPassword is %s", ssid, password);
                     graphics_task(pax_buffer, ili9341, framebuffer, NULL, buffer);
