@@ -12,5 +12,5 @@
 #include "menu.h"
 
 
-esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_t* menu, char* message);
-bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, uint8_t* framebuffer, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize);
+esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341, menu_t* menu, char* message);
+bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize);

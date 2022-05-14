@@ -4,18 +4,18 @@
 #include "pax_keyboard.h"
 #include "rp2040.h"
 
-void render_message(pax_buf_t *aBuffer, char* message, float aPosX, float aPosY, float aWidth, float aHeight) {
+void render_message(pax_buf_t *pax_buffer, char* message, float aPosX, float aPosY, float aWidth, float aHeight) {
     pax_col_t fgColor = 0xFFFF0000;
     pax_col_t bgColor = 0xFFFFD4D4;
-    pax_clip(aBuffer, aPosX, aPosY, aWidth, aHeight);
-    pax_simple_rect(aBuffer, bgColor, aPosX, aPosY, aWidth, aHeight);
-    pax_outline_rect(aBuffer, fgColor, aPosX, aPosY, aWidth, aHeight);
-    pax_clip(aBuffer, aPosX + 1, aPosY + 1, aWidth - 2, aHeight - 2);
-    pax_draw_text(aBuffer, fgColor, NULL, 18, aPosX + 1, aPosY + 1, message);
-    pax_noclip(aBuffer);
+    pax_clip(pax_buffer, aPosX, aPosY, aWidth, aHeight);
+    pax_simple_rect(pax_buffer, bgColor, aPosX, aPosY, aWidth, aHeight);
+    pax_outline_rect(pax_buffer, fgColor, aPosX, aPosY, aWidth, aHeight);
+    pax_clip(pax_buffer, aPosX + 1, aPosY + 1, aWidth - 2, aHeight - 2);
+    pax_draw_text(pax_buffer, fgColor, NULL, 18, aPosX + 1, aPosY + 1, message);
+    pax_noclip(pax_buffer);
 }
 
-esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* framebuffer, menu_t* menu, char* message) {
+esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341,  menu_t* menu, char* message) {
     pax_background(pax_buffer, 0xCCCCCC);
     if (menu != NULL) {
         menu_render(pax_buffer, menu, 10, 10, 320-20, 240-20);
@@ -25,13 +25,13 @@ esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341, uint8_t* frameb
         render_message(pax_buffer, message, 20, 110, 320-40, 20);
     }
 
-    return ili9341_write(ili9341, framebuffer);
+    return ili9341_write(ili9341, pax_buffer->buf);
 }
 
-bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, uint8_t* framebuffer, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize) {
+bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize) {
     bool accepted = false;
     pkb_ctx_t kb_ctx;
-    pkb_init(aBuffer, &kb_ctx, aOutput);
+    pkb_init(pax_buffer, &kb_ctx, aOutput);
 
     pax_col_t fgColor = 0xFF000000;
     pax_col_t bgColor = 0xFFFFFFFF;
@@ -51,17 +51,17 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, ui
     float titleHeight = 20;
     float hintHeight = 14;
 
-    pax_noclip(aBuffer);
-    pax_simple_rect(aBuffer, shadowColor, aPosX+5, aPosY+5, aWidth, aHeight);
-    pax_simple_rect(aBuffer, bgColor, aPosX, aPosY, aWidth, aHeight);
-    pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
-    pax_simple_rect(aBuffer, titleBgColor, aPosX, aPosY, aWidth, titleHeight);
-    pax_simple_line(aBuffer, titleColor, aPosX + 1, aPosY + titleHeight, aPosX + aWidth - 2, aPosY + titleHeight - 1);
-    pax_clip(aBuffer, aPosX + 1, aPosY + 1, aWidth - 2, titleHeight - 2);
-    pax_draw_text(aBuffer, titleColor, NULL, titleHeight - 2, aPosX + 1, aPosY + 1, aTitle);
-    pax_clip(aBuffer, aPosX + 1, aPosY + aHeight - hintHeight, aWidth - 2, hintHeight);
-    pax_draw_text(aBuffer, borderColor, NULL, hintHeight - 2, aPosX + 1, aPosY + aHeight - hintHeight, aHint);
-    pax_noclip(aBuffer);
+    pax_noclip(pax_buffer);
+    pax_simple_rect(pax_buffer, shadowColor, aPosX+5, aPosY+5, aWidth, aHeight);
+    pax_simple_rect(pax_buffer, bgColor, aPosX, aPosY, aWidth, aHeight);
+    pax_outline_rect(pax_buffer, borderColor, aPosX, aPosY, aWidth, aHeight);
+    pax_simple_rect(pax_buffer, titleBgColor, aPosX, aPosY, aWidth, titleHeight);
+    pax_simple_line(pax_buffer, titleColor, aPosX + 1, aPosY + titleHeight, aPosX + aWidth - 2, aPosY + titleHeight - 1);
+    pax_clip(pax_buffer, aPosX + 1, aPosY + 1, aWidth - 2, titleHeight - 2);
+    pax_draw_text(pax_buffer, titleColor, NULL, titleHeight - 2, aPosX + 1, aPosY + 1, aTitle);
+    pax_clip(pax_buffer, aPosX + 1, aPosY + aHeight - hintHeight, aWidth - 2, hintHeight);
+    pax_draw_text(pax_buffer, borderColor, NULL, hintHeight - 2, aPosX + 1, aPosY + aHeight - hintHeight, aHint);
+    pax_noclip(pax_buffer);
 
     kb_ctx.x = aPosX + 1;
     kb_ctx.y = aPosY + titleHeight + 1 ;
@@ -142,8 +142,8 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* aBuffer, ILI9341* ili9341, ui
         }
         pkb_loop(&kb_ctx);
         if (kb_ctx.dirty) {
-            pkb_redraw(aBuffer, &kb_ctx);
-            ili9341_write(ili9341, framebuffer);
+            pkb_redraw(pax_buffer, &kb_ctx);
+            ili9341_write(ili9341, pax_buffer->buf);
         }
         if (kb_ctx.input_accepted) {
             memset(aOutput, 0, aOutputSize);
