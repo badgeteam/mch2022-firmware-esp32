@@ -38,6 +38,7 @@
 #include "wifi_ota.h"
 
 #include "esp_vfs.h"
+#include "esp_vfs_fat.h"
 
 static const char *TAG = "main";
 
@@ -55,6 +56,7 @@ typedef enum action {
     ACTION_WIFI_LIST,
     ACTION_BACK,
     ACTION_FILE_BROWSER,
+    ACTION_FILE_BROWSER_INT,
     ACTION_UNINSTALL
 } menu_action_t;
 
@@ -151,7 +153,11 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     
     menu_args_t* file_browser_args = malloc(sizeof(menu_args_t));
     file_browser_args->action = ACTION_FILE_BROWSER;
-    menu_insert_item(menu, "File browser", NULL, file_browser_args, -1);
+    menu_insert_item(menu, "File browser (sd card)", NULL, file_browser_args, -1);
+    
+    menu_args_t* file_browser_int_args = malloc(sizeof(menu_args_t));
+    file_browser_int_args->action = ACTION_FILE_BROWSER_INT;
+    menu_insert_item(menu, "File browser (internal)", NULL, file_browser_int_args, -1);
     
     menu_args_t* uninstall_args = malloc(sizeof(menu_args_t));
     uninstall_args->action = ACTION_UNINSTALL;
@@ -485,8 +491,9 @@ void find_parent_dir(char* path, char* parent) {
     parent[last_separator] = '\0';
 }
 
-void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    char path[512] = "/sd";
+void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* initial_path) {
+    char path[512] = {0};
+    strncpy(path, initial_path, sizeof(path));
     while (true) {    
         menu_t* menu = menu_alloc(path);
         DIR* dir = opendir(path);
@@ -679,11 +686,33 @@ void app_main(void) {
         esp_restart();
     }
     
-    /* Start SD card */
+    /* Start internal filesystem */
+    const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
+    
+    wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
+    
+    if (fs_partition != NULL) {
+        const esp_vfs_fat_mount_config_t mount_config = {
+            .format_if_mount_failed = true,
+            .max_files              = 5,
+            .allocation_unit_size   = 0,
+        };
+        esp_err_t res = esp_vfs_fat_spiflash_mount("/internal", "locfd", &mount_config, &s_wl_handle);
+        if (res != ESP_OK) {
+            ESP_LOGE(TAG, "failed to mount locfd (%d)", res);
+        } else {
+            ESP_LOGI(TAG, "Internal filesystem mounted");
+        }
+    } else {
+        ESP_LOGE(TAG, "locfd partition not found");
+    }
+    
+    /* Start SD card filesystem */
     res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     if (sdcard_ready) {
-        list_files_in_folder("/sd");
+        ESP_LOGI(TAG, "SD card filesystem mounted");
+        //list_files_in_folder("/sd");
     }
 
     /* Start LEDs */
@@ -719,7 +748,9 @@ void app_main(void) {
             graphics_task(pax_buffer, ili9341, NULL, "Firmware update...");
             ota_update();
         } else if (menu_action == ACTION_FILE_BROWSER) {
-            file_browser(rp2040->queue, pax_buffer, ili9341);
+            file_browser(rp2040->queue, pax_buffer, ili9341, "/sd");
+        } else if (menu_action == ACTION_FILE_BROWSER_INT) {
+            file_browser(rp2040->queue, pax_buffer, ili9341, "/internal");
         } else if (menu_action == ACTION_UNINSTALL) {
             uninstall_browser(rp2040->queue, pax_buffer, ili9341);
         } else if (menu_action == ACTION_SETTINGS) {
