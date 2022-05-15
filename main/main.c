@@ -708,7 +708,7 @@ void app_main(void) {
     }
     
     /* Start SD card filesystem */
-    res = mount_sd(SD_CMD, SD_CLK, SD_D0, SD_PWR, "/sd", false, 5);
+    res = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
