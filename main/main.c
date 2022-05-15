@@ -645,7 +645,16 @@ void app_main(void) {
     }
 
     rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
-    
+
+    uint8_t rp2040_uid[8];
+    if (rp2040_get_uid(rp2040, rp2040_uid) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get RP2040 UID");
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "Failed to read UID", NULL, NULL);
+        esp_restart();
+    }
+
+    printf("RP2040 UID: %02X%02X%02X%02X%02X%02X%02X%02X\n", rp2040_uid[0], rp2040_uid[1], rp2040_uid[2], rp2040_uid[3], rp2040_uid[4], rp2040_uid[5], rp2040_uid[6], rp2040_uid[7]);
+
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "ICE40 FPGA error", NULL, NULL);
