@@ -31,3 +31,6 @@
 [submodule "components/mch2022-efuse"]
 	path = components/mch2022-efuse
 	url = https://github.com/badgeteam/esp32-component-mch2022-efuse.git
+[submodule "components/mch2022-bsp"]
+	path = components/mch2022-bsp
+	url = https://github.com/badgeteam/esp32-component-mch2022-bsp.git
