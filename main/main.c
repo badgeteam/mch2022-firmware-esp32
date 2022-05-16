@@ -40,6 +40,8 @@
 #include "esp_vfs.h"
 #include "esp_vfs_fat.h"
 
+#include "fpga_download.h"
+
 static const char *TAG = "main";
 
 typedef enum action {
@@ -49,6 +51,7 @@ typedef enum action {
     ACTION_SETTINGS,
     ACTION_OTA,
     ACTION_FPGA,
+    ACTION_FPGA_DL,
     ACTION_RP2040_BL,
     ACTION_WIFI_CONNECT,
     ACTION_WIFI_SCAN,
@@ -138,6 +141,10 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* ota_args = malloc(sizeof(menu_args_t));
     ota_args->action = ACTION_OTA;
     menu_insert_item(menu, "Firmware update", NULL, ota_args, -1);
+    
+    menu_args_t* fpga_dl_args = malloc(sizeof(menu_args_t));
+    fpga_dl_args->action = ACTION_FPGA_DL;
+    menu_insert_item(menu, "FPGA download", NULL, fpga_dl_args, -1);
 
     menu_args_t* fpga_args = malloc(sizeof(menu_args_t));
     fpga_args->action = ACTION_FPGA;
@@ -742,6 +749,8 @@ void app_main(void) {
         } else if (menu_action == ACTION_FPGA) {
             graphics_task(pax_buffer, ili9341, NULL, "Loading...");
             fpga_test(ili9341, ice40, rp2040->queue);
+        } else if (menu_action == ACTION_FPGA_DL) {
+            fpga_download(ice40, pax_buffer, ili9341);
         } else if (menu_action == ACTION_RP2040_BL) {
             graphics_task(pax_buffer, ili9341, NULL, "RP2040 update...");
             rp2040_reboot_to_bootloader(rp2040);
