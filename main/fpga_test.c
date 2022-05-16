@@ -156,12 +156,6 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
         reload_fpga = false;
         printf("LCD deinit...\n");
         ili9341_deinit(ili9341);
-        printf("LCD deselect...\n");
-        ili9341_select(ili9341, false);
-        printf("Wait...\n");
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        printf("LCD select...\n");
-        ili9341_select(ili9341, true);
 
         printf("FPGA load...\n");
         if (load_old_bitstream) {
