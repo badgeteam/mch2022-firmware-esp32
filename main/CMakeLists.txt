@@ -10,6 +10,7 @@ idf_component_register(
          "system_wrapper.c"
          "wifi_connection.c"
          "wifi_ota.c"
+         "fpga_download.c"
     INCLUDE_DIRS "." "include"
     EMBED_TXTFILES ${project_dir}/server_certs/isrgrootx1.pem
 )
