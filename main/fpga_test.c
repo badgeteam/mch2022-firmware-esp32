@@ -114,37 +114,56 @@ esp_err_t verify_file_in_psram(ICE40* ice40, FILE* fd) {
     return ESP_OK;
 }
 
-void test_spi(ICE40* ice40) {
+bool test_spi(ICE40* ice40) {
     esp_err_t res;
-    uint8_t r1[8], r2[8];
-    uint8_t data0[8] = {0x01, 0x23, 0x45, 0x67, 0x01, 0x23, 0x45, 0x67};
-    uint8_t data1[8] = {0x89, 0xab, 0xcd, 0xef, 0x89, 0xab, 0xcd, 0xef};
+    uint8_t data_tx[256];
+    uint8_t data_rx[128];
 
-    res = ice40_send(ice40, data0, 8);
+    // Generate pseudo random sequence
+    data_tx[0] = 1;
+    for (int i = 1; i < 256; i++)
+        data_tx[i] = (data_tx[i-1] << 1) ^ ((data_tx[i-1] & 0x80) ? 0x1d : 0x00);
+
+    // Send first 128 byte at high speed
+    res = ice40_send_turbo(ice40, &data_tx[0], 128);
     if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Transaction 1 failed");
-        return;
+        ESP_LOGE(TAG, "Transaction 1 failed (Turbo TX)");
+        return false;
     }
 
-    res = ice40_transaction(ice40, data1, 8, r1, 8);
+    // Execute full duplex transaction with next 128 bytes
+    res = ice40_transaction(ice40, &data_tx[128], 128, data_rx, 128);
     if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Transaction 2 failed");
-        return;
+        ESP_LOGE(TAG, "Transaction 2 failed (Full Duplex)");
+        return false;
     }
 
-    printf("Transaction 2 result: ");
-    for (uint8_t i = 0; i < 8; i++) printf("%02X ", r1[i]);
-    printf("\n");
-
-    res = ice40_receive(ice40, r2, 8);
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Transaction 3 failed");
-        return;
+    // Validate RX data
+    if (memcmp(&data_rx[1], &data_tx[0], 127)) {
+        printf("Transaction 1->2 integrity fail:\n");
+        for (int i = 0; i < 128; i++)
+            printf("%02X%c", data_rx[i], ((i&0xf)==0xf) ? '\n' : ' ');
+        printf("\n");
+        return false;
     }
 
-    printf("Transaction 3 result: ");
-    for (uint8_t i = 0; i < 8; i++) printf("%02X ", r2[i]);
-    printf("\n");
+    // Receive half duplex
+    res = ice40_receive(ice40, data_rx, 128);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Transaction 3 failed (Half Duplex RX)");
+        return false;
+    }
+
+    // Validate RX data
+    if (memcmp(&data_rx[1], &data_tx[128], 127)) {
+        printf("Transaction 2->3 integrity fail:\n");
+        for (int i = 0; i < 128; i++)
+            printf("%02X%c", data_rx[i], ((i&0xf)==0xf) ? '\n' : ' ');
+        printf("\n");
+        return false;
+    }
+
+    return true;
 }
 
 void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
@@ -170,8 +189,15 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
             printf("Bitstream loaded succesfully!\n");
         }
 
-        test_spi(ice40);
-        
+        int i;
+        for (i = 0; i < 256; i++)
+            if (!test_spi(ice40))
+                break;
+        if (i == 256)
+            printf("SPI test success\n");
+        else
+            printf("SPI test failure at iteration %d\n", i);
+
         bool waitForChoice = true;
         while (waitForChoice) {
             rp2040_input_message_t buttonMessage = {0};
