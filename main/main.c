@@ -686,6 +686,18 @@ void app_main(void) {
         esp_restart();
     }
 
+    if (bsp_bme680_init() != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize the BME680 position sensor");
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "BME680 sensor error", "Check I2C bus", "Remove SAO and try again");
+        esp_restart();
+    }
+
+    BME680* bme680 = get_bme680();
+    if (bme680 == NULL) {
+        ESP_LOGE(TAG, "bme680 is NULL");
+        esp_restart();
+    }
+
     /* Start AppFS */
     res = appfs_init();
     if (res != ESP_OK) {
