@@ -21,3 +21,9 @@ Source code included as submodules is licensed separately, please check the foll
 | components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |
 | components/ws2812           | MIT                               | Unlicense / Public domain                              |
 
+## How to make
+
+git clone --recursive https://github.com/badgeteam/mch2022-firmware-esp32
+cd mch2022-firmware-esp32
+make prepare
+make
