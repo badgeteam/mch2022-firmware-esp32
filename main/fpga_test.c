@@ -184,6 +184,8 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
         }
         if (res != ESP_OK) {
             printf("Failed to load app bitstream into FPGA (%d)\n", res);
+            ice40_disable(ice40);
+            ili9341_init(ili9341);
             return;
         } else {
             printf("Bitstream loaded succesfully!\n");
