@@ -4,6 +4,7 @@
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
+#include "esp_wpa2.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "lwip/err.h"
@@ -43,15 +44,15 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
 
 void wifi_init() {
     s_wifi_event_group = xEventGroupCreate();
-
+    
     ESP_ERROR_CHECK(esp_netif_init());
-
+    
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     esp_netif_create_default_wifi_sta();
-
+    
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
+    
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL, &instance_any_id));
@@ -67,13 +68,17 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
     strcpy((char*) wifi_config.sta.ssid, aSsid);
     strcpy((char*) wifi_config.sta.password, aPassword);
     wifi_config.sta.threshold.authmode = aAuthmode;
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
-    ESP_ERROR_CHECK(esp_wifi_start() );
-
+    
+    // Set WiFi config.
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    // Disable 11b as NOC asked.
+    esp_wifi_config_11b_rate(WIFI_IF_STA, true);
+    // Start WiFi.
+    ESP_ERROR_CHECK(esp_wifi_start());
+    
     ESP_LOGI(TAG, "Connecting to WiFi...");
-
+    
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
@@ -89,4 +94,53 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
         ESP_ERROR_CHECK(esp_wifi_stop());
     }
     return false;
+}
+
+bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonIdent, const char* aPassword, uint8_t aRetryMax) {
+    gRetryCounter = 0;
+    gRetryMax = aRetryMax;
+    wifi_config_t wifi_config = {0};
+    if (strlen(aSsid) > 32) {
+        ESP_LOGE(TAG, "SSID is too long (%zu > 32)!", strlen(aSsid));
+        return false;
+    }
+    strncpy((char*) wifi_config.sta.ssid, aSsid, 32);
+    
+    // Set WiFi config.
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    
+    // Set WPA2 ENT config.
+    esp_wifi_sta_wpa2_ent_set_identity((const uint8_t *) aAnonIdent, strlen(aAnonIdent));
+    esp_wifi_sta_wpa2_ent_set_username((const uint8_t *) aIdent, strlen(aIdent));
+    esp_wifi_sta_wpa2_ent_set_password((const uint8_t *) aPassword, strlen(aPassword));
+    esp_wifi_sta_wpa2_ent_set_ttls_phase2_method(ESP_EAP_TTLS_PHASE2_MSCHAPV2);
+    // Enable enterprise auth.
+    esp_wifi_sta_wpa2_ent_enable();
+    // Disable 11b as NOC asked.
+    esp_wifi_config_11b_rate(WIFI_IF_STA, true);
+    // Start the connection.
+    esp_wifi_start();
+    
+    ESP_LOGI(TAG, "Connecting to WiFi...");
+    
+    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group, WIFI_CONNECTED_BIT | WIFI_FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually happened. */
+    if (bits & WIFI_CONNECTED_BIT) {
+        ESP_LOGI(TAG, "Connected to WiFi");
+        return true;
+    } else if (bits & WIFI_FAIL_BIT) {
+        ESP_LOGE(TAG, "Failed to connect");
+        ESP_ERROR_CHECK(esp_wifi_stop());
+    } else {
+        ESP_LOGE(TAG, "Unknown event received while waiting on connection");
+        ESP_ERROR_CHECK(esp_wifi_stop());
+    }
+    return false;
+}
+
+void wifi_scan() {
+    
 }

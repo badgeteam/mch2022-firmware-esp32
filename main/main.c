@@ -87,9 +87,9 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* 
         vTaskDelay(100 / portTICK_PERIOD_MS);
         return;
     }
-    
+
     ESP_LOGI(TAG, "Application size %d", app_size);
-    
+
     res = appfsCreateFile(label, app_size, &handle);
     if (res != ESP_OK) {
         graphics_task(pax_buffer, ili9341, NULL, "Failed to create on AppFS");
@@ -117,7 +117,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_t* menu = menu_alloc("Main menu");
     *appfs_fd = APPFS_INVALID_FD;
     *menu_action = ACTION_NONE;
-    
+
     while (1) {
         *appfs_fd = appfsNextEntry(*appfs_fd);
         if (*appfs_fd == APPFS_INVALID_FD) break;
@@ -133,15 +133,15 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* install_args = malloc(sizeof(menu_args_t));
     install_args->action = ACTION_INSTALLER;
     menu_insert_item(menu, "Hatchery", NULL, install_args, -1);
-    
+
     menu_args_t* settings_args = malloc(sizeof(menu_args_t));
     settings_args->action = ACTION_SETTINGS;
     menu_insert_item(menu, "WiFi settings", NULL, settings_args, -1);
-    
+
     menu_args_t* ota_args = malloc(sizeof(menu_args_t));
     ota_args->action = ACTION_OTA;
     menu_insert_item(menu, "Firmware update", NULL, ota_args, -1);
-    
+
     menu_args_t* fpga_dl_args = malloc(sizeof(menu_args_t));
     fpga_dl_args->action = ACTION_FPGA_DL;
     menu_insert_item(menu, "FPGA download", NULL, fpga_dl_args, -1);
@@ -149,23 +149,23 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_args_t* fpga_args = malloc(sizeof(menu_args_t));
     fpga_args->action = ACTION_FPGA;
     menu_insert_item(menu, "FPGA test", NULL, fpga_args, -1);
-    
+
     menu_args_t* rp2040bl_args = malloc(sizeof(menu_args_t));
     rp2040bl_args->action = ACTION_RP2040_BL;
     menu_insert_item(menu, "RP2040 bootloader", NULL, rp2040bl_args, -1);
-    
+
     menu_args_t* wifi_connect_args = malloc(sizeof(menu_args_t));
     wifi_connect_args->action = ACTION_WIFI_CONNECT;
     menu_insert_item(menu, "WiFi connect", NULL, wifi_connect_args, -1);
-    
+
     menu_args_t* file_browser_args = malloc(sizeof(menu_args_t));
     file_browser_args->action = ACTION_FILE_BROWSER;
     menu_insert_item(menu, "File browser (sd card)", NULL, file_browser_args, -1);
-    
+
     menu_args_t* file_browser_int_args = malloc(sizeof(menu_args_t));
     file_browser_int_args->action = ACTION_FILE_BROWSER_INT;
     menu_insert_item(menu, "File browser (internal)", NULL, file_browser_int_args, -1);
-    
+
     menu_args_t* uninstall_args = malloc(sizeof(menu_args_t));
     uninstall_args->action = ACTION_UNINSTALL;
     menu_insert_item(menu, "Uninstall app", NULL, uninstall_args, -1);
@@ -205,18 +205,18 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
             graphics_task(pax_buffer, ili9341, menu, NULL);
             render = false;
         }
-        
+
         if (menuArgs != NULL) {
             *appfs_fd = menuArgs->fd;
             *menu_action = menuArgs->action;
             break;
         }
     }
-    
+
     for (size_t index = 0; index < menu_get_length(menu); index++) {
         free(menu_get_callback_args(menu, index));
     }
-    
+
     menu_free(menu);
 }
 
@@ -227,15 +227,15 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
     menu_args_t* wifi_scan_args = malloc(sizeof(menu_args_t));
     wifi_scan_args->action = ACTION_WIFI_SCAN;
     menu_insert_item(menu, "Add by scan...", NULL, wifi_scan_args, -1);
-    
+
     menu_args_t* wifi_manual_args = malloc(sizeof(menu_args_t));
     wifi_manual_args->action = ACTION_WIFI_MANUAL;
     menu_insert_item(menu, "Add manually...", NULL, wifi_manual_args, -1);
-    
+
     menu_args_t* wifi_list_args = malloc(sizeof(menu_args_t));
     wifi_list_args->action = ACTION_WIFI_LIST;
     menu_insert_item(menu, "List known networks", NULL, wifi_list_args, -1);
-    
+
     menu_args_t* back_args = malloc(sizeof(menu_args_t));
     back_args->action = ACTION_BACK;
     menu_insert_item(menu, "< Back", NULL, back_args, -1);
@@ -275,17 +275,17 @@ void menu_wifi_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
             graphics_task(pax_buffer, ili9341, menu, NULL);
             render = false;
         }
-        
+
         if (menuArgs != NULL) {
             *menu_action = menuArgs->action;
             break;
         }
     }
-    
+
     for (size_t index = 0; index < menu_get_length(menu); index++) {
         free(menu_get_callback_args(menu, index));
     }
-    
+
     menu_free(menu);
 }
 
@@ -306,28 +306,77 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
+// void wifi_connect_to_stored() {
+//     wifi_connect_ent("MCH2022-legacy", "thefunny", "q", "nope, you are not", 3);
+// }
+
 void wifi_connect_to_stored() {
+    // Open NVS.
     nvs_handle_t handle;
     nvs_open("system", NVS_READWRITE, &handle);
-    char ssid[33];
-    char password[33];
-    size_t requiredSize;
-    esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
-    if (res != ESP_OK) {
-        strcpy(ssid, "");
-    } else if (requiredSize < sizeof(ssid)) {
-        res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
-        if (res != ESP_OK) strcpy(ssid, "");
-        res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
-        if (res != ESP_OK) {
-            strcpy(password, "");
-        } else if (requiredSize < sizeof(password)) {
-            res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
-            if (res != ESP_OK) strcpy(password, "");
-        }
+    uint8_t use_ent;
+    char *ssid = NULL;
+    char *ident = NULL;
+    char *anon_ident = NULL;
+    char *password = NULL;
+    size_t len;
+    
+    // Read NVS.
+    esp_err_t res;
+    // Read SSID.
+    res = nvs_get_str(handle, "wifi.ssid", NULL, &len);
+    if (res) goto errcheck;
+    ssid = malloc(len);
+    res = nvs_get_str(handle, "wifi.ssid", ssid, &len);
+    if (res) goto errcheck;
+    // Check whether connection is enterprise.
+    res = nvs_get_u8(handle, "wifi.use_ent", &use_ent);
+    if (res) goto errcheck;
+    if (use_ent) {
+        // Read enterprise-specific parameters.
+        // Read identity.
+        res = nvs_get_str(handle, "wifi.ident", NULL, &len);
+        if (res) goto errcheck;
+        ident = malloc(len);
+        res = nvs_get_str(handle, "wifi.ident", ident, &len);
+        // Read anonymous identity.
+        res = nvs_get_str(handle, "wifi.anon_ident", NULL, &len);
+        if (res) goto errcheck;
+        anon_ident = malloc(len);
+        res = nvs_get_str(handle, "wifi.anon_ident", anon_ident, &len);
+        if (res) goto errcheck;
     }
+    // Read password.
+    res = nvs_get_str(handle, "wifi.password", NULL, &len);
+    if (res) goto errcheck;
+    password = malloc(len);
+    res = nvs_get_str(handle, "wifi.password", password, &len);
+    if (res) goto errcheck;
+    
+    // Close NVS.
     nvs_close(handle);
-    wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+    
+    // Open the appropriate connection.
+    if (use_ent) {
+        wifi_connect_ent(ssid, ident, anon_ident, password, 3);
+    } else {
+        wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+    }
+    
+    errcheck:
+    if (res == ESP_ERR_NVS_NOT_FOUND || res == ESP_ERR_NVS_NOT_INITIALIZED) {
+        // When NVS is not initialised.
+        ESP_LOGI(TAG, "WiFi settings not stored in NVS.");
+    } else if (res) {
+        // Other errors.
+        ESP_LOGE(TAG, "Error connecting to WiFi: %s", esp_err_to_name(res));
+    }
+    
+    // Free memory.
+    if (ssid) free(ssid);
+    if (ident) free(ident);
+    if (anon_ident) free(anon_ident);
+    if (password) free(password);
 }
 
 void list_files_in_folder(const char* path) {
@@ -336,7 +385,7 @@ void list_files_in_folder(const char* path) {
         ESP_LOGE(TAG, "Failed to open directory %s", path);
         return;
     }
-    
+
     struct dirent *ent;
     char type;
     char size[12];
@@ -459,7 +508,7 @@ void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341*
             graphics_task(pax_buffer, ili9341, menu, NULL);
             render = false;
         }
-        
+
         if (menuArgs != NULL) {
             char message[1024];
             sprintf(message, "Uninstalling %s...", menuArgs->name);
@@ -469,16 +518,16 @@ void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341*
             menuArgs = NULL;
             break;
         }
-        
+
         if (exit) {
             break;
         }
     }
-    
+
     for (size_t index = 0; index < menu_get_length(menu); index++) {
         free(menu_get_callback_args(menu, index));
     }
-    
+
     menu_free(menu);
 }
 
@@ -493,7 +542,7 @@ void find_parent_dir(char* path, char* parent) {
     for (size_t index = 0; index < strlen(path); index++) {
         if (path[index] == '/') last_separator = index;
     }
-    
+
     strcpy(parent, path);
     parent[last_separator] = '\0';
 }
@@ -501,7 +550,7 @@ void find_parent_dir(char* path, char* parent) {
 void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* initial_path) {
     char path[512] = {0};
     strncpy(path, initial_path, sizeof(path));
-    while (true) {    
+    while (true) {
         menu_t* menu = menu_alloc(path);
         DIR* dir = opendir(path);
         if (dir == NULL) {
@@ -575,7 +624,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                 graphics_task(pax_buffer, ili9341, menu, NULL);
                 render = false;
             }
-            
+
             if (menuArgs != NULL) {
                 if (menuArgs->type == 'd') {
                     strcpy(path, menuArgs->path);
@@ -587,23 +636,23 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                 menuArgs = NULL;
                 render = true;
             }
-            
+
             if (exit) {
                 break;
             }
         }
-        
+
         for (size_t index = 0; index < menu_get_length(menu); index++) {
             free(menu_get_callback_args(menu, index));
         }
-        
+
         menu_free(menu);
     }
 }
 
 void app_main(void) {
     esp_err_t res;
-    
+
     /* Initialize memory */
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
     if (framebuffer == NULL) {
@@ -611,40 +660,40 @@ void app_main(void) {
         esp_restart();
     }
     memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
-    
+
     pax_buf_t* pax_buffer = malloc(sizeof(pax_buf_t));
     if (framebuffer == NULL) {
         ESP_LOGE(TAG, "Failed to allocate buffer for PAX graphics library");
         esp_restart();
     }
     memset(pax_buffer, 0, sizeof(pax_buf_t));
-    
+
     pax_buf_init(pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
-    
+
     /* Initialize hardware */
-    
+
     efuse_protect();
-    
+
     if (bsp_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize basic board support functions");
         esp_restart();
     }
-    
+
     ILI9341* ili9341 = get_ili9341();
     if (ili9341 == NULL) {
         ESP_LOGE(TAG, "ili9341 is NULL");
         esp_restart();
     }
 
-    
+
     display_boot_screen(pax_buffer, ili9341);
-    
+
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "RP2040 co-processor error", NULL, NULL);
         esp_restart();
     }
-    
+
     RP2040* rp2040 = get_rp2040();
     if (rp2040 == NULL) {
         ESP_LOGE(TAG, "rp2040 is NULL");
@@ -667,13 +716,13 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "ICE40 FPGA error", NULL, NULL);
         esp_restart();
     }
-    
+
     ICE40* ice40 = get_ice40();
     if (ice40 == NULL) {
         ESP_LOGE(TAG, "ice40 is NULL");
         esp_restart();
     }
-    
+
     if (bsp_bno055_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BNO055 position sensor");
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "BNO055 sensor error", "Check I2C bus", "Remove SAO and try again");
@@ -705,7 +754,7 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
         esp_restart();
     }
-    
+
     /* Start NVS */
     res = nvs_init();
     if (res != ESP_OK) {
@@ -713,12 +762,12 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
         esp_restart();
     }
-    
+
     /* Start internal filesystem */
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
-    
+
     wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
-    
+
     if (fs_partition != NULL) {
         const esp_vfs_fat_mount_config_t mount_config = {
             .format_if_mount_failed = true,
@@ -734,7 +783,7 @@ void app_main(void) {
     } else {
         ESP_LOGE(TAG, "locfd partition not found");
     }
-    
+
     /* Start SD card filesystem */
     res = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
     bool sdcard_ready = (res == ESP_OK);
@@ -747,7 +796,7 @@ void app_main(void) {
     ws2812_init(GPIO_LED_DATA);
     uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
     ws2812_send_data(ledBuffer, sizeof(ledBuffer));
-    
+
     /* Start WiFi */
     wifi_init();
 
@@ -769,7 +818,7 @@ void app_main(void) {
             esp_restart();
         } else if (menu_action == ACTION_INSTALLER) {
             graphics_task(pax_buffer, ili9341, NULL, "Not implemented");
-         } else if (menu_action == ACTION_WIFI_CONNECT) {
+        } else if (menu_action == ACTION_WIFI_CONNECT) {
             graphics_task(pax_buffer, ili9341, NULL, "Connecting...");
             wifi_connect_to_stored();
         } else if (menu_action == ACTION_OTA) {
@@ -818,6 +867,7 @@ void app_main(void) {
                     } else {
                         graphics_task(pax_buffer, ili9341, NULL, "Canceled");
                     }
+                    nvs_set_u8(handle, "wifi.use_ent", 0);
                     nvs_close(handle);
                 } else if (menu_action == ACTION_WIFI_LIST) {
                     nvs_handle_t handle;
@@ -850,6 +900,6 @@ void app_main(void) {
         }
     }
 
-    
+
     free(framebuffer);
 }
