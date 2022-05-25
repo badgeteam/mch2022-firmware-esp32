@@ -56,7 +56,7 @@ bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
     return fpga_read_stdin(buffer, length, 3000);
 }
 
-void fpga_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     char message[64];
 
     pax_noclip(pax_buffer);
@@ -93,7 +93,6 @@ void fpga_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         
         uint8_t* buffer = malloc(length);
         if (buffer == NULL) {
-            free(buffer);
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0xa85a32);
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
@@ -141,13 +140,7 @@ void fpga_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         esp_err_t res = ice40_load_bitstream(ice40, buffer, length);
         free(buffer);
         
-        if (res == ESP_OK) {
-            while (!fpga_uart_sync(&length, &crc)) {
-                vTaskDelay(2 / portTICK_PERIOD_MS);
-            }
-            ice40_disable(ice40);
-            ili9341_init(ili9341);
-        } else {
+        if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
             pax_noclip(pax_buffer);
@@ -159,5 +152,72 @@ void fpga_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
             fpga_uninstall_uart();
             return;
         }
+
+        // Waiting for next download and sending key strokes to FPGA
+        uint16_t key_state = 0;
+        while (!fpga_uart_sync(&length, &crc)) {
+            rp2040_input_message_t buttonMessage = {0};
+            if (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
+                uint8_t pin = buttonMessage.input;
+                bool value = buttonMessage.state;
+                uint16_t key_mask = 0;
+                switch(pin) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        key_mask = 1 << 0;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        key_mask = 1 << 1;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_LEFT:
+                        key_mask = 1 << 2;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_RIGHT:
+                        key_mask = 1 << 3;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_PRESS:
+                        key_mask = 1 << 4;
+                        break;
+                    case RP2040_INPUT_BUTTON_HOME:
+                        key_mask = 1 << 5;
+                        break;
+                    case RP2040_INPUT_BUTTON_MENU:
+                        key_mask = 1 << 6;
+                        break;
+                    case RP2040_INPUT_BUTTON_SELECT:
+                        key_mask = 1 << 7;
+                        break;
+                    case RP2040_INPUT_BUTTON_START:
+                        key_mask = 1 << 8;
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                        key_mask = 1 << 9;
+                        break;
+                    case RP2040_INPUT_BUTTON_BACK:
+                        key_mask = 1 << 10;
+                    default:
+                        break;
+                }
+                if (key_mask != 0)
+                {
+                    if (value) {
+                        key_state |= key_mask;
+                    }
+                    else {
+                        key_state &= ~key_mask;
+                    }
+                    uint8_t message[5] = { 0xf5 };
+                    message[1] = key_state & 0xff;
+                    message[2] = key_state >> 8;
+                    message[3] = key_mask & 0xff;
+                    message[4] = key_mask >> 8;
+                    res = ice40_send(ice40, message, 5);
+                }
+            }
+            else {
+                vTaskDelay(2 / portTICK_PERIOD_MS);
+            }
+        }
+        ice40_disable(ice40);
+        ili9341_init(ili9341);
     }
 }

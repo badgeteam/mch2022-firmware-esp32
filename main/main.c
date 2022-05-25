@@ -811,7 +811,7 @@ void app_main(void) {
             graphics_task(pax_buffer, ili9341, NULL, "Loading...");
             fpga_test(ili9341, ice40, rp2040->queue);
         } else if (menu_action == ACTION_FPGA_DL) {
-            fpga_download(ice40, pax_buffer, ili9341);
+            fpga_download(rp2040->queue, ice40, pax_buffer, ili9341);
         } else if (menu_action == ACTION_RP2040_BL) {
             graphics_task(pax_buffer, ili9341, NULL, "RP2040 update...");
             rp2040_reboot_to_bootloader(rp2040);
