@@ -60,6 +60,77 @@ void fpga_uart_mess(const char *mess) {
     uart_write_bytes(0, mess, strlen(mess));
 }
 
+esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
+{
+    rp2040_input_message_t buttonMessage = {0};
+    while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
+        uint8_t pin = buttonMessage.input;
+        bool value = buttonMessage.state;
+        //snprintf(message, sizeof(message), "button %d %d\n", pin, value);
+        //fpga_uart_mess(message);
+        uint16_t key_mask = 0;
+        switch(pin) {
+            case RP2040_INPUT_JOYSTICK_DOWN:
+                key_mask = 1 << 0;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+                key_mask = 1 << 1;
+                break;
+            case RP2040_INPUT_JOYSTICK_LEFT:
+                key_mask = 1 << 2;
+                break;
+            case RP2040_INPUT_JOYSTICK_RIGHT:
+                key_mask = 1 << 3;
+                break;
+            case RP2040_INPUT_JOYSTICK_PRESS:
+                key_mask = 1 << 4;
+                break;
+            case RP2040_INPUT_BUTTON_HOME:
+                key_mask = 1 << 5;
+                break;
+            case RP2040_INPUT_BUTTON_MENU:
+                key_mask = 1 << 6;
+                break;
+            case RP2040_INPUT_BUTTON_SELECT:
+                key_mask = 1 << 7;
+                break;
+            case RP2040_INPUT_BUTTON_START:
+                key_mask = 1 << 8;
+                break;
+            case RP2040_INPUT_BUTTON_ACCEPT:
+                key_mask = 1 << 9;
+                break;
+            case RP2040_INPUT_BUTTON_BACK:
+                key_mask = 1 << 10;
+            default:
+                break;
+        }
+        if (key_mask != 0)
+        {
+            if (value) {
+                *key_state |= key_mask;
+            }
+            else {
+                *key_state &= ~key_mask;
+            }
+            //snprintf(message, sizeof(message), "send %04X %04X\n", key_state, key_mask);
+            //fpga_uart_mess(message);
+
+            uint8_t spi_message[5] = { 0xf4 };
+            spi_message[1] = *key_state & 0xff;
+            spi_message[2] = *key_state >> 8;
+            spi_message[3] = key_mask & 0xff;
+            spi_message[4] = key_mask >> 8;
+            esp_err_t res = ice40_send(ice40, spi_message, 5);
+            if (res != ESP_OK) {
+                return res;
+            }
+        }
+        *idle_count = 0;
+    }
+    return ESP_OK;
+}
+
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     char message[64];
 
@@ -132,7 +203,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*3, message);
             ili9341_write(ili9341, pax_buffer->buf);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            snprintf(message, sizeof(message), "CRC failed %08X %08x\n", crc, checkCrc);
+            snprintf(message, sizeof(message), "CRC incorrect %08X %08x\n", crc, checkCrc);
             fpga_uart_mess(message);
             fpga_uninstall_uart();
             return;
@@ -153,14 +224,17 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0xa85a32);
             pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "FPGA signals not done");
+            snprintf(message, sizeof(message), "Upload failed: %d", res);
+            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
             ili9341_write(ili9341, pax_buffer->buf);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            snprintf(message, sizeof(message), "loading bitstream failed with %d\n", res);
+            snprintf(message, sizeof(message), "uploading bitstream failed with %d\n", res);
+            fpga_uart_mess(message);
             fpga_uninstall_uart();
             return;
         }
-        snprintf(message, sizeof(message), "bitstream loaded\n");
+        snprintf(message, sizeof(message), "bitstream has uploaded\n");
+        fpga_uart_mess(message);
 
         // Waiting for next download and sending key strokes to FPGA
         uint16_t key_state = 0;
@@ -172,82 +246,21 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
                 }
                 idle_count = 0;
             }
-            rp2040_input_message_t buttonMessage = {0};
-            while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
-                uint8_t pin = buttonMessage.input;
-                bool value = buttonMessage.state;
-                //snprintf(message, sizeof(message), "button %d %d\n", pin, value);
-                //fpga_uart_mess(message);
-                uint16_t key_mask = 0;
-                switch(pin) {
-                    case RP2040_INPUT_JOYSTICK_DOWN:
-                        key_mask = 1 << 0;
-                        break;
-                    case RP2040_INPUT_JOYSTICK_UP:
-                        key_mask = 1 << 1;
-                        break;
-                    case RP2040_INPUT_JOYSTICK_LEFT:
-                        key_mask = 1 << 2;
-                        break;
-                    case RP2040_INPUT_JOYSTICK_RIGHT:
-                        key_mask = 1 << 3;
-                        break;
-                    case RP2040_INPUT_JOYSTICK_PRESS:
-                        key_mask = 1 << 4;
-                        break;
-                    case RP2040_INPUT_BUTTON_HOME:
-                        key_mask = 1 << 5;
-                        break;
-                    case RP2040_INPUT_BUTTON_MENU:
-                        key_mask = 1 << 6;
-                        break;
-                    case RP2040_INPUT_BUTTON_SELECT:
-                        key_mask = 1 << 7;
-                        break;
-                    case RP2040_INPUT_BUTTON_START:
-                        key_mask = 1 << 8;
-                        break;
-                    case RP2040_INPUT_BUTTON_ACCEPT:
-                        key_mask = 1 << 9;
-                        break;
-                    case RP2040_INPUT_BUTTON_BACK:
-                        key_mask = 1 << 10;
-                    default:
-                        break;
-                }
-                if (key_mask != 0)
-                {
-                    if (value) {
-                        key_state |= key_mask;
-                    }
-                    else {
-                        key_state &= ~key_mask;
-                    }
-                    //snprintf(message, sizeof(message), "send %04X %04X\n", key_state, key_mask);
-                    //fpga_uart_mess(message);
-
-                    uint8_t spi_message[5] = { 0xf4 };
-                    spi_message[1] = key_state & 0xff;
-                    spi_message[2] = key_state >> 8;
-                    spi_message[3] = key_mask & 0xff;
-                    spi_message[4] = key_mask >> 8;
-                    res = ice40_send(ice40, spi_message, 5);
-                    if (res != ESP_OK) {
-                        ice40_disable(ice40);
-                        ili9341_init(ili9341);
-                        pax_noclip(pax_buffer);
-                        pax_background(pax_buffer, 0xa85a32);
-                        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-                        snprintf(message, sizeof(message), "ice40_send: %d", res);
-                        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
-                        ili9341_write(ili9341, pax_buffer->buf);
-                        vTaskDelay(1000 / portTICK_PERIOD_MS);
-                        snprintf(message, sizeof(message), "ice40_send failed with %d\n", res);
-                        fpga_uart_mess(message);
-                        fpga_uninstall_uart();
-                    }
-                }
-                idle_count = 0;
+            esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state, &idle_count);
+            if (res != ESP_OK) {
+                ice40_disable(ice40);
+                ili9341_init(ili9341);
+                pax_noclip(pax_buffer);
+                pax_background(pax_buffer, 0xa85a32);
+                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
+                snprintf(message, sizeof(message), "Error: %d", res);
+                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
+                ili9341_write(ili9341, pax_buffer->buf);
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                snprintf(message, sizeof(message), "processing events failed with %d\n", res);
+                fpga_uart_mess(message);
+                fpga_uninstall_uart();
+                return;
             }
             vTaskDelay(10 / portTICK_PERIOD_MS);
             idle_count++;

@@ -29,5 +29,13 @@ while len(bitstream) - sent > 0:
     port.write(bitstream[sent:sent + txLength])
     time.sleep(0.05)
     sent += txLength
+while port.is_open:
+    inLen = port.in_waiting
+    if inLen > 0:
+        data = port.read(inLen).decode('utf-8','ignore');
+        if data == 'FPGA':
+            print(data)
+        else:
+            print(data, end='')
 port.close()
 print("\n")
