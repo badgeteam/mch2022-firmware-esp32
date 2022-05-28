@@ -113,10 +113,10 @@ esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *
             }
 
             uint8_t spi_message[5] = { 0xf4 };
-            spi_message[1] = *key_state & 0xff;
-            spi_message[2] = *key_state >> 8;
-            spi_message[3] = key_mask & 0xff;
-            spi_message[4] = key_mask >> 8;
+            spi_message[1] = *key_state >> 8;
+            spi_message[2] = *key_state & 0xff;
+            spi_message[3] = key_mask >> 8;
+            spi_message[4] = key_mask & 0xff;
             esp_err_t res = ice40_send(ice40, spi_message, 5);
             if (res != ESP_OK) {
                 return res;
