@@ -306,10 +306,6 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-// void wifi_connect_to_stored() {
-//     wifi_connect_ent("MCH2022-legacy", "thefunny", "q", "nope, you are not", 3);
-// }
-
 void wifi_connect_to_stored() {
     // Open NVS.
     nvs_handle_t handle;
@@ -893,6 +889,9 @@ void app_main(void) {
                     char buffer[300];
                     snprintf(buffer, sizeof(buffer), "SSID is %s\nPassword is %s", ssid, password);
                     graphics_task(pax_buffer, ili9341, NULL, buffer);
+                } else if (menu_action == ACTION_WIFI_SCAN) {
+                    // Scan for WiFi networks.
+                    wifi_scan(NULL);
                 } else {
                     break;
                 }
