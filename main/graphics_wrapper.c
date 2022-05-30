@@ -18,7 +18,7 @@ void render_message(pax_buf_t *pax_buffer, char* message, float aPosX, float aPo
 esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341,  menu_t* menu, char* message) {
     pax_background(pax_buffer, 0xCCCCCC);
     if (menu != NULL) {
-        menu_render(pax_buffer, menu, 10, 10, 320-20, 240-20);
+        menu_render(pax_buffer, menu, 10, 10, 320-20, 240-20, 0xFF000000);
     }
     
     if (message != NULL) {

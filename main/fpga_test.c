@@ -4,12 +4,13 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include "fpga.h"
-#include "selftest.h"
 #include "ili9341.h"
 #include "ice40.h"
 #include "rp2040.h"
 #include "hardware.h"
+
+extern const uint8_t fpga_selftest_bin_start[] asm("_binary_fpga_selftest_bin_start");
+extern const uint8_t fpga_selftest_bin_end[] asm("_binary_fpga_selftest_bin_end");
 
 static const char *TAG = "fpga_test";
 
@@ -169,7 +170,6 @@ bool test_spi(ICE40* ice40) {
 void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
     esp_err_t res;
     bool reload_fpga = false;
-    bool load_old_bitstream = false;
     do {
         printf("Start FPGA test...\n");
         reload_fpga = false;
@@ -177,11 +177,7 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
         ili9341_deinit(ili9341);
 
         printf("FPGA load...\n");
-        if (load_old_bitstream) {
-            res = ice40_load_bitstream(ice40, proto2_bin, sizeof(proto2_bin));
-        } else {
-            res = ice40_load_bitstream(ice40, selftest_sw_bin, sizeof(selftest_sw_bin));
-        }
+        res = ice40_load_bitstream(ice40, fpga_selftest_bin_start, fpga_selftest_bin_end - fpga_selftest_bin_start);
         if (res != ESP_OK) {
             printf("Failed to load app bitstream into FPGA (%d)\n", res);
             ice40_disable(ice40);
@@ -214,12 +210,10 @@ void fpga_test(ILI9341* ili9341, ICE40* ice40, xQueueHandle buttonQueue) {
                             break;
                         case RP2040_INPUT_BUTTON_BACK:
                             reload_fpga = true;
-                            load_old_bitstream = true;
                             waitForChoice = false;
                             break;
                         case RP2040_INPUT_BUTTON_ACCEPT:
                             reload_fpga = true;
-                            load_old_bitstream = false;
                             waitForChoice = false;
                             break;
                         default:
