@@ -22,9 +22,6 @@ menu_t* menu_alloc(const char* aTitle) {
 
 void _menu_free_item(menu_item_t* aMenuItem) {
     free(aMenuItem->label);
-    //if (aMenuItem->callbackArgs != NULL) {
-    //    free(aMenuItem->callbackArgs);
-    //}
     free(aMenuItem);
 }
 
@@ -177,37 +174,40 @@ void menu_debug(menu_t* aMenu) {
     printf("------\n");
 }
 
-void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight) {
-    pax_col_t fgColor = 0xFF000000;
+void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor) {
+    pax_col_t fgColor = aColor;
     pax_col_t bgColor = 0xFFFFFFFF;
-    pax_col_t borderColor = 0xFF000000;
+    pax_col_t bgTextColor = 0xFFFFFFFF;
+    pax_col_t borderColor = 0x88000000;
     pax_col_t titleColor = 0xFFFFFFFF;
-    pax_col_t scrollbarBgColor = 0xFF555555;
-    pax_col_t scrollbarFgColor = 0xFFCCCCCC;
-    pax_col_t scrollbarSlColor = 0xFFFFFFFF;
+    pax_col_t titleBgColor = aColor;
+    pax_col_t scrollbarBgColor = 0xFFCCCCCC;
+    pax_col_t scrollbarFgColor = 0xFF555555;
+    
     float  entry_height = 18 + 2;
     size_t maxItems = aHeight / entry_height;
     
     float posY = aPosY;
-    
-    pax_clip(aBuffer, aPosX, aPosY, aWidth, aHeight);
-    pax_simple_rect(aBuffer, bgColor, aPosX, aPosY, aWidth, aHeight);
+
+    pax_noclip(aBuffer);
     
     if (maxItems > 1) {
         maxItems--;
-        pax_simple_rect(aBuffer, borderColor, aPosX, posY, aWidth, entry_height);
+        pax_simple_rect(aBuffer, titleBgColor, aPosX, posY, aWidth, entry_height);
         pax_simple_line(aBuffer, titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
         pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 2, entry_height - 2);
         pax_draw_text(aBuffer, titleColor, NULL, entry_height - 2, aPosX + 1, posY + 1, aMenu->title);
+        pax_noclip(aBuffer);
         posY += entry_height;
     }
-    pax_clip(aBuffer, aPosX, posY, aWidth, aHeight);
-    pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
     
     size_t itemOffset = 0;
     if (aMenu->position >= maxItems) {
         itemOffset = aMenu->position - maxItems + 1;
     }
+    
+    pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
+    pax_simple_rect(aBuffer, bgColor, aPosX, posY, aWidth, aHeight - posY + aPosY);
 
     for (size_t index = itemOffset; (index < itemOffset + maxItems) && (index < aMenu->length); index++) {
         menu_item_t* item = _menu_find_item(aMenu, index);
@@ -215,15 +215,17 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
             printf("Render error: item is NULL at %u\n", index);
             break;
         }
-        pax_clip(aBuffer, aPosX, posY, aWidth, entry_height);
+
         if (index == aMenu->position) {
             pax_simple_rect(aBuffer, fgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
-            pax_draw_text(aBuffer, bgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_draw_text(aBuffer, bgTextColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_noclip(aBuffer);
         } else {
             pax_simple_rect(aBuffer, bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
             pax_draw_text(aBuffer, fgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_noclip(aBuffer);
         }
         posY += entry_height;
     }
@@ -237,12 +239,10 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     
     float scrollbarHeight = aHeight - entry_height;
     float scrollbarStart = scrollbarHeight * fractionStart;
-    float scrollbarSelected = scrollbarHeight * fractionSelected;
     float scrollbarEnd = scrollbarHeight * fractionEnd;
     
     pax_simple_rect(aBuffer, scrollbarBgColor, aPosX + aWidth - 5, aPosY + entry_height - 1, 4, scrollbarHeight);
     pax_simple_rect(aBuffer, scrollbarFgColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarStart, 4, scrollbarEnd - scrollbarStart);
-    pax_simple_rect(aBuffer, scrollbarSlColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarSelected, 4, scrollbarHeight / aMenu->length);
 
     pax_noclip(aBuffer);
 }

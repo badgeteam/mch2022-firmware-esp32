@@ -13,12 +13,15 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rp2040bl.h"
-#include "rp2040_firmware.h"
 #include "system_wrapper.h"
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
 
+extern const uint8_t rp2040_firmware_bin_start[] asm("_binary_rp2040_firmware_bin_start");
+extern const uint8_t rp2040_firmware_bin_end[] asm("_binary_rp2040_firmware_bin_end");
+
 void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    size_t firmware_size = rp2040_firmware_bin_end - rp2040_firmware_bin_start;
     char message[64];
     
     uint8_t fw_version;
@@ -158,7 +161,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 13, 0, 20*1, message);
         ili9341_write(ili9341, pax_buffer->buf);
         
-        uint32_t erase_length = sizeof(mch2022_firmware_bin);
+        uint32_t erase_length = firmware_size;
         erase_length = erase_length + erase_size - (erase_length % erase_size); // Round up to erase size
         
         if (erase_length > flash_size - erase_size) {
@@ -188,13 +191,13 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         uint32_t totalLength = 0;
         
         while (true) {
-            if ((sizeof(mch2022_firmware_bin) - position) < txSize) {
-                txSize = sizeof(mch2022_firmware_bin) - position;
+            if ((firmware_size - position) < txSize) {
+                txSize = firmware_size - position;
             }
             
             if (txSize == 0) break;
 
-            uint8_t percentage = position * 100 / sizeof(mch2022_firmware_bin);
+            uint8_t percentage = position * 100 / firmware_size;
             
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0x325aa8);
@@ -206,7 +209,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
 
             uint32_t checkCrc = 0;
             memset(txBuffer, 0, write_size);
-            memcpy(txBuffer, &mch2022_firmware_bin[position], txSize);
+            memcpy(txBuffer, &rp2040_firmware_bin_start[position], txSize);
             blockCrc = crc32_le(0, txBuffer, write_size);
             totalCrc = crc32_le(totalCrc, txBuffer, write_size);
             totalLength += write_size;

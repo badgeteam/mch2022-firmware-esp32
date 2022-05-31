@@ -14,3 +14,4 @@
 esp_err_t appfs_init(void);
 uint8_t* load_file_to_ram(FILE* fd, size_t* fsize);
 void appfs_boot_app(int fd);
+void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* label);

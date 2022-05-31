@@ -34,3 +34,6 @@
 [submodule "components/mch2022-bsp"]
 	path = components/mch2022-bsp
 	url = https://github.com/badgeteam/esp32-component-mch2022-bsp.git
+[submodule "components/pax-codecs"]
+	path = components/pax-codecs
+	url = https://github.com/robotman2412/pax-codecs.git
