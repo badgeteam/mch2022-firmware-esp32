@@ -10,20 +10,13 @@
 #include "ice40.h"
 #include "rp2040.h"
 #include "fpga_test.h"
+#include "pax_gfx.h"
 
 extern const uint8_t fpga_selftest_bin_start[] asm("_binary_fpga_selftest_bin_start");
 extern const uint8_t fpga_selftest_bin_end[] asm("_binary_fpga_selftest_bin_end");
 
 
 static const char *TAG = "fpga_test";
-
-esp_err_t load_file_into_psram(ICE40* ice40, FILE* fd) {
-    fseek(fd, 0, SEEK_SET);
-    const uint8_t write_cmd = 0x02;
-    uint32_t amount_read;
-    uint32_t position = 0;
-    uint8_t* tx_buffer = malloc(SPI_MAX_TRANSFER_SIZE);
-    if (tx_buffer == NULL) return ESP_FAIL;
 
 /* SPI commands */
 #define SPI_CMD_NOP1                0x00
