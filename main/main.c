@@ -805,7 +805,7 @@ void app_main(void) {
             appfs_boot_app(appfs_fd);
         } else if (menu_action == ACTION_FPGA) {
             graphics_task(pax_buffer, ili9341, NULL, "Loading...");
-            fpga_test(ili9341, ice40, rp2040->queue);
+            fpga_test(rp2040->queue, ice40, pax_buffer, ili9341);
         } else if (menu_action == ACTION_FPGA_DL) {
             fpga_download(rp2040->queue, ice40, pax_buffer, ili9341);
         } else if (menu_action == ACTION_RP2040_BL) {
