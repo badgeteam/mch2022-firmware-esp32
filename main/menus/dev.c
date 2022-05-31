@@ -17,11 +17,14 @@
 #include "dev.h"
 #include "fpga_download.h"
 #include "hardware.h"
+#include "file_browser.h"
 
 typedef enum action {
     ACTION_NONE,
     ACTION_BACK,
-    ACTION_FPGA_DL
+    ACTION_FPGA_DL,
+    ACTION_FILE_BROWSER,
+    ACTION_FILE_BROWSER_INT,
 } menu_dev_action_t;
 
 void render_dev_help(pax_buf_t* pax_buffer) {
@@ -33,7 +36,8 @@ void render_dev_help(pax_buf_t* pax_buffer) {
 void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     menu_t* menu = menu_alloc("Development tools");
     menu_insert_item(menu, "FPGA download mode", NULL, (void*) ACTION_FPGA_DL, -1);
-    
+    menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
+    menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
 
     bool render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -86,6 +90,10 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
         if (action != ACTION_NONE) {
             if (action == ACTION_FPGA_DL) {
                 fpga_download(buttonQueue, get_ice40(), pax_buffer, ili9341);
+            } else if (action == ACTION_FILE_BROWSER) {
+                file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
+            } else if (action == ACTION_FILE_BROWSER_INT) {
+                file_browser(buttonQueue, pax_buffer, ili9341, "/internal");
             } else if (action == ACTION_BACK) {
                 break;
             }

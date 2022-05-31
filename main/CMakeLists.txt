@@ -19,6 +19,8 @@ idf_component_register(
          "menus/start.c"
          "menus/dev.c"
          "menus/wifi.c"
+         "uninstall.c"
+         "file_browser.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

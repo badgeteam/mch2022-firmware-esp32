@@ -13,42 +13,46 @@
 #include "menu.h"
 #include "rp2040.h"
 #include "appfs_wrapper.h"
+#include "hardware.h"
+#include "system_wrapper.h"
+#include "bootscreen.h"
+#include "uninstall.h"
 
-typedef enum {
-    ACTION_NONE,
-    ACTION_APPFS,
-    ACTION_BACK
-} menu_launcher_action_t;
+static const char *TAG = "uninstaller";
 
-typedef struct {
+typedef struct _uninstall_menu_args {
     appfs_handle_t fd;
-    menu_launcher_action_t action;
-} menu_launcher_args_t;
+    char name[512];
+} uninstall_menu_args_t;
 
-void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Apps");
-
+void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    menu_t* menu = menu_alloc("Uninstall application");
+    
     appfs_handle_t appfs_fd = APPFS_INVALID_FD;
     while (1) {
         appfs_fd = appfsNextEntry(appfs_fd);
         if (appfs_fd == APPFS_INVALID_FD) break;
         const char* name = NULL;
         appfsEntryInfo(appfs_fd, &name, NULL);
-        menu_launcher_args_t* args = malloc(sizeof(menu_launcher_args_t));
+        uninstall_menu_args_t* args = malloc(sizeof(uninstall_menu_args_t));
+        if (args == NULL) {
+            ESP_LOGE(TAG, "Failed to malloc() menu args");
+            return;
+        }
         args->fd = appfs_fd;
-        args->action = ACTION_APPFS;
+        sprintf(args->name, name);
         menu_insert_item(menu, name, NULL, (void*) args, -1);
     }
 
     bool render = true;
-    menu_launcher_args_t* menuArgs = NULL;
+    uninstall_menu_args_t* menuArgs = NULL;
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] start app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] uninstall app  [B] back");
 
     bool quit = false;
-
+    
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
@@ -93,9 +97,12 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (menuArgs != NULL) {
-            if (menuArgs->action == ACTION_APPFS) {
-                appfs_boot_app(menuArgs->fd);
-            }
+            char message[1024];
+            sprintf(message, "Uninstalling %s...", menuArgs->name);
+            printf("%s\n", message);
+            display_boot_screen(pax_buffer, ili9341, message);
+            appfsDeleteFile(menuArgs->name);
+            menuArgs = NULL;
             break;
         }
         

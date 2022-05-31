@@ -19,6 +19,7 @@
 #include "wifi_connect.h"
 #include "wifi_ota.h"
 #include "wifi.h"
+#include "uninstall.h"
 
 typedef enum action {
     ACTION_NONE,
@@ -106,6 +107,8 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 }
             } else if (action == ACTION_WIFI) {
                 menu_wifi(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_UNINSTALL) {
+                uninstall_browser(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
                 break;
             }
