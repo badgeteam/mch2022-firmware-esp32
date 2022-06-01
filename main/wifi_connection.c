@@ -3,8 +3,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
-#include "esp_wifi.h"
-#include "esp_wpa2.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "lwip/err.h"
@@ -113,7 +111,7 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
     return false;
 }
 
-bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonIdent, const char* aPassword, uint8_t aRetryMax) {
+bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonIdent, const char* aPassword, esp_eap_ttls_phase2_types phase2, uint8_t aRetryMax) {
     retryCount = 0;
     maxRetries = aRetryMax;
     wifi_config_t wifi_config = {0};
@@ -131,7 +129,7 @@ bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonId
     esp_wifi_sta_wpa2_ent_set_identity((const uint8_t *) aAnonIdent, strlen(aAnonIdent));
     esp_wifi_sta_wpa2_ent_set_username((const uint8_t *) aIdent, strlen(aIdent));
     esp_wifi_sta_wpa2_ent_set_password((const uint8_t *) aPassword, strlen(aPassword));
-    esp_wifi_sta_wpa2_ent_set_ttls_phase2_method(ESP_EAP_TTLS_PHASE2_MSCHAPV2);
+    esp_wifi_sta_wpa2_ent_set_ttls_phase2_method(phase2);
     // Enable enterprise auth.
     esp_wifi_sta_wpa2_ent_enable();
     // Disable 11b as NOC asked.
@@ -139,7 +137,8 @@ bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonId
     // Start the connection.
     esp_wifi_start();
     
-    ESP_LOGI(TAG, "Connecting to WiFi...");
+    ESP_LOGI(TAG, "Connecting to '%s' as '%s'/'%s': %s", aSsid, aIdent, aAnonIdent, aPassword);
+    ESP_LOGI(TAG, "Phase2 mode: %d", phase2);
     
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */

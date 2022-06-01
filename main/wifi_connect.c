@@ -21,7 +21,8 @@ bool wifi_connect_to_stored() {
     // Open NVS.
     nvs_handle_t handle;
     nvs_open("system", NVS_READWRITE, &handle);
-    uint8_t use_ent;
+    wifi_auth_mode_t authmode = 0;
+    esp_eap_ttls_phase2_types phase2 = 0;
     char *ssid = NULL;
     char *ident = NULL;
     char *anon_ident = NULL;
@@ -36,22 +37,36 @@ bool wifi_connect_to_stored() {
     ssid = malloc(len);
     res = nvs_get_str(handle, "wifi.ssid", ssid, &len);
     if (res) goto errcheck;
+    
     // Check whether connection is enterprise.
-    res = nvs_get_u8(handle, "wifi.use_ent", &use_ent);
+    res = nvs_get_u8(handle, "wifi.authmode", &authmode);
+    bool use_ent = authmode == WIFI_AUTH_WPA2_ENTERPRISE;
     if (res) goto errcheck;
+    
     if (use_ent) {
         // Read enterprise-specific parameters.
+        
+        // Read phase2 mode.
+        res = nvs_get_u8(handle, "wifi.phase2", &phase2);
+        if (res) goto errcheck;
+        
         // Read identity.
-        res = nvs_get_str(handle, "wifi.ident", NULL, &len);
+        res = nvs_get_str(handle, "wifi.username", NULL, &len);
         if (res) goto errcheck;
         ident = malloc(len);
-        res = nvs_get_str(handle, "wifi.ident", ident, &len);
+        res = nvs_get_str(handle, "wifi.username", ident, &len);
+        
         // Read anonymous identity.
         res = nvs_get_str(handle, "wifi.anon_ident", NULL, &len);
-        if (res) goto errcheck;
-        anon_ident = malloc(len);
-        res = nvs_get_str(handle, "wifi.anon_ident", anon_ident, &len);
-        if (res) goto errcheck;
+        if (res == ESP_ERR_NVS_NOT_FOUND) {
+            // Default is use the same thing.
+            anon_ident = strdup(ident);
+        } else {
+            if (res) goto errcheck;
+            anon_ident = malloc(len);
+            res = nvs_get_str(handle, "wifi.anon_ident", anon_ident, &len);
+            if (res) goto errcheck;
+        }
     }
     // Read password.
     res = nvs_get_str(handle, "wifi.password", NULL, &len);
@@ -65,9 +80,9 @@ bool wifi_connect_to_stored() {
     
     // Open the appropriate connection.
     if (use_ent) {
-        result = wifi_connect_ent(ssid, ident, anon_ident, password, 3);
+        result = wifi_connect_ent(ssid, ident, anon_ident, password, phase2, 3);
     } else {
-        result = wifi_connect(ssid, password, WIFI_AUTH_WPA2_PSK, 3);
+        result = wifi_connect(ssid, password, authmode, 3);
     }
     
     errcheck:
