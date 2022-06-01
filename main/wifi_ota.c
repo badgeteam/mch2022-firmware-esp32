@@ -14,6 +14,7 @@
 #include "nvs_flash.h"
 #include <sys/socket.h>
 #include "esp_wifi.h"
+#include "bootscreen.h"
 
 #define HASH_LEN 32
 
@@ -78,98 +79,6 @@ static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client) {
     return err;
 }
 
-void ota_task(void *pvParameter) {
-    ESP_LOGI(TAG, "Starting OTA update");
-/*
-    esp_netif_t *netif = get_example_netif_from_desc(bind_interface_name);
-    if (netif == NULL) {
-        ESP_LOGE(TAG, "Can't find netif from interface description");
-        abort();
-    }
-    struct ifreq ifr;
-    esp_netif_get_netif_impl_name(netif, ifr.ifr_name);
-    ESP_LOGI(TAG, "Bind interface name is %s", ifr.ifr_name);
-*/
-    esp_http_client_config_t config = {
-        .url = "https://ota.bodge.team/mch2022.bin",
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .cert_pem = (char *)server_cert_pem_start,
-        .event_handler = _http_event_handler,
-        .keep_alive_enable = true,
-/*
-        .if_name = &ifr,
-*/
-    };
-    
-    esp_https_ota_config_t ota_config = {
-        .http_config = &config,
-        .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
-#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
-        .partial_http_download = true,
-        .max_http_request_size = CONFIG_EXAMPLE_HTTP_REQUEST_SIZE,
-#endif
-    };
-
-    //config.skip_cert_common_name_check = true;
-
-    ESP_LOGI(TAG, "Attempting to download update from %s", config.url);
-    
-    esp_https_ota_handle_t https_ota_handle = NULL;
-    esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        vTaskDelete(NULL);
-    }
-
-    esp_app_desc_t app_desc;
-    err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_https_ota_read_img_desc failed");
-        esp_https_ota_abort(https_ota_handle);
-        vTaskDelete(NULL);
-    }
-    err = validate_image_header(&app_desc);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "image header verification failed");
-        esp_https_ota_abort(https_ota_handle);
-        vTaskDelete(NULL);
-    }
-
-    esp_err_t ota_finish_err = ESP_OK;
-    while (1) {
-        err = esp_https_ota_perform(https_ota_handle);
-        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
-            break;
-        }
-        // esp_https_ota_perform returns after every read operation which gives user the ability to
-        // monitor the status of OTA upgrade by calling esp_https_ota_get_image_len_read, which gives length of image
-        // data read so far.
-        ESP_LOGD(TAG, "Image bytes read: %d", esp_https_ota_get_image_len_read(https_ota_handle));
-    }
-
-    if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
-        // the OTA image was not completely received and user can customise the response to this situation.
-        ESP_LOGE(TAG, "Complete data was not received.");
-    } else {
-        ota_finish_err = esp_https_ota_finish(https_ota_handle);
-        if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
-            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            esp_restart();
-        } else {
-            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
-                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-            }
-            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
-            vTaskDelete(NULL);
-        }
-    }
-    
-    esp_https_ota_abort(https_ota_handle);
-    vTaskDelete(NULL);
-    esp_restart();
-}
-
 static void print_sha256(const uint8_t *image_hash, const char *label) {
     char hash_print[HASH_LEN * 2 + 1];
     hash_print[HASH_LEN * 2] = 0;
@@ -195,12 +104,120 @@ static void get_sha256_of_partitions(void) {
     print_sha256(sha_256, "SHA-256 for current firmware: ");
 }
 
-void ota_update(void) {
-    get_sha256_of_partitions();
-    
+void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text) {
+    pax_noclip(pax_buffer);
+    const pax_font_t* font = pax_get_font("sky mono");
+    pax_background(pax_buffer, 0xFFFFFF);
+    pax_vec1_t size = pax_text_size(font, 20, text);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 20, (320 / 2) - (size.x / 2), (240 - 20) / 2, text);
+    ili9341_write(ili9341, pax_buffer->buf);
+}
+
+
+void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
-    xTaskCreate(&ota_task, "OTA update", 8192, NULL, 5, NULL);
+    ESP_LOGI(TAG, "Starting OTA update");
+
+    esp_http_client_config_t config = {
+        .url = "https://ota.bodge.team/mch2022.bin",
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .cert_pem = (char *)server_cert_pem_start,
+        .event_handler = _http_event_handler,
+        .keep_alive_enable = true
+    };
+    
+    esp_https_ota_config_t ota_config = {
+        .http_config = &config,
+        .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
+#ifdef CONFIG_EXAMPLE_ENABLE_PARTIAL_HTTP_DOWNLOAD
+        .partial_http_download = true,
+        .max_http_request_size = CONFIG_EXAMPLE_HTTP_REQUEST_SIZE,
+#endif
+    };
+
+    //config.skip_cert_common_name_check = true;
+
+    ESP_LOGI(TAG, "Attempting to download update from %s", config.url);
+    
+    display_ota_state(pax_buffer, ili9341, "Starting download...");
+    
+    esp_https_ota_handle_t https_ota_handle = NULL;
+    esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
+        display_ota_state(pax_buffer, ili9341, "Failed to start download");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        esp_restart();
+    }
+
+    esp_app_desc_t app_desc;
+    err = esp_https_ota_get_img_desc(https_ota_handle, &app_desc);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "esp_https_ota_read_img_desc failed");
+        esp_https_ota_abort(https_ota_handle);
+        display_ota_state(pax_buffer, ili9341, "Failed to read image desc");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        esp_restart();
+    }
+    err = validate_image_header(&app_desc);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "image header verification failed");
+        esp_https_ota_abort(https_ota_handle);
+        display_ota_state(pax_buffer, ili9341, "Image header verification failed");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        esp_restart();
+    }
+
+    esp_err_t ota_finish_err = ESP_OK;
+    int percent_shown = -1;
+    while (1) {
+        err = esp_https_ota_perform(https_ota_handle);
+        if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
+            break;
+        }
+        
+        int len_total = esp_https_ota_get_image_size(https_ota_handle);
+        int len_read = esp_https_ota_get_image_len_read(https_ota_handle);
+        int percent = (len_read * 100) / len_total;
+
+        if (percent != percent_shown) {
+            ESP_LOGI(TAG, "Downloading %d / %d (%d%%)", len_read, len_total, percent);
+            percent_shown = percent;
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer), "Updating... %d%%", percent);
+            display_ota_state(pax_buffer, ili9341, buffer);
+        }
+    }
+
+    if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
+        // the OTA image was not completely received and user can customise the response to this situation.
+        ESP_LOGE(TAG, "Complete data was not received.");
+        display_ota_state(pax_buffer, ili9341, "Download failed");
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        esp_restart();
+    } else {
+        ota_finish_err = esp_https_ota_finish(https_ota_handle);
+        if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
+            ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
+            display_ota_state(pax_buffer, ili9341, "Update completed");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            esp_restart();
+        } else {
+            if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
+                ESP_LOGE(TAG, "Image validation failed, image is corrupted");
+                display_ota_state(pax_buffer, ili9341, "Image validation failed");
+            } else {
+                display_ota_state(pax_buffer, ili9341, "Update failed");
+            }
+            ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+            esp_restart();
+        }
+    }
+    
+    esp_https_ota_abort(https_ota_handle);
+    esp_restart();
     
     while (1) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
