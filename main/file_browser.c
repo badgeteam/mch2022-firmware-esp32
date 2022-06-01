@@ -142,12 +142,9 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
         closedir(dir);
 
         bool render = true;
+        bool renderbg = true;
         bool exit = false;
         file_browser_menu_args_t* menuArgs = NULL;
-        
-        pax_background(pax_buffer, 0xFFFFFF);
-        pax_noclip(pax_buffer);
-        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] install  [B] back");
 
         while (1) {
             rp2040_input_message_t buttonMessage = {0};
@@ -171,6 +168,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                         if (value) {
                             menuArgs = pd_args;
                         }
+                        break;
                     case RP2040_INPUT_BUTTON_ACCEPT:
                     case RP2040_INPUT_JOYSTICK_PRESS:
                         if (value) {
@@ -184,9 +182,16 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                         break;
                 }
             }
+            
+            if (renderbg) {
+                pax_background(pax_buffer, 0xFFFFFF);
+                pax_noclip(pax_buffer);
+                pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] install  [B] back");
+                renderbg = false;
+            }
 
             if (render) {
-                menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF72008a);
+                menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
                 ili9341_write(ili9341, pax_buffer->buf);
                 render = false;
             }
@@ -201,6 +206,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                 }
                 menuArgs = NULL;
                 render = true;
+                renderbg = true;
             }
 
             if (exit) {
