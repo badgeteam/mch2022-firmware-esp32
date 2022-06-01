@@ -100,7 +100,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 display_boot_screen(pax_buffer, ili9341, "Connecting to WiFi...");
                 if (wifi_connect_to_stored()) {
                     display_boot_screen(pax_buffer, ili9341, "Starting firmware update...");
-                    ota_update();
+                    ota_update(pax_buffer, ili9341);
                 } else {
                     display_boot_screen(pax_buffer, ili9341, "Failed to connect to WiFi");
                     vTaskDelay(500 / portTICK_PERIOD_MS);
