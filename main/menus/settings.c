@@ -86,7 +86,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF2f55a8);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }

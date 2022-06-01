@@ -102,9 +102,9 @@ void app_main(void) {
         esp_restart();
     }
     
+    display_boot_screen(pax_buffer, ili9341, "Starting...");
+    
     audio_init();
-
-    display_boot_screen(pax_buffer, ili9341, "Initializing RP2040...");
 
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
@@ -120,16 +120,14 @@ void app_main(void) {
 
     rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
 
-    uint8_t rp2040_uid[8];
+    /*uint8_t rp2040_uid[8];
     if (rp2040_get_uid(rp2040, rp2040_uid) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get RP2040 UID");
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "Failed to read UID", NULL, NULL);
         esp_restart();
     }
 
-    printf("RP2040 UID: %02X%02X%02X%02X%02X%02X%02X%02X\n", rp2040_uid[0], rp2040_uid[1], rp2040_uid[2], rp2040_uid[3], rp2040_uid[4], rp2040_uid[5], rp2040_uid[6], rp2040_uid[7]);
-
-    display_boot_screen(pax_buffer, ili9341, "Initializing ICE40...");
+    printf("RP2040 UID: %02X%02X%02X%02X%02X%02X%02X%02X\n", rp2040_uid[0], rp2040_uid[1], rp2040_uid[2], rp2040_uid[3], rp2040_uid[4], rp2040_uid[5], rp2040_uid[6], rp2040_uid[7]);*/
     
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
@@ -143,7 +141,7 @@ void app_main(void) {
         esp_restart();
     }
     
-    display_boot_screen(pax_buffer, ili9341, "Initializing BNO055...");
+    /*display_boot_screen(pax_buffer, ili9341, "Initializing BNO055...");
 
     if (bsp_bno055_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BNO055 position sensor");
@@ -155,9 +153,9 @@ void app_main(void) {
     if (bno055 == NULL) {
         ESP_LOGE(TAG, "bno055 is NULL");
         esp_restart();
-    }
+    }*/
 
-    display_boot_screen(pax_buffer, ili9341, "Initializing BME680...");
+    /*display_boot_screen(pax_buffer, ili9341, "Initializing BME680...");
     
     if (bsp_bme680_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BME680 position sensor");
@@ -169,9 +167,9 @@ void app_main(void) {
     if (bme680 == NULL) {
         ESP_LOGE(TAG, "bme680 is NULL");
         esp_restart();
-    }
+    }*/
     
-    display_boot_screen(pax_buffer, ili9341, "Initializing AppFS...");
+    //display_boot_screen(pax_buffer, ili9341, "Initializing AppFS...");
 
     /* Start AppFS */
     res = appfs_init();
@@ -181,7 +179,7 @@ void app_main(void) {
         esp_restart();
     }
     
-    display_boot_screen(pax_buffer, ili9341, "Initializing NVS...");
+    //display_boot_screen(pax_buffer, ili9341, "Initializing NVS...");
 
     /* Start NVS */
     res = nvs_init();
@@ -191,7 +189,7 @@ void app_main(void) {
         esp_restart();
     }
 
-    display_boot_screen(pax_buffer, ili9341, "Initializing filesystem...");
+    //display_boot_screen(pax_buffer, ili9341, "Initializing filesystem...");
     
     /* Start internal filesystem */
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
@@ -220,8 +218,6 @@ void app_main(void) {
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
     }
-    
-    play_bootsound();
 
     /* Start LEDs */
     ws2812_init(GPIO_LED_DATA);
@@ -230,6 +226,9 @@ void app_main(void) {
 
     /* Start WiFi */
     wifi_init();
+    
+    /* Rick that roll */
+    play_bootsound();
 
     /* Launcher menu */
     while (true) {

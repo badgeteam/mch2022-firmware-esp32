@@ -480,9 +480,7 @@ static bool run_test(ICE40* ice40, pax_buf_t* pax_buffer, const pax_font_t *font
 } while (0)
 
 
-static void
-run_all_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341)
-{
+bool run_fpga_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     const pax_font_t *font;
     int line = 0;
     bool ok = true;
@@ -510,23 +508,23 @@ run_all_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI
     RUN_TEST("PMOD open",       test_pmod_open);
 
     /* Show instructions for interactive test */
-    pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+ 0, "Insert PMOD plug");
+    /*pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+ 0, "Insert PMOD plug");
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+10, "Then press button for interactive test");
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+20, " - Check LCD color bars");
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+30, " - Then LCD & RGB led color cycling");
-    ili9341_write(ili9341, pax_buffer->buf);
+    ili9341_write(ili9341, pax_buffer->buf);*/
 
     /* Wait for button */
-    wait_button(buttonQueue);
+    //wait_button(buttonQueue);
 
     /* Clear the instructions from buffer */
-    pax_draw_rect(pax_buffer, 0xff8060f0, 0, 20*line, 320, 240-20*line);
+    //pax_draw_rect(pax_buffer, 0xff8060f0, 0, 20*line, 320, 240-20*line);
 
     /* Handover LCD to FPGA */
     ili9341_deinit(ili9341);
 
     /* Run interactive tests */
-    RUN_TEST("PMOD plug", test_pmod_plug);
+    //RUN_TEST("PMOD plug", test_pmod_plug);
     RUN_TEST("LCD init",  test_lcd_init);
 
     /* Wait a second (for user to see color bars) */
@@ -536,7 +534,9 @@ run_all_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI
     soc_message(ice40, SOC_CMD_LCD_RGB_CYCLE_SET, 1, NULL, 0);
 
     /* Wait for button */
-    wait_button(buttonQueue);
+    if (!wait_button(buttonQueue)) {
+        ok = false;
+    }
 
     /* Stop LCD / RGB cycling */
     soc_message(ice40, SOC_CMD_LCD_RGB_CYCLE_SET, 0, NULL, 0);
@@ -550,21 +550,19 @@ error:
 
     /* Pass / Fail result on screen */
     if (ok)
-        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 100, 20*line, "PASS");
+        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 0, 20*line, "FPGA PASS");
     else
-        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 100, 20*line, "FAIL");
+        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20*line, "FPGA FAIL");
 
     ili9341_write(ili9341, pax_buffer->buf);
-
-    /* Done, just wait for button */
-    wait_button(buttonQueue);
 
     /* Cleanup */
     ice40_disable(ice40);
 
-    return;
+    return ok;
 }
 
 void fpga_test(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    run_all_tests(buttonQueue, ice40, pax_buffer, ili9341);
+    run_fpga_tests(buttonQueue, ice40, pax_buffer, ili9341);
+    wait_button(buttonQueue);
 }
