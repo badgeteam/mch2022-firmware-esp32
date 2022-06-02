@@ -60,9 +60,10 @@ typedef enum action {
 } menu_wifi_action_t;
 
 void render_wifi_help(pax_buf_t* pax_buffer) {
+    const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] accept  [B] back");
 }
 
 void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
@@ -440,12 +441,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     /* ==== scanning phase ==== */
     if (scan) {
         // Show a little bit of text.
-        char *text = "Scanning...";
-        pax_vec1_t dims = pax_text_size(NULL, 1, text);
-        float scale = pax_buffer->width / dims.x;
-        pax_background(pax_buffer, 0xffffffff);
-        pax_draw_text(pax_buffer, 0xff000000, NULL, scale, 0, (pax_buffer->height - dims.y*scale)/2, text);
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_boot_screen(pax_buffer, ili9341, "Scanning WiFi networks...");
         
         // Scan for networks.
         wifi_ap_record_t *aps;

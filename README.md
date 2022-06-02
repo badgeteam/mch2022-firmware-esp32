@@ -16,6 +16,7 @@ Source code included as submodules is licensed separately, please check the foll
 | components/i2c-bno055       | MIT                               | Nicolai Electronics                                    |
 | components/mch2022-rp2040   | MIT                               | Renze Nicolai                                          |
 | components/pax-graphics     | MIT                               | Julian Scheffers                                       |
+| components/pax-keyboard     | MIT                               | Julian Scheffers                                       |
 | components/sdcard           | MIT                               | Nicolai Electronics                                    |
 | components/spi-ice40        | MIT                               | Nicolai Electronics                                    |
 | components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |

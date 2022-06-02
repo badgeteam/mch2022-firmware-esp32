@@ -29,9 +29,13 @@ esp_err_t graphics_task(pax_buf_t* pax_buffer, ILI9341* ili9341,  menu_t* menu, 
 }
 
 bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput, size_t aOutputSize) {
+    const pax_font_t *font = pax_get_font("saira regular");
     bool accepted = false;
     pkb_ctx_t kb_ctx;
-    pkb_init(pax_buffer, &kb_ctx, aOutput);
+    pkb_init(pax_buffer, &kb_ctx, 1024);
+    pkb_set_content(&kb_ctx, aOutput);
+    kb_ctx.kb_font = font;
+    kb_ctx.text_font = font;
 
     pax_col_t fgColor = 0xFF000000;
     pax_col_t bgColor = 0xFFFFFFFF;
@@ -42,7 +46,7 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341,
     pax_col_t selColor = 0xff007fff;
 
     kb_ctx.text_col       = borderColor;
-    kb_ctx.sel_text_col   = selColor;
+    kb_ctx.sel_text_col   = bgColor;
     kb_ctx.sel_col        = selColor;
     kb_ctx.bg_col         = bgColor;
 
@@ -58,9 +62,9 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341,
     pax_simple_rect(pax_buffer, titleBgColor, aPosX, aPosY, aWidth, titleHeight);
     pax_simple_line(pax_buffer, titleColor, aPosX + 1, aPosY + titleHeight, aPosX + aWidth - 2, aPosY + titleHeight - 1);
     pax_clip(pax_buffer, aPosX + 1, aPosY + 1, aWidth - 2, titleHeight - 2);
-    pax_draw_text(pax_buffer, titleColor, NULL, titleHeight - 2, aPosX + 1, aPosY + 1, aTitle);
+    pax_draw_text(pax_buffer, titleColor, font, titleHeight - 2, aPosX + 1, aPosY + 1, aTitle);
     pax_clip(pax_buffer, aPosX + 1, aPosY + aHeight - hintHeight, aWidth - 2, hintHeight);
-    pax_draw_text(pax_buffer, borderColor, NULL, hintHeight - 2, aPosX + 1, aPosY + aHeight - hintHeight, aHint);
+    pax_draw_text(pax_buffer, borderColor, font, hintHeight - 2, aPosX + 1, aPosY + aHeight - hintHeight, aHint);
     pax_noclip(pax_buffer);
 
     kb_ctx.x = aPosX + 1;

@@ -4,7 +4,6 @@ idf_component_register(
          "fpga_test.c"
          "graphics_wrapper.c"
          "menu.c"
-         "pax_keyboard.c"
          "rp2040_updater.c"
          "settings.c"
          "system_wrapper.c"

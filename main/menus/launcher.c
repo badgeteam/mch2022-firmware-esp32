@@ -27,7 +27,8 @@ typedef struct {
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     menu_t* menu = menu_alloc("Apps");
-
+    const pax_font_t *font = pax_get_font("saira regular");
+    
     appfs_handle_t appfs_fd = APPFS_INVALID_FD;
     while (1) {
         appfs_fd = appfsNextEntry(appfs_fd);
@@ -45,7 +46,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] start app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] start app  [B] back");
 
     bool quit = false;
 

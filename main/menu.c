@@ -183,6 +183,7 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     pax_col_t titleBgColor = aColor;
     pax_col_t scrollbarBgColor = 0xFFCCCCCC;
     pax_col_t scrollbarFgColor = 0xFF555555;
+    const pax_font_t *font = pax_get_font("saira regular");
     
     float  entry_height = 18 + 2;
     size_t maxItems = aHeight / entry_height;
@@ -196,7 +197,7 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
         pax_simple_rect(aBuffer, titleBgColor, aPosX, posY, aWidth, entry_height);
         pax_simple_line(aBuffer, titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
         pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 2, entry_height - 2);
-        pax_draw_text(aBuffer, titleColor, NULL, entry_height - 2, aPosX + 1, posY + 1, aMenu->title);
+        pax_draw_text(aBuffer, titleColor, font, entry_height - 2, aPosX + 1, posY + 1, aMenu->title);
         pax_noclip(aBuffer);
         posY += entry_height;
     }
@@ -219,12 +220,12 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
         if (index == aMenu->position) {
             pax_simple_rect(aBuffer, fgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
-            pax_draw_text(aBuffer, bgTextColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_draw_text(aBuffer, bgTextColor, font, entry_height - 2, aPosX + 1, posY + 1, item->label);
             pax_noclip(aBuffer);
         } else {
             pax_simple_rect(aBuffer, bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
             pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
-            pax_draw_text(aBuffer, fgColor, NULL, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_draw_text(aBuffer, fgColor, font, entry_height - 2, aPosX + 1, posY + 1, item->label);
             pax_noclip(aBuffer);
         }
         posY += entry_height;
