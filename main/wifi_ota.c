@@ -108,8 +108,10 @@ void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text
     pax_noclip(pax_buffer);
     const pax_font_t* font = pax_get_font("sky mono");
     pax_background(pax_buffer, 0xFFFFFF);
-    pax_vec1_t size = pax_text_size(font, 20, text);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 20, (320 / 2) - (size.x / 2), (240 - 20) / 2, text);
+    pax_vec1_t title_size = pax_text_size(font, 18, "Firmware update");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, "Firmware update");
+    pax_vec1_t size = pax_text_size(font, 18, text);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (size.x / 2), 120 + 10, text);
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
@@ -200,7 +202,7 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
         ota_finish_err = esp_https_ota_finish(https_ota_handle);
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            display_ota_state(pax_buffer, ili9341, "Update completed");
+            display_ota_state(pax_buffer, ili9341, "Update installed");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
         } else {
