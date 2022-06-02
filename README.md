@@ -11,6 +11,7 @@ Source code included as submodules is licensed separately, please check the foll
 | Submodule                   | License                           | Author                                                 |
 |-----------------------------|-----------------------------------|--------------------------------------------------------|
 | esp-idf                     | Apache License 2.0                | Espressif Systems (Shanghai) CO LTD                    |
+| main/pax-keyboard           | MIT                               | Julian Scheffers                                       |
 | components/appfs            | THE BEER-WARE LICENSE Revision 42 | Jeroen Domburg <jeroen@spritesmods.com>                |
 | components/bus-i2c          | MIT                               | Nicolai Electronics                                    |
 | components/i2c-bno055       | MIT                               | Nicolai Electronics                                    |
