@@ -24,9 +24,10 @@ typedef enum action {
 } menu_start_action_t;
 
 void render_start_help(pax_buf_t* pax_buffer) {
+    const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] accept");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] accept");
 }
 
 void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
