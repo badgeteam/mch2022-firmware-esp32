@@ -95,7 +95,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
             if (action == ACTION_FPGA_DL) {
                 fpga_download(buttonQueue, get_ice40(), pax_buffer, ili9341);
             } else if (action == ACTION_FPGA_TEST) {
-                fpga_test(buttonQueue, get_ice40(), pax_buffer, ili9341);
+                fpga_test(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_FILE_BROWSER) {
                 file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
             } else if (action == ACTION_FILE_BROWSER_INT) {

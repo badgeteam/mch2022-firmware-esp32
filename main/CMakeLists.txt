@@ -20,6 +20,8 @@ idf_component_register(
          "menus/wifi.c"
          "uninstall.c"
          "file_browser.c"
+         "test_common.c"
+         "factory_test.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

@@ -72,15 +72,24 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* 
 
     res = appfsCreateFile(label, app_size, &handle);
     if (res != ESP_OK) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to create on AppFS");
+        display_boot_screen(pax_buffer, ili9341, "Failed to create file");
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        free(app);
+        return;
+    }
+    int roundedSize=(app_size+(SPI_FLASH_MMU_PAGE_SIZE-1))&(~(SPI_FLASH_MMU_PAGE_SIZE-1));
+    res = appfsErase(handle, 0, roundedSize);
+    if (res != ESP_OK) {
+        display_boot_screen(pax_buffer, ili9341, "Failed to erase file");
+        ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         free(app);
         return;
     }
     res = appfsWrite(handle, 0, app, app_size);
     if (res != ESP_OK) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to write to AppFS");
+        display_boot_screen(pax_buffer, ili9341, "Failed to write file");
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
         vTaskDelay(100 / portTICK_PERIOD_MS);
         free(app);

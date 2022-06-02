@@ -10,4 +10,5 @@
 #include "ice40.h"
 #include "pax_gfx.h"
 
-void fpga_test(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341);
+void fpga_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
+bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);

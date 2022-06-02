@@ -15,6 +15,7 @@
 #include "menu.h"
 #include "rp2040.h"
 #include "appfs_wrapper.h"
+#include "bootscreen.h"
 
 static const char *TAG = "file browser";
 
@@ -104,20 +105,24 @@ void find_parent_dir(char* path, char* parent) {
 }
 
 void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* initial_path) {
+    display_boot_screen(pax_buffer, ili9341, "Please wait...");
     char path[512] = {0};
     strncpy(path, initial_path, sizeof(path));
     while (true) {
         menu_t* menu = menu_alloc(path);
         DIR* dir = opendir(path);
         if (dir == NULL) {
-            ESP_LOGE(TAG, "Failed to open directory %s", path);
+            if (path[0] != 0) {
+                ESP_LOGE(TAG, "Failed to open directory %s", path);
+                display_boot_screen(pax_buffer, ili9341, "Failed to open directory");
+                vTaskDelay(200 / portTICK_PERIOD_MS);
+            }
             return;
         }
         struct dirent *ent;
         file_browser_menu_args_t* pd_args = malloc(sizeof(file_browser_menu_args_t));
         pd_args->type = 'd';
         find_parent_dir(path, pd_args->path);
-        printf("Parent dir: %s\n", pd_args->path);
         menu_insert_item(menu, "../", NULL, pd_args, -1);
 
         while ((ent = readdir(dir)) != NULL) {
@@ -133,8 +138,6 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             } else {
                 args->type = 'd';
             }
-
-            printf("%c %s %s\r\n", args->type, ent->d_name, args->path);
 
             snprintf(args->label, sizeof(args->label), "%s%s", ent->d_name, (args->type == 'd') ? "/" : "");
             menu_insert_item(menu, args->label, NULL, args, -1);
@@ -186,7 +189,8 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             if (renderbg) {
                 pax_background(pax_buffer, 0xFFFFFF);
                 pax_noclip(pax_buffer);
-                pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 19, "[A] install  [B] back");
+                const pax_font_t *font = pax_get_font("saira regular");
+                pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] install  [B] back");
                 renderbg = false;
             }
 

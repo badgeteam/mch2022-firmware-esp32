@@ -48,6 +48,8 @@
 
 #include "menus/start.h"
 
+#include "factory_test.h"
+
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
 
@@ -102,9 +104,19 @@ void app_main(void) {
         esp_restart();
     }
     
-    display_boot_screen(pax_buffer, ili9341, "Starting...");
+    /* Start NVS */
+    res = nvs_init();
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "NVS init failed: %d", res);
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
+        esp_restart();
+    }
     
     audio_init();
+    
+    factory_test(pax_buffer, ili9341);
+    
+    display_boot_screen(pax_buffer, ili9341, "Starting...");
 
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
@@ -178,16 +190,6 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
         esp_restart();
     }
-    
-    //display_boot_screen(pax_buffer, ili9341, "Initializing NVS...");
-
-    /* Start NVS */
-    res = nvs_init();
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "NVS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
-        esp_restart();
-    }
 
     //display_boot_screen(pax_buffer, ili9341, "Initializing filesystem...");
     
@@ -217,12 +219,14 @@ void app_main(void) {
     bool sdcard_ready = (res == ESP_OK);
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
-    }
 
-    /* Start LEDs */
-    ws2812_init(GPIO_LED_DATA);
-    uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
-    ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+        /* LED power is on: start LED driver and turn LEDs off */
+        ws2812_init(GPIO_LED_DATA);
+        const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        ws2812_send_data(led_off, sizeof(led_off));
+    } else {
+        gpio_set_level(GPIO_SD_PWR, 0); // Disable power to LEDs and SD card
+    }
 
     /* Start WiFi */
     wifi_init();
