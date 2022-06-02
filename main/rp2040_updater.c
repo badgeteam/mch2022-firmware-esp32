@@ -110,13 +110,10 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         }
 
         display_rp2040_update_state(pax_buffer, ili9341, "Synchronizing...");
-        
-        char rx_buffer[16];
-        uint8_t rx_buffer_pos = 0;
-        memset(rx_buffer, 0, sizeof(rx_buffer));
+
         while (true) {
             if (rp2040_bl_sync()) break;
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
         }
         
         uint32_t flash_start = 0, flash_size = 0, erase_size = 0, write_size = 0, max_data_len = 0;

@@ -109,7 +109,7 @@ void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text
     const pax_font_t* font = pax_get_font("sky mono");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_vec1_t title_size = pax_text_size(font, 18, "Firmware update");
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, "Co-processor update");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, "Firmware update");
     pax_vec1_t size = pax_text_size(font, 18, text);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (size.x / 2), 120 + 10, text);
     ili9341_write(ili9341, pax_buffer->buf);
