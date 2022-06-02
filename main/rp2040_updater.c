@@ -202,10 +202,6 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         
         bool sealRes = rp2040_bl_seal(0x10010000, 0x10010000, totalLength, totalCrc);
         
-        snprintf(message, sizeof(message) - 1, "%s", sealRes ? "OK" : "FAIL");
-        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 20*1, message);
-        ili9341_write(ili9341, pax_buffer->buf);
-        
         if (sealRes) {
             vTaskDelay(2000 / portTICK_PERIOD_MS);
             pax_noclip(pax_buffer);
@@ -213,9 +209,11 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
             memset(message, 0, sizeof(message));
             display_rp2040_update_state(pax_buffer, ili9341, "Update completed");
             rp2040_bl_go(0x10010000);
+        } else {
+            display_rp2040_update_state(pax_buffer, ili9341, "Update failed");
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            restart();
         }
-        
-        display_rp2040_update_state(pax_buffer, ili9341, "Update failed");
 
         while (true) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
