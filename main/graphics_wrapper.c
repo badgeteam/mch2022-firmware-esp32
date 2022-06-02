@@ -32,7 +32,7 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341,
     const pax_font_t *font = pax_get_font("saira regular");
     bool accepted = false;
     pkb_ctx_t kb_ctx;
-    pkb_init(pax_buffer, &kb_ctx, 2048);
+    pkb_init(pax_buffer, &kb_ctx, 32);
     pkb_set_content(&kb_ctx, aOutput);
     kb_ctx.kb_font = font;
     kb_ctx.text_font = font;
