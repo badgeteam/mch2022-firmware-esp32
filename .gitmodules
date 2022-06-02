@@ -38,5 +38,5 @@
 	path = components/pax-codecs
 	url = https://github.com/robotman2412/pax-codecs.git
 [submodule "main/pax-keyboard"]
-	path = main/pax-keyboard
+	path = components/pax-keyboard
 	url = https://github.com/robotman2412/pax-keyboard
