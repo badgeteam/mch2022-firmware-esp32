@@ -22,6 +22,7 @@ idf_component_register(
          "file_browser.c"
          "test_common.c"
          "factory_test.c"
+         "animation.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
@@ -32,4 +33,36 @@ idf_component_register(
                 ${project_dir}/resources/boot.snd
                 ${project_dir}/resources/mch2022_logo.png
                 ${project_dir}/resources/logo_screen.png
+                ${project_dir}/resources/icons/dev.png
+                ${project_dir}/resources/icons/home.png
+                ${project_dir}/resources/icons/settings.png
+                ${project_dir}/resources/icons/apps.png
+                ${project_dir}/resources/animation/animation_frame_1.png
+                ${project_dir}/resources/animation/animation_frame_2.png
+                ${project_dir}/resources/animation/animation_frame_3.png
+                ${project_dir}/resources/animation/animation_frame_4.png
+                ${project_dir}/resources/animation/animation_frame_5.png
+                ${project_dir}/resources/animation/animation_frame_6.png
+                ${project_dir}/resources/animation/animation_frame_7.png
+                ${project_dir}/resources/animation/animation_frame_8.png
+                ${project_dir}/resources/animation/animation_frame_9.png
+                ${project_dir}/resources/animation/animation_frame_10.png
+                ${project_dir}/resources/animation/animation_frame_11.png
+                ${project_dir}/resources/animation/animation_frame_12.png
+                ${project_dir}/resources/animation/animation_frame_13.png
+                ${project_dir}/resources/animation/animation_frame_14.png
+                ${project_dir}/resources/animation/animation_frame_15.png
+                ${project_dir}/resources/animation/animation_frame_16.png
+                ${project_dir}/resources/animation/animation_frame_17.png
+                ${project_dir}/resources/animation/animation_frame_18.png
+                ${project_dir}/resources/animation/animation_frame_19.png
+                ${project_dir}/resources/animation/animation_frame_20.png
+                ${project_dir}/resources/animation/animation_frame_21.png
+                ${project_dir}/resources/animation/animation_frame_22.png
+                ${project_dir}/resources/animation/animation_frame_23.png
+                ${project_dir}/resources/animation/animation_frame_24.png
+                ${project_dir}/resources/animation/animation_frame_25.png
+                ${project_dir}/resources/animation/animation_frame_26.png
+                ${project_dir}/resources/animation/animation_frame_27.png
+                ${project_dir}/resources/animation/animation_frame_28.png
 )

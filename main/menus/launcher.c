@@ -10,9 +10,13 @@
 #include "appfs.h"
 #include "ili9341.h"
 #include "pax_gfx.h"
+#include "pax_codecs.h"
 #include "menu.h"
 #include "rp2040.h"
 #include "appfs_wrapper.h"
+
+extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
+extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
 typedef enum {
     ACTION_NONE,
@@ -26,7 +30,23 @@ typedef struct {
 } menu_launcher_args_t;
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Apps");
+    menu_t* menu = menu_alloc("Apps", 32, 18);
+    
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFFFFFFFF;
+    menu->selectedItemColor = 0xFFfa448c;
+    menu->borderColor       = 0xFF491d88;
+    menu->titleColor        = 0xFFfa448c;
+    menu->titleBgColor      = 0xFF491d88;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+     
+    pax_buf_t icon_apps;
+    pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
+    
+    menu_set_icon(menu, &icon_apps);
+    
     const pax_font_t *font = pax_get_font("saira regular");
     
     appfs_handle_t appfs_fd = APPFS_INVALID_FD;
@@ -46,7 +66,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] start app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start app  [B] back");
 
     bool quit = false;
 
@@ -88,7 +108,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -110,4 +130,5 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     }
 
     menu_free(menu);
+    pax_buf_destroy(&icon_apps);
 }

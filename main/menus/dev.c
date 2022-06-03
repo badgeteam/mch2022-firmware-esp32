@@ -10,6 +10,7 @@
 #include "appfs.h"
 #include "ili9341.h"
 #include "pax_gfx.h"
+#include "pax_codecs.h"
 #include "menu.h"
 #include "rp2040.h"
 #include "launcher.h"
@@ -19,6 +20,10 @@
 #include "hardware.h"
 #include "file_browser.h"
 #include "fpga_test.h"
+#include "animation.h"
+
+extern const uint8_t dev_png_start[] asm("_binary_dev_png_start");
+extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 
 typedef enum action {
     ACTION_NONE,
@@ -27,21 +32,39 @@ typedef enum action {
     ACTION_FPGA_TEST,
     ACTION_FILE_BROWSER,
     ACTION_FILE_BROWSER_INT,
+    ACTION_ANIMATION
 } menu_dev_action_t;
 
 void render_dev_help(pax_buf_t* pax_buffer) {
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
 }
 
 void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Development tools");
+    menu_t* menu = menu_alloc("Development tools", 32, 18);
+    
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFF000000;
+    menu->selectedItemColor = 0xFFfec859;
+    menu->borderColor       = 0xFFfa448c;
+    menu->titleColor        = 0xFFfec859;
+    menu->titleBgColor      = 0xFFfa448c;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+     
+    pax_buf_t icon_dev;
+    pax_decode_png_buf(&icon_dev, (void*) dev_png_start, dev_png_end - dev_png_start, PAX_BUF_32_8888ARGB, 0);
+    
+    menu_set_icon(menu, &icon_dev);
+    
     menu_insert_item(menu, "FPGA download mode", NULL, (void*) ACTION_FPGA_DL, -1);
     menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
     menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
+    menu_insert_item(menu, "Animation", NULL, (void*) ACTION_ANIMATION, -1);
 
     bool render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -86,7 +109,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -100,6 +123,8 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
                 file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
             } else if (action == ACTION_FILE_BROWSER_INT) {
                 file_browser(buttonQueue, pax_buffer, ili9341, "/internal");
+            } else if (action == ACTION_ANIMATION) {
+                display_animation(pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
                 break;
             }
@@ -110,4 +135,6 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     }
 
     menu_free(menu);
+    
+    pax_buf_destroy(&icon_dev);
 }

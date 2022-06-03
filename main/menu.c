@@ -1,9 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "pax_gfx.h"
+#include "pax_codecs.h"
 #include "menu.h"
 
-menu_t* menu_alloc(const char* aTitle) {
+menu_t* menu_alloc(const char* aTitle, float arg_entry_height, float arg_text_height) {
     if (aTitle == NULL) return NULL;
     menu_t* menu = malloc(sizeof(menu_t));
     if (menu == NULL) return NULL;
@@ -17,6 +18,20 @@ menu_t* menu_alloc(const char* aTitle) {
     menu->firstItem = NULL;
     menu->length = 0;
     menu->position = 0;
+    menu->entry_height = (arg_entry_height > 0) ? arg_entry_height : 20;
+    menu->text_height = (arg_text_height > 0) ? arg_text_height : (arg_entry_height - 2);
+    menu->icon = NULL;
+    
+    menu->fgColor = 0xFF000000;
+    menu->bgColor = 0xFFFFFFFF;
+    menu->bgTextColor = 0xFFFFFFFF;
+    menu->selectedItemColor = 0xFF000000;
+    menu->borderColor = 0x88000000;
+    menu->titleColor = 0xFFFFFFFF;
+    menu->titleBgColor = 0xFF000000;
+    menu->scrollbarBgColor = 0xFFCCCCCC;
+    menu->scrollbarFgColor = 0xFF555555;
+    
     return menu;
 }
 
@@ -35,6 +50,10 @@ void menu_free(menu_t* aMenu) {
         currentItem = nextItem;
     }
     free(aMenu);
+}
+
+void menu_set_icon(menu_t* aMenu, pax_buf_t* icon) {
+    aMenu->icon = icon;
 }
 
 menu_item_t* _menu_find_item(menu_t* aMenu, size_t aPosition) {
@@ -66,11 +85,12 @@ bool menu_insert_item(menu_t* aMenu, const char* aLabel, menu_callback_t aCallba
     newItem->label = malloc(labelSize);
     if (newItem->label == NULL) {
         free(newItem);
-        return NULL;
+        return false;
     }
     memcpy(newItem->label, aLabel, labelSize);
     newItem->callback = aCallback;
     newItem->callbackArgs = aCallbackArgs;
+    newItem->icon = NULL;
     if (aMenu->firstItem == NULL) {
         newItem->nextItem = NULL;
         newItem->previousItem = NULL;
@@ -88,6 +108,21 @@ bool menu_insert_item(menu_t* aMenu, const char* aLabel, menu_callback_t aCallba
         }
     }
     aMenu->length++;
+    return true;
+}
+
+bool menu_insert_item_icon(menu_t* aMenu, const char* aLabel, menu_callback_t aCallback, void* aCallbackArgs, size_t aPosition, pax_buf_t* icon) {
+    if (!menu_insert_item(aMenu, aLabel, aCallback, aCallbackArgs, aPosition)) {
+        return false;
+    }
+    menu_item_t* item;
+    if (aPosition >= aMenu->length - 1) {
+        item = _menu_find_last_item(aMenu);
+    } else {
+        item = _menu_find_item(aMenu, aPosition);
+    }
+    
+    item->icon = icon;
     return true;
 }
 
@@ -175,17 +210,11 @@ void menu_debug(menu_t* aMenu) {
 }
 
 void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor) {
-    pax_col_t fgColor = aColor;
-    pax_col_t bgColor = 0xFFFFFFFF;
-    pax_col_t bgTextColor = 0xFFFFFFFF;
-    pax_col_t borderColor = 0x88000000;
-    pax_col_t titleColor = 0xFFFFFFFF;
-    pax_col_t titleBgColor = aColor;
-    pax_col_t scrollbarBgColor = 0xFFCCCCCC;
-    pax_col_t scrollbarFgColor = 0xFF555555;
     const pax_font_t *font = pax_get_font("saira regular");
     
-    float  entry_height = 18 + 2;
+    float entry_height = aMenu->entry_height;//18 + 2;
+    float text_height = aMenu->text_height;
+    float text_offset = ((entry_height - text_height) / 2) + 1;
     size_t maxItems = aHeight / entry_height;
     
     float posY = aPosY;
@@ -193,12 +222,20 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     pax_noclip(aBuffer);
     
     if (maxItems > 1) {
+        float offsetX = 0;
+        if (aMenu->icon != NULL) {
+            offsetX = aMenu->icon->width;
+        }
+        
         maxItems--;
-        pax_simple_rect(aBuffer, titleBgColor, aPosX, posY, aWidth, entry_height);
-        pax_simple_line(aBuffer, titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
-        pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 2, entry_height - 2);
-        pax_draw_text(aBuffer, titleColor, font, entry_height - 2, aPosX + 1, posY + 1, aMenu->title);
+        pax_simple_rect(aBuffer, aMenu->titleBgColor, aPosX, posY, aWidth, entry_height);
+        //pax_simple_line(aBuffer, aMenu->titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
+        pax_clip(aBuffer, aPosX + 1, posY + text_offset, aWidth - 2, text_height);
+        pax_draw_text(aBuffer, aMenu->titleColor, font, text_height, aPosX + offsetX + 1, posY + text_offset, aMenu->title);
         pax_noclip(aBuffer);
+        if (aMenu->icon != NULL) {
+            pax_draw_image(aBuffer, aMenu->icon, aPosX, posY);
+        }
         posY += entry_height;
     }
     
@@ -207,8 +244,8 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
         itemOffset = aMenu->position - maxItems + 1;
     }
     
-    pax_outline_rect(aBuffer, borderColor, aPosX, aPosY, aWidth, aHeight);
-    pax_simple_rect(aBuffer, bgColor, aPosX, posY, aWidth, aHeight - posY + aPosY);
+    pax_outline_rect(aBuffer, aMenu->borderColor, aPosX, aPosY, aWidth, aHeight);
+    pax_simple_rect(aBuffer, aMenu->bgColor, aPosX, posY, aWidth, aHeight - posY + aPosY);
 
     for (size_t index = itemOffset; (index < itemOffset + maxItems) && (index < aMenu->length); index++) {
         menu_item_t* item = _menu_find_item(aMenu, index);
@@ -216,18 +253,28 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
             printf("Render error: item is NULL at %u\n", index);
             break;
         }
+        
+        float iconWidth = 0;
+        if (item->icon != NULL) {
+            iconWidth = item->icon->width + 1;
+        }
 
         if (index == aMenu->position) {
-            pax_simple_rect(aBuffer, fgColor, aPosX + 1, posY, aWidth - 2, entry_height);
-            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
-            pax_draw_text(aBuffer, bgTextColor, font, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_simple_rect(aBuffer, aMenu->selectedItemColor, aPosX + 1, posY, aWidth - 2, entry_height);
+            pax_clip(aBuffer, aPosX + 1, posY + text_offset, aWidth - 4, text_height);
+            pax_draw_text(aBuffer, aMenu->bgTextColor, font, text_height, aPosX + iconWidth + 1, posY + text_offset, item->label);
             pax_noclip(aBuffer);
         } else {
-            pax_simple_rect(aBuffer, bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
-            pax_clip(aBuffer, aPosX + 1, posY + 1, aWidth - 4, entry_height - 2);
-            pax_draw_text(aBuffer, fgColor, font, entry_height - 2, aPosX + 1, posY + 1, item->label);
+            pax_simple_rect(aBuffer, aMenu->bgColor, aPosX + 1, posY, aWidth - 2, entry_height);
+            pax_clip(aBuffer, aPosX + 1, posY + text_offset, aWidth - 4, text_height);
+            pax_draw_text(aBuffer, aMenu->fgColor, font, text_height, aPosX + iconWidth + 1, posY + text_offset, item->label);
             pax_noclip(aBuffer);
         }
+        
+        if (item->icon != NULL) {
+            pax_draw_image(aBuffer, item->icon, aPosX + 1, posY);
+        }
+        
         posY += entry_height;
     }
     
@@ -242,8 +289,8 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     float scrollbarStart = scrollbarHeight * fractionStart;
     float scrollbarEnd = scrollbarHeight * fractionEnd;
     
-    pax_simple_rect(aBuffer, scrollbarBgColor, aPosX + aWidth - 5, aPosY + entry_height - 1, 4, scrollbarHeight);
-    pax_simple_rect(aBuffer, scrollbarFgColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarStart, 4, scrollbarEnd - scrollbarStart);
+    pax_simple_rect(aBuffer, aMenu->scrollbarBgColor, aPosX + aWidth - 5, aPosY + entry_height - 1, 4, scrollbarHeight);
+    pax_simple_rect(aBuffer, aMenu->scrollbarFgColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarStart, 4, scrollbarEnd - scrollbarStart);
 
     pax_noclip(aBuffer);
 }

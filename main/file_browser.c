@@ -109,7 +109,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
     char path[512] = {0};
     strncpy(path, initial_path, sizeof(path));
     while (true) {
-        menu_t* menu = menu_alloc(path);
+        menu_t* menu = menu_alloc(path, 20, 18);
         DIR* dir = opendir(path);
         if (dir == NULL) {
             if (path[0] != 0) {
