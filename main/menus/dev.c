@@ -21,6 +21,7 @@
 #include "file_browser.h"
 #include "fpga_test.h"
 #include "animation.h"
+#include "button_test.h"
 
 extern const uint8_t dev_png_start[] asm("_binary_dev_png_start");
 extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
@@ -32,7 +33,8 @@ typedef enum action {
     ACTION_FPGA_TEST,
     ACTION_FILE_BROWSER,
     ACTION_FILE_BROWSER_INT,
-    ACTION_ANIMATION
+    ACTION_ANIMATION,
+    ACTION_BUTTON_TEST
 } menu_dev_action_t;
 
 void render_dev_help(pax_buf_t* pax_buffer) {
@@ -65,6 +67,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
     menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
     menu_insert_item(menu, "Animation", NULL, (void*) ACTION_ANIMATION, -1);
+    menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
 
     bool render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -125,6 +128,8 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
                 file_browser(buttonQueue, pax_buffer, ili9341, "/internal");
             } else if (action == ACTION_ANIMATION) {
                 display_animation(pax_buffer, ili9341);
+            } else if (action == ACTION_BUTTON_TEST) {
+                test_buttons(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
                 break;
             }
