@@ -115,10 +115,8 @@ void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-pax_buf_t* ota_pax_buffer;
-ILI9341* ota_ili9341;
 
-void ota_task(void *pvParameter) {
+void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
     ESP_LOGI(TAG, "Starting OTA update");
@@ -144,13 +142,13 @@ void ota_task(void *pvParameter) {
 
     ESP_LOGI(TAG, "Attempting to download update from %s", config.url);
     
-    display_ota_state(ota_pax_buffer, ota_ili9341, "Starting download...");
+    display_ota_state(pax_buffer, ili9341, "Starting download...");
     
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        display_ota_state(ota_pax_buffer, ota_ili9341, "Failed to start download");
+        display_ota_state(pax_buffer, ili9341, "Failed to start download");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         esp_restart();
     }
@@ -160,7 +158,7 @@ void ota_task(void *pvParameter) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_https_ota_read_img_desc failed");
         esp_https_ota_abort(https_ota_handle);
-        display_ota_state(ota_pax_buffer, ota_ili9341, "Failed to read image desc");
+        display_ota_state(pax_buffer, ili9341, "Failed to read image desc");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         esp_restart();
     }
@@ -168,7 +166,7 @@ void ota_task(void *pvParameter) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "image header verification failed");
         esp_https_ota_abort(https_ota_handle);
-        display_ota_state(ota_pax_buffer, ota_ili9341, "Image header verification failed");
+        display_ota_state(pax_buffer, ili9341, "Image header verification failed");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         esp_restart();
     }
@@ -190,29 +188,29 @@ void ota_task(void *pvParameter) {
             percent_shown = percent;
             char buffer[128];
             snprintf(buffer, sizeof(buffer), "Updating... %d%%", percent);
-            display_ota_state(ota_pax_buffer, ota_ili9341, buffer);
+            display_ota_state(pax_buffer, ili9341, buffer);
         }
     }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
         // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
-        display_ota_state(ota_pax_buffer, ota_ili9341, "Download failed");
+        display_ota_state(pax_buffer, ili9341, "Download failed");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         esp_restart();
     } else {
         ota_finish_err = esp_https_ota_finish(https_ota_handle);
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            display_ota_state(ota_pax_buffer, ota_ili9341, "Update installed");
+            display_ota_state(pax_buffer, ili9341, "Update installed");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
         } else {
             if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-                display_ota_state(ota_pax_buffer, ota_ili9341, "Image validation failed");
+                display_ota_state(pax_buffer, ili9341, "Image validation failed");
             } else {
-                display_ota_state(ota_pax_buffer, ota_ili9341, "Update failed");
+                display_ota_state(pax_buffer, ili9341, "Update failed");
             }
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
@@ -222,13 +220,6 @@ void ota_task(void *pvParameter) {
     
     esp_https_ota_abort(https_ota_handle);
     esp_restart();
-}
-
-void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
-
-    ota_pax_buffer = pax_buffer;
-    ota_ili9341 = ili9341;
-    xTaskCreate(&ota_task, "OTA update", 8192, NULL, 5, NULL);
     
     while (1) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
