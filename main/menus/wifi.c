@@ -73,7 +73,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, esp_eap_ttls_phase2_types default_mode);
 
 void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("WiFi configuration", 32, 18);
+    menu_t* menu = menu_alloc("WiFi configuration", 34, 18);
     menu_insert_item(menu, "Show current settings", NULL, (void*) ACTION_SHOW, -1);
     menu_insert_item(menu, "Scan for networks", NULL, (void*) ACTION_SCAN, -1);
     menu_insert_item(menu, "Configure manually", NULL, (void*) ACTION_MANUAL, -1);

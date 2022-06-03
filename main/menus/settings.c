@@ -42,7 +42,7 @@ void render_settings_help(pax_buf_t* pax_buffer) {
 }
 
 void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Settings", 32, 18);
+    menu_t* menu = menu_alloc("Settings", 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;

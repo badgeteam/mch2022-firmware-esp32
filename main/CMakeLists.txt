@@ -37,6 +37,7 @@ idf_component_register(
                 ${project_dir}/resources/icons/home.png
                 ${project_dir}/resources/icons/settings.png
                 ${project_dir}/resources/icons/apps.png
+                ${project_dir}/resources/icons/hatchery.png
                 ${project_dir}/resources/animation/animation_frame_1.png
                 ${project_dir}/resources/animation/animation_frame_2.png
                 ${project_dir}/resources/animation/animation_frame_3.png

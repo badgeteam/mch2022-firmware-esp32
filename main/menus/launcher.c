@@ -30,7 +30,7 @@ typedef struct {
 } menu_launcher_args_t;
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Apps", 32, 18);
+    menu_t* menu = menu_alloc("Apps", 34, 18);
     
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
