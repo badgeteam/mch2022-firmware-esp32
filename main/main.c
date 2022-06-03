@@ -15,7 +15,7 @@
 #include "pax_gfx.h"
 #include "sdcard.h"
 #include "appfs.h"
-
+#include "esp_ota_ops.h"
 #include "rp2040.h"
 #include "rp2040bl.h"
 
@@ -71,6 +71,10 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
 
 void app_main(void) {
     esp_err_t res;
+    
+    const esp_app_desc_t *app_description = esp_ota_get_app_description();
+    ESP_LOGI(TAG, "App version: %s", app_description->version);
+    //ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
 
     /* Initialize memory */
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
@@ -236,7 +240,7 @@ void app_main(void) {
 
     /* Launcher menu */
     while (true) {
-        menu_start(rp2040->queue, pax_buffer, ili9341);
+        menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
     }
 
     free(framebuffer);

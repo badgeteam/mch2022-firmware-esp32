@@ -41,14 +41,20 @@ typedef enum action {
     ACTION_SETTINGS
 } menu_start_action_t;
 
-void render_start_help(pax_buf_t* pax_buffer) {
+void render_start_help(pax_buf_t* pax_buffer, const char* version) {
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "[A] accept");
+
+    char version_text[64];
+    snprintf(version_text, sizeof(version_text), "v%s", version);
+    
+    pax_vec1_t version_size = pax_text_size(font, 18, version_text);
+    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, version_text);
 }
 
-void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version) {
     menu_t* menu = menu_alloc("Main menu", 34, 18);
     
     menu->fgColor           = 0xFF000000;
@@ -83,7 +89,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     bool render = true;
     menu_start_action_t action = ACTION_NONE;
     
-    render_start_help(pax_buffer);
+    render_start_help(pax_buffer, version);
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
@@ -135,7 +141,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             }
             action = ACTION_NONE;
             render = true;
-            render_start_help(pax_buffer);
+            render_start_help(pax_buffer, version);
         }
     }
 
