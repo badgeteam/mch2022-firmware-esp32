@@ -113,9 +113,7 @@ void app_main(void) {
     }
     
     audio_init();
-    
-    factory_test(pax_buffer, ili9341);
-    
+
     display_boot_screen(pax_buffer, ili9341, "Starting...");
 
     if (bsp_rp2040_init() != ESP_OK) {
@@ -131,6 +129,8 @@ void app_main(void) {
     }
 
     rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
+    
+    factory_test(pax_buffer, ili9341);
 
     /*uint8_t rp2040_uid[8];
     if (rp2040_get_uid(rp2040, rp2040_uid) != ESP_OK) {
