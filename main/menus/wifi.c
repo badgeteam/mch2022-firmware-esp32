@@ -63,7 +63,7 @@ void render_wifi_help(pax_buf_t* pax_buffer) {
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
 }
 
 void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
@@ -73,7 +73,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, esp_eap_ttls_phase2_types default_mode);
 
 void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("WiFi configuration");
+    menu_t* menu = menu_alloc("WiFi configuration", 34, 18);
     menu_insert_item(menu, "Show current settings", NULL, (void*) ACTION_SHOW, -1);
     menu_insert_item(menu, "Scan for networks", NULL, (void*) ACTION_SCAN, -1);
     menu_insert_item(menu, "Configure manually", NULL, (void*) ACTION_MANUAL, -1);
@@ -121,7 +121,7 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF2f55a8);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -195,7 +195,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 }
 
 wifi_ap_record_t *wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, size_t num_aps, wifi_ap_record_t *aps) {
-    menu_t *menu = menu_alloc("Select network");
+    menu_t *menu = menu_alloc("Select network", 20, 18);
     wifi_ap_record_t *picked = NULL;
     
     render_wifi_help(pax_buffer);
@@ -269,7 +269,7 @@ wifi_ap_record_t *wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buf
 }
 
 int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, wifi_auth_mode_t default_mode) {
-    menu_t* menu = menu_alloc("Authentication mode");
+    menu_t* menu = menu_alloc("Authentication mode", 20, 18);
     menu_insert_item(menu, "Insecure", NULL, (void*) ACTION_AUTH_OPEN, -1);
     menu_insert_item(menu, "WEP", NULL, (void*) ACTION_AUTH_WEP, -1);
     menu_insert_item(menu, "WPA PSK", NULL, (void*) ACTION_AUTH_WPA_PSK, -1);
@@ -347,7 +347,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 }
 
 int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, esp_eap_ttls_phase2_types default_mode) {
-    menu_t* menu = menu_alloc("Phase 2 authentication mode");
+    menu_t* menu = menu_alloc("Phase 2 authentication mode", 20, 18);
     menu_insert_item(menu, "ESP", NULL, (void*) ACTION_PHASE2_EAP, -1);
     menu_insert_item(menu, "MSCHAPv2", NULL, (void*) ACTION_PHASE2_MSCHAPV2, -1);
     menu_insert_item(menu, "MSCHAP", NULL, (void*) ACTION_PHASE2_MSCHAP, -1);

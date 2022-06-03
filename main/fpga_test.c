@@ -11,6 +11,7 @@
 #include "rp2040.h"
 #include "fpga_test.h"
 #include "pax_gfx.h"
+#include "test_common.h"
 
 extern const uint8_t fpga_selftest_bin_start[] asm("_binary_fpga_selftest_bin_start");
 extern const uint8_t fpga_selftest_bin_end[] asm("_binary_fpga_selftest_bin_end");
@@ -114,7 +115,8 @@ static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t *res
 
 /* Test routines */
 
-static bool test_bitstream_load(ICE40* ice40, uint32_t *rc) {
+static bool test_bitstream_load(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
     esp_err_t res;
 
     res = ice40_load_bitstream(ice40, fpga_selftest_bin_start, fpga_selftest_bin_end - fpga_selftest_bin_start);
@@ -127,7 +129,7 @@ static bool test_bitstream_load(ICE40* ice40, uint32_t *rc) {
     return true;
 }
 
-static bool test_spi_loopback_one(ICE40* ice40) {
+static bool _test_spi_loopback_one(ICE40* ice40) {
     esp_err_t res;
     uint8_t data_tx[257];
     uint8_t data_rx[258];
@@ -219,12 +221,14 @@ static bool test_spi_loopback_one(ICE40* ice40) {
     return true;
 }
 
-static bool test_spi_loopback(ICE40* ice40, uint32_t *rc) {
+static bool test_spi_loopback(uint32_t *rc) {
     int i;
+    
+    ICE40* ice40 = get_ice40();
 
     /* Run test 256 times */
     for (i=0; i<256; i++) {
-        if (!test_spi_loopback_one(ice40))
+        if (!_test_spi_loopback_one(ice40))
             break;
     }
 
@@ -239,7 +243,9 @@ static bool test_spi_loopback(ICE40* ice40, uint32_t *rc) {
     return true;
 }
 
-static bool test_soc_loopback(ICE40 *ice40, uint32_t *rc) {
+static bool test_soc_loopback(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PING, SOC_CMD_PING_PARAM, rc, 0)) {
         *rc = -1;
@@ -255,7 +261,9 @@ static bool test_soc_loopback(ICE40 *ice40, uint32_t *rc) {
     return true;
 }
 
-static bool test_uart_loopback(ICE40* ice40, uint32_t *rc) {
+static bool test_uart_loopback(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     /* Enable loopback mode of RP2040 */
     rp2040_set_fpga_loopback(get_rp2040(), true, true);
     vTaskDelay(pdMS_TO_TICKS(10));
@@ -273,7 +281,9 @@ static bool test_uart_loopback(ICE40* ice40, uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_psram(ICE40* ice40, uint32_t *rc) {
+static bool test_psram(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PSRAM_TEST, 0, rc, pdMS_TO_TICKS(1000))) {
         *rc = -1;
@@ -284,7 +294,9 @@ static bool test_psram(ICE40* ice40, uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_irq_n(ICE40* ice40, uint32_t *rc) {
+static bool test_irq_n(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     esp_err_t res;
 
     /* Set pin as input */
@@ -327,7 +339,8 @@ static bool test_irq_n(ICE40* ice40, uint32_t *rc) {
     return true;
 }
 
-static bool test_lcd_mode(ICE40* ice40, uint32_t *rc) {
+static bool test_lcd_mode(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
     esp_err_t res;
     bool ok;
 
@@ -371,7 +384,8 @@ static bool test_lcd_mode(ICE40* ice40, uint32_t *rc) {
     return ok;
 }
 
-static bool test_pmod_open(ICE40* ice40, uint32_t *rc) {
+static bool test_pmod_open(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PMOD_OPEN_TEST, 0, rc, 0)) {
         *rc = -1;
@@ -382,7 +396,9 @@ static bool test_pmod_open(ICE40* ice40, uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_pmod_plug(ICE40* ice40, uint32_t *rc) {
+static bool test_pmod_plug(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PMOD_PLUG_TEST, 0, rc, 0)) {
         *rc = -1;
@@ -393,7 +409,9 @@ static bool test_pmod_plug(ICE40* ice40, uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_lcd_init(ICE40* ice40, uint32_t *rc) {
+static bool test_lcd_init(uint32_t *rc) {
+    ICE40* ice40 = get_ice40();
+
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_LCD_INIT_TEST, 0, rc, 0)) {
         *rc = -1;
@@ -404,83 +422,8 @@ static bool test_lcd_init(ICE40* ice40, uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-
-typedef bool (*test_fn)(ICE40 *ice40, uint32_t *rc);
-
-
-static bool wait_button(xQueueHandle buttonQueue) {
-    rp2040_input_message_t buttonMessage = {0};
-
-    while (1) {
-        if (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
-            if (buttonMessage.state) {
-                switch(buttonMessage.input) {
-                    case RP2040_INPUT_BUTTON_HOME:
-                    case RP2040_INPUT_BUTTON_MENU:
-                    case RP2040_INPUT_BUTTON_BACK:
-                        return false;
-                    case RP2040_INPUT_BUTTON_ACCEPT:
-                        return true;
-                    default:
-                        break;
-                }
-            }
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(10));
-        }
-    }
-}
-
-static bool run_test(ICE40* ice40, pax_buf_t* pax_buffer, const pax_font_t *font, ILI9341* ili9341, int line,
-         const char *test_name, test_fn fn) {
-    bool rv;
-    uint32_t rc;
-
-    /* Test name */
-    pax_draw_text(pax_buffer, 0xffffffff, font, 18, 0, 20*line, test_name);
-    if (ili9341)
-        ili9341_write(ili9341, pax_buffer->buf);
-
-    /* Run the test */
-    rv = fn(ice40, &rc);
-
-    /* Display result */
-    if (!rv) {
-        /* Error */
-        char buf[10];
-        snprintf(buf, sizeof(buf), "%08x", rc);
-        pax_draw_text(pax_buffer, 0xffff0000, font, 18, 200, 20*line, buf);
-    } else {
-        /* OK ! */
-        pax_draw_text(pax_buffer, 0xff00ff00, font, 18, 200, 20*line, "      OK");
-    }
-
-    if (ili9341)
-        ili9341_write(ili9341, pax_buffer->buf);
-
-    /* Pass through the 'OK' status */
-    return rv;
-}
-
-#define RUN_TEST(name, fn) do {\
-    ok &= run_test(ice40, pax_buffer, font, ili9341, line++, name, fn); \
-} while (0)
-
-#define RUN_TEST_MANDATORY(name, fn) do {\
-    if (!run_test(ice40, pax_buffer, font, ili9341, line++, name, fn)) { \
-        pax_draw_text(pax_buffer, 0xffff0000, font, 18, 0, 20*line, "Aborted"); \
-        ili9341_write(ili9341, pax_buffer->buf); \
-        ok = false; \
-        goto error; \
-    } \
-} while (0)
-
-#define RUN_TEST_BLIND(name, fn) do {\
-    ok &= run_test(ice40, pax_buffer, font, NULL, line++, name, fn); \
-} while (0)
-
-
-bool run_fpga_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    ICE40* ice40 = get_ice40();
     const pax_font_t *font;
     int line = 0;
     bool ok = true;
@@ -534,9 +477,7 @@ bool run_fpga_tests(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffe
     soc_message(ice40, SOC_CMD_LCD_RGB_CYCLE_SET, 1, NULL, 0);
 
     /* Wait for button */
-    if (!wait_button(buttonQueue)) {
-        ok = false;
-    }
+    RUN_TEST("LCD control", test_wait_for_response);
 
     /* Stop LCD / RGB cycling */
     soc_message(ice40, SOC_CMD_LCD_RGB_CYCLE_SET, 0, NULL, 0);
@@ -550,9 +491,9 @@ error:
 
     /* Pass / Fail result on screen */
     if (ok)
-        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 0, 20*line, "FPGA PASS");
+        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 0, 20*line, "PASS");
     else
-        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20*line, "FPGA FAIL");
+        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20*line, "FAIL");
 
     ili9341_write(ili9341, pax_buffer->buf);
 
@@ -562,7 +503,7 @@ error:
     return ok;
 }
 
-void fpga_test(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    run_fpga_tests(buttonQueue, ice40, pax_buffer, ili9341);
-    wait_button(buttonQueue);
+void fpga_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    run_fpga_tests(buttonQueue, pax_buffer, ili9341);
+    test_wait_for_response(NULL);
 }

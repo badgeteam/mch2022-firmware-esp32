@@ -26,7 +26,7 @@ typedef struct _uninstall_menu_args {
 } uninstall_menu_args_t;
 
 void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Uninstall application");
+    menu_t* menu = menu_alloc("Uninstall application", 20, 18);
     const pax_font_t *font = pax_get_font("saira regular");
     
     appfs_handle_t appfs_fd = APPFS_INVALID_FD;
@@ -50,7 +50,7 @@ void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341*
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] uninstall app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] uninstall app  [B] back");
 
     bool quit = false;
     

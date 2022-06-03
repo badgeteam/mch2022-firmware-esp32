@@ -15,7 +15,7 @@
 #include "pax_gfx.h"
 #include "sdcard.h"
 #include "appfs.h"
-
+#include "esp_ota_ops.h"
 #include "rp2040.h"
 #include "rp2040bl.h"
 
@@ -48,6 +48,8 @@
 
 #include "menus/start.h"
 
+#include "factory_test.h"
+
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
 
@@ -69,6 +71,10 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
 
 void app_main(void) {
     esp_err_t res;
+    
+    const esp_app_desc_t *app_description = esp_ota_get_app_description();
+    ESP_LOGI(TAG, "App version: %s", app_description->version);
+    //ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
 
     /* Initialize memory */
     uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
@@ -102,9 +108,17 @@ void app_main(void) {
         esp_restart();
     }
     
-    display_boot_screen(pax_buffer, ili9341, "Starting...");
+    /* Start NVS */
+    res = nvs_init();
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "NVS init failed: %d", res);
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
+        esp_restart();
+    }
     
     audio_init();
+
+    display_boot_screen(pax_buffer, ili9341, "Starting...");
 
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
@@ -119,6 +133,8 @@ void app_main(void) {
     }
 
     rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
+    
+    factory_test(pax_buffer, ili9341);
 
     /*uint8_t rp2040_uid[8];
     if (rp2040_get_uid(rp2040, rp2040_uid) != ESP_OK) {
@@ -178,16 +194,6 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
         esp_restart();
     }
-    
-    //display_boot_screen(pax_buffer, ili9341, "Initializing NVS...");
-
-    /* Start NVS */
-    res = nvs_init();
-    if (res != ESP_OK) {
-        ESP_LOGE(TAG, "NVS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
-        esp_restart();
-    }
 
     //display_boot_screen(pax_buffer, ili9341, "Initializing filesystem...");
     
@@ -217,12 +223,14 @@ void app_main(void) {
     bool sdcard_ready = (res == ESP_OK);
     if (sdcard_ready) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
-    }
 
-    /* Start LEDs */
-    ws2812_init(GPIO_LED_DATA);
-    uint8_t ledBuffer[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0};
-    ws2812_send_data(ledBuffer, sizeof(ledBuffer));
+        /* LED power is on: start LED driver and turn LEDs off */
+        ws2812_init(GPIO_LED_DATA);
+        const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        ws2812_send_data(led_off, sizeof(led_off));
+    } else {
+        gpio_set_level(GPIO_SD_PWR, 0); // Disable power to LEDs and SD card
+    }
 
     /* Start WiFi */
     wifi_init();
@@ -232,7 +240,7 @@ void app_main(void) {
 
     /* Launcher menu */
     while (true) {
-        menu_start(rp2040->queue, pax_buffer, ili9341);
+        menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
     }
 
     free(framebuffer);
