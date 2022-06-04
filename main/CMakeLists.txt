@@ -24,6 +24,7 @@ idf_component_register(
          "factory_test.c"
          "animation.c"
          "button_test.c"
+         "adc_test.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
