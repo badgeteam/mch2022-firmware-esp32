@@ -17,6 +17,8 @@
 #include "settings.h"
 #include "dev.h"
 #include "bootscreen.h"
+#include "hardware.h"
+#include "math.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
@@ -41,17 +43,13 @@ typedef enum action {
     ACTION_SETTINGS
 } menu_start_action_t;
 
-void render_start_help(pax_buf_t* pax_buffer, const char* version) {
+void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "[A] accept");
-
-    char version_text[64];
-    snprintf(version_text, sizeof(version_text), "v%s", version);
-    
-    pax_vec1_t version_size = pax_text_size(font, 18, version_text);
-    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, version_text);
+    pax_vec1_t version_size = pax_text_size(font, 18, text);
+    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }
 
 void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version) {
@@ -88,12 +86,21 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
     bool render = true;
     menu_start_action_t action = ACTION_NONE;
+
+    uint8_t analogReadTimer = 0;
+    float battery_voltage = 0;
+    float usb_voltage = 0;
+    //uint8_t rp2040_usb = 0;
     
-    render_start_help(pax_buffer, version);
+    // Calculated:
+    uint8_t battery_percent = 0;
+    bool battery_charging = false;
+    
+    RP2040* rp2040 = get_rp2040();
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(buttonQueue, &buttonMessage, 100 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin = buttonMessage.input;
             bool value = buttonMessage.state;
             switch(pin) {
@@ -122,7 +129,29 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             }
         }
 
+        if (analogReadTimer > 0) {
+            analogReadTimer--;
+        } else {
+            analogReadTimer = 10; // No need to update these values really quickly
+            if (rp2040_read_vbat(rp2040, &battery_voltage) != ESP_OK) {
+                battery_voltage = 0;
+            }
+            if (rp2040_read_vusb(rp2040, &usb_voltage) != ESP_OK) {
+                usb_voltage = 0;
+            }
+            
+            battery_percent = ((battery_voltage - 3.7) * 100) / (4.1 - 3.7);
+            if (battery_percent > 100) battery_percent = 100;
+            
+            battery_charging = (usb_voltage > 4.0) && (battery_percent < 100);
+            
+            render = true;
+        }
+
         if (render) {
+            char textBuffer[64];
+            snprintf(textBuffer, sizeof(textBuffer), "B%1.1fv U%1.1fv %03u%%%c v%s", battery_voltage, usb_voltage, battery_percent, battery_charging ? '+' : ' ', version);
+            render_start_help(pax_buffer, textBuffer);
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
@@ -141,7 +170,6 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             }
             action = ACTION_NONE;
             render = true;
-            render_start_help(pax_buffer, version);
         }
     }
 
