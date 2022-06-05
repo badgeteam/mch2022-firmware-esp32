@@ -60,6 +60,20 @@ bool test_stuck_buttons(uint32_t* rc) {
     return (state == 0x0000);
 }
 
+bool test_adc_vbat(uint32_t* rc) {
+    float value = 0;
+    esp_err_t res = rp2040_read_vbat(get_rp2040(), &value);
+    *rc = value * 100;
+    return ((res == ESP_OK) && (value < 4.3) && (value > 3.9));
+}
+
+bool test_adc_vusb(uint32_t* rc) {
+    float value = 0;
+    esp_err_t res = rp2040_read_vusb(get_rp2040(), &value);
+    *rc = value * 100;
+    return ((res == ESP_OK) && (value > 4.5));
+}
+
 bool test_sd_power(uint32_t* rc) {
     *rc = 0x00000000;
     // Init all GPIO pins for SD card and LED
@@ -106,8 +120,12 @@ bool run_basic_tests(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     RUN_TEST_MANDATORY("ICE40",  test_ice40_init);
     RUN_TEST_MANDATORY("BNO055", test_bno055_init);
     RUN_TEST_MANDATORY("BME680", test_bme680_init);
-    RUN_TEST_MANDATORY("STUCK BUTTONS", test_stuck_buttons);
-    RUN_TEST_MANDATORY("SD/LED POWER", test_sd_power);
+    
+    /* Run tests */
+    RUN_TEST("STUCK BUTTONS", test_stuck_buttons);
+    RUN_TEST("SD/LED POWER", test_sd_power);
+    RUN_TEST("Battery voltage", test_adc_vbat);
+    RUN_TEST("USB voltage", test_adc_vusb);
     
 
 error:
