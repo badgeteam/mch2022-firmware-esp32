@@ -25,6 +25,7 @@ idf_component_register(
          "animation.c"
          "button_test.c"
          "adc_test.c"
+         "webusb.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

@@ -50,6 +50,7 @@
 
 #include "factory_test.h"
 #include "fpga_download.h"
+#include "webusb.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -72,6 +73,8 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
 
 void app_main(void) {
     esp_err_t res;
+    
+    audio_init();
     
     const esp_app_desc_t *app_description = esp_ota_get_app_description();
     ESP_LOGI(TAG, "App version: %s", app_description->version);
@@ -116,8 +119,6 @@ void app_main(void) {
         display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
         esp_restart();
     }
-    
-    audio_init();
 
     display_boot_screen(pax_buffer, ili9341, "Starting...");
 
@@ -258,9 +259,9 @@ void app_main(void) {
         }
     } else if (webusb_mode == 0x01) {
         display_boot_screen(pax_buffer, ili9341, "WebUSB mode");
-        /*while (true) {
-            
-        }*/
+        while (true) {
+            webusb_main(rp2040->queue, pax_buffer, ili9341);
+        }
     } else if (webusb_mode == 0x02) {
         display_boot_screen(pax_buffer, ili9341, "FPGA download mode");
         while (true) {
