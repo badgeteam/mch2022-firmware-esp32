@@ -49,6 +49,7 @@
 #include "menus/start.h"
 
 #include "factory_test.h"
+#include "fpga_download.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -235,12 +236,40 @@ void app_main(void) {
     /* Start WiFi */
     wifi_init();
     
-    /* Rick that roll */
-    play_bootsound();
+    /* Check WebUSB mode */
+    
+    uint8_t webusb_mode;
+    res = rp2040_get_webusb_mode(rp2040, &webusb_mode);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read WebUSB mode: %d", res);
+        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "Failed to read WebUSB mode", NULL, NULL);
+        esp_restart();
+    }
+    
+    ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
+    
+    if (webusb_mode == 0x00) { // Normal boot
+        /* Rick that roll */
+        play_bootsound();
 
-    /* Launcher menu */
-    while (true) {
-        menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
+        /* Launcher menu */
+        while (true) {
+            menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
+        }
+    } else if (webusb_mode == 0x01) {
+        display_boot_screen(pax_buffer, ili9341, "WebUSB mode");
+        /*while (true) {
+            
+        }*/
+    } else if (webusb_mode == 0x02) {
+        display_boot_screen(pax_buffer, ili9341, "FPGA download mode");
+        while (true) {
+            fpga_download(rp2040->queue, get_ice40(), pax_buffer, ili9341);
+        }
+    } else {
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
+        display_boot_screen(pax_buffer, ili9341, buffer);
     }
 
     free(framebuffer);
