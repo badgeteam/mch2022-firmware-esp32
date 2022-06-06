@@ -140,8 +140,12 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
                 usb_voltage = 0;
             }
             
-            battery_percent = ((battery_voltage - 3.7) * 100) / (4.1 - 3.7);
-            if (battery_percent > 100) battery_percent = 100;
+            if (battery_voltage >= 3.6) {
+                battery_percent = ((battery_voltage - 3.6) * 100) / (4.2 - 3.6);
+                if (battery_percent > 100) battery_percent = 100;
+            } else {
+                battery_percent = 0;
+            }
             
             battery_charging = (usb_voltage > 4.0) && (battery_percent < 100);
             
