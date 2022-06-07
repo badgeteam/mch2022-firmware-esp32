@@ -19,10 +19,61 @@ extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 typedef struct {
     //appfs_handle_t fd;
     //menu_launcher_action_t action;
+    void *data;
 } menu_hatchery_args_t;
+
+typedef void (*fill_menu_items_fn_t)(menu_t *menu);
+typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args);
+
+static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action);
+static void add_menu_item(menu_t *menu, const char *name, menu_hatchery_args_t *args);
+
+
+static void fill_menu_items_apps(menu_t *menu) {
+    add_menu_item(menu, "App A", NULL);
+    add_menu_item(menu, "Test App", NULL);
+    add_menu_item(menu, "App xx", NULL);
+}
+
+static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
+}
+
+
+static void fill_menu_items_categories(menu_t *menu) {
+    add_menu_item(menu, "Fun", NULL);
+    add_menu_item(menu, "Test", NULL);
+    add_menu_item(menu, "Strange", NULL);
+}
+
+static void action_categories(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps);
+}
+
+
+static void fill_menu_items_types(menu_t *menu) {
+    add_menu_item(menu, "App", NULL);
+    add_menu_item(menu, "Python", NULL);
+    add_menu_item(menu, "FPGA", NULL);
+}
+
+static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories);
+}
 
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types);
+}
+
+// Generic functions
+
+static void add_menu_item(menu_t *menu, const char *name, menu_hatchery_args_t *args) {
+    args = malloc(sizeof(menu_hatchery_args_t));
+    args->data = 0;
+    menu_insert_item(menu, name, NULL, (void*) args, -1);
+}
+
+static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action) {
     menu_t* menu = menu_alloc("Hatchery", 34, 18);
     
     menu->fgColor           = 0xFF000000;
@@ -41,13 +92,15 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_set_icon(menu, &icon_apps);
 
     const pax_font_t *font = pax_get_font("saira regular");
+
+    fill_menu_items(menu);
     
     bool render = true;
     menu_hatchery_args_t* menuArgs = NULL;
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, select);
 
     bool quit = false;
 
@@ -57,7 +110,6 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
             uint8_t pin = buttonMessage.input;
             bool value = buttonMessage.state;
             switch(pin) {
-                /*
                 case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);
@@ -70,14 +122,12 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                         render = true;
                     }
                     break;
-                */
                 case RP2040_INPUT_BUTTON_HOME:
                 case RP2040_INPUT_BUTTON_BACK:
                     if (value) {
                         quit = true;
                     }
                     break;
-                /*
                 case RP2040_INPUT_BUTTON_ACCEPT:
                 case RP2040_INPUT_JOYSTICK_PRESS:
                 case RP2040_INPUT_BUTTON_SELECT:
@@ -86,10 +136,19 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                         menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
                     }
                     break;
-                */
                 default:
                     break;
             }
+        }
+
+        if (quit) {
+            break;
+        }
+
+        if (menuArgs != NULL) {
+            action(buttonQueue, pax_buffer, ili9341, menuArgs);
+            menuArgs = NULL;
+            render = true;
         }
 
         if (render) {
@@ -97,18 +156,12 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
-
-        if (menuArgs != NULL) {
-            /*
-            if (menuArgs->action == ACTION_APPFS) {
-                appfs_boot_app(menuArgs->fd);
-            }
-            */
-            break;
-        }
-        
-        if (quit) {
-            break;
-        }
     }
+
+    for (size_t index = 0; index < menu_get_length(menu); index++) {
+        free(menu_get_callback_args(menu, index));
+    }
+
+    menu_free(menu);
+    pax_buf_destroy(&icon_apps);
 }
