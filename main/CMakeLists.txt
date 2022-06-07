@@ -14,6 +14,7 @@ idf_component_register(
          "audio.c"
          "bootscreen.c"
          "menus/launcher.c"
+	 "menus/hatchery.c"
          "menus/settings.c"
          "menus/start.c"
          "menus/dev.c"

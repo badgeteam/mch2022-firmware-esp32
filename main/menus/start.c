@@ -14,6 +14,7 @@
 #include "menu.h"
 #include "rp2040.h"
 #include "launcher.h"
+#include "hatchery.h"
 #include "settings.h"
 #include "dev.h"
 #include "bootscreen.h"
@@ -165,8 +166,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             if (action == ACTION_APPS) {
                 menu_launcher(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_HATCHERY) {
-                // Not implemented
-                display_boot_screen(pax_buffer, ili9341, "Not implemented");
+                menu_hatchery(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SETTINGS) {
                 menu_settings(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {
