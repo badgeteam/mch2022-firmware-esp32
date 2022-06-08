@@ -100,15 +100,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "App version: %s", app_description->version);
     //ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
 
-    /* Initialize memory */
-    uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
-    if (framebuffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate framebuffer");
-        esp_restart();
-    }
-    memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
-
-    pax_buf_init(&pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
+    /* Initialize GFX */
+    pax_buf_init(&pax_buffer, NULL, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
 
     /* Initialize hardware */
 
@@ -285,6 +278,4 @@ void app_main(void) {
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
         display_boot_screen(&pax_buffer, ili9341, buffer);
     }
-
-    free(framebuffer);
 }
