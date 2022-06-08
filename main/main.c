@@ -92,6 +92,7 @@ void stop() {
 
 const char* fatal_error_str = "A fatal error occured";
 const char* reset_board_str = "Reset the board to try again";
+static pax_buf_t pax_buffer;
 
 void app_main(void) {
     esp_err_t res;
@@ -102,22 +103,8 @@ void app_main(void) {
     ESP_LOGI(TAG, "App version: %s", app_description->version);
     //ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
 
-    /* Initialize memory */
-    uint8_t* framebuffer = heap_caps_malloc(ILI9341_BUFFER_SIZE, MALLOC_CAP_8BIT);
-    if (framebuffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate framebuffer");
-        esp_restart();
-    }
-    memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
-
-    pax_buf_t* pax_buffer = malloc(sizeof(pax_buf_t));
-    if (framebuffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate buffer for PAX graphics library");
-        esp_restart();
-    }
-    memset(pax_buffer, 0, sizeof(pax_buf_t));
-
-    pax_buf_init(pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
+    /* Initialize GFX */
+    pax_buf_init(&pax_buffer, NULL, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
 
     /* Initialize hardware */
 
@@ -138,28 +125,28 @@ void app_main(void) {
     res = nvs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "NVS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
 
-    display_boot_screen(pax_buffer, ili9341, "Starting...");
+    display_boot_screen(&pax_buffer, ili9341, "Starting...");
 
     /* Initialize RP2040 co-processor */
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
-        display_fatal_error(pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
         stop();
     }
 
     RP2040* rp2040 = get_rp2040();
 
-    rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
+    rp2040_updater(rp2040, &pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
     
-    factory_test(pax_buffer, ili9341);
+    factory_test(&pax_buffer, ili9341);
 
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
-        display_fatal_error(pax_buffer, ili9341, fatal_error_str, "A hardware failure occured", "while initializing the FPGA", reset_board_str);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "A hardware failure occured", "while initializing the FPGA", reset_board_str);
         stop();
     }
 
@@ -169,7 +156,7 @@ void app_main(void) {
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, fatal_error_str, "Failed to initialize AppFS", "Flash may be corrupted", reset_board_str);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize AppFS", "Flash may be corrupted", reset_board_str);
         stop();
     }
     
@@ -187,7 +174,7 @@ void app_main(void) {
         esp_err_t res = esp_vfs_fat_spiflash_mount("/internal", "locfd", &mount_config, &s_wl_handle);
         if (res != ESP_OK) {
             ESP_LOGE(TAG, "failed to mount locfd (%d)", res);
-            display_fatal_error(pax_buffer, ili9341, fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
+            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
             stop();
         } else {
             ESP_LOGI(TAG, "Internal filesystem mounted");
@@ -219,7 +206,7 @@ void app_main(void) {
     res = rp2040_get_webusb_mode(rp2040, &webusb_mode);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read WebUSB mode: %d", res);
-        display_fatal_error(pax_buffer, ili9341, fatal_error_str, "Failed to read WebUSB mode", NULL, NULL);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to read WebUSB mode", NULL, NULL);
         stop();
     }
     
@@ -231,23 +218,21 @@ void app_main(void) {
 
         /* Launcher menu */
         while (true) {
-            menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
+            menu_start(rp2040->queue, &pax_buffer, ili9341, app_description->version);
         }
     } else if (webusb_mode == 0x01) {
-        display_boot_screen(pax_buffer, ili9341, "WebUSB mode");
+        display_boot_screen(&pax_buffer, ili9341, "WebUSB mode");
         while (true) {
-            webusb_main(rp2040->queue, pax_buffer, ili9341);
+            webusb_main(rp2040->queue, &pax_buffer, ili9341);
         }
     } else if (webusb_mode == 0x02) {
-        display_boot_screen(pax_buffer, ili9341, "FPGA download mode");
+        display_boot_screen(&pax_buffer, ili9341, "FPGA download mode");
         while (true) {
-            fpga_download(rp2040->queue, get_ice40(), pax_buffer, ili9341);
+            fpga_download(rp2040->queue, get_ice40(), &pax_buffer, ili9341);
         }
     } else {
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
-        display_boot_screen(pax_buffer, ili9341, buffer);
+        display_boot_screen(&pax_buffer, ili9341, buffer);
     }
-
-    free(framebuffer);
 }
