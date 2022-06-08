@@ -89,6 +89,8 @@ void stop() {
     }
 }
 
+static pax_buf_t pax_buffer;
+
 void app_main(void) {
     esp_err_t res;
     
@@ -106,14 +108,7 @@ void app_main(void) {
     }
     memset(framebuffer, 0, ILI9341_BUFFER_SIZE);
 
-    pax_buf_t* pax_buffer = malloc(sizeof(pax_buf_t));
-    if (framebuffer == NULL) {
-        ESP_LOGE(TAG, "Failed to allocate buffer for PAX graphics library");
-        esp_restart();
-    }
-    memset(pax_buffer, 0, sizeof(pax_buf_t));
-
-    pax_buf_init(pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
+    pax_buf_init(&pax_buffer, framebuffer, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
 
     /* Initialize hardware */
 
@@ -134,15 +129,15 @@ void app_main(void) {
     res = nvs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "NVS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "NVS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
 
-    display_boot_screen(pax_buffer, ili9341, "Starting...");
+    display_boot_screen(&pax_buffer, ili9341, "Starting...");
 
     if (bsp_rp2040_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "RP2040 co-processor error", NULL, NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "RP2040 co-processor error", NULL, NULL);
         stop();
     }
 
@@ -152,14 +147,14 @@ void app_main(void) {
         stop();
     }
 
-    rp2040_updater(rp2040, pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
+    rp2040_updater(rp2040, &pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
     
-    factory_test(pax_buffer, ili9341);
+    factory_test(&pax_buffer, ili9341);
 
     /*uint8_t rp2040_uid[8];
     if (rp2040_get_uid(rp2040, rp2040_uid) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get RP2040 UID");
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "Failed to read UID", NULL, NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "Failed to read UID", NULL, NULL);
         stop();
     }
 
@@ -167,7 +162,7 @@ void app_main(void) {
     
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "ICE40 FPGA error", NULL, NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "ICE40 FPGA error", NULL, NULL);
         stop();
     }
 
@@ -177,11 +172,11 @@ void app_main(void) {
         stop();
     }
     
-    /*display_boot_screen(pax_buffer, ili9341, "Initializing BNO055...");
+    /*display_boot_screen(&pax_buffer, ili9341, "Initializing BNO055...");
 
     if (bsp_bno055_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BNO055 position sensor");
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "BNO055 sensor error", "Check I2C bus", "Remove SAO and try again");
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "BNO055 sensor error", "Check I2C bus", "Remove SAO and try again");
         stop();
     }
 
@@ -191,11 +186,11 @@ void app_main(void) {
         stop();
     }*/
 
-    /*display_boot_screen(pax_buffer, ili9341, "Initializing BME680...");
+    /*display_boot_screen(&pax_buffer, ili9341, "Initializing BME680...");
     
     if (bsp_bme680_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the BME680 position sensor");
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "BME680 sensor error", "Check I2C bus", "Remove SAO and try again");
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "BME680 sensor error", "Check I2C bus", "Remove SAO and try again");
         stop();
     }
 
@@ -205,17 +200,17 @@ void app_main(void) {
         stop();
     }*/
     
-    //display_boot_screen(pax_buffer, ili9341, "Initializing AppFS...");
+    //display_boot_screen(&pax_buffer, ili9341, "Initializing AppFS...");
 
     /* Start AppFS */
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "AppFS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
 
-    //display_boot_screen(pax_buffer, ili9341, "Initializing filesystem...");
+    //display_boot_screen(&pax_buffer, ili9341, "Initializing filesystem...");
     
     /* Start internal filesystem */
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
@@ -261,7 +256,7 @@ void app_main(void) {
     res = rp2040_get_webusb_mode(rp2040, &webusb_mode);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read WebUSB mode: %d", res);
-        display_fatal_error(pax_buffer, ili9341, "Failed to initialize", "Failed to read WebUSB mode", NULL, NULL);
+        display_fatal_error(&pax_buffer, ili9341, "Failed to initialize", "Failed to read WebUSB mode", NULL, NULL);
         stop();
     }
     
@@ -273,22 +268,22 @@ void app_main(void) {
 
         /* Launcher menu */
         while (true) {
-            menu_start(rp2040->queue, pax_buffer, ili9341, app_description->version);
+            menu_start(rp2040->queue, &pax_buffer, ili9341, app_description->version);
         }
     } else if (webusb_mode == 0x01) {
-        display_boot_screen(pax_buffer, ili9341, "WebUSB mode");
+        display_boot_screen(&pax_buffer, ili9341, "WebUSB mode");
         while (true) {
-            webusb_main(rp2040->queue, pax_buffer, ili9341);
+            webusb_main(rp2040->queue, &pax_buffer, ili9341);
         }
     } else if (webusb_mode == 0x02) {
-        display_boot_screen(pax_buffer, ili9341, "FPGA download mode");
+        display_boot_screen(&pax_buffer, ili9341, "FPGA download mode");
         while (true) {
-            fpga_download(rp2040->queue, get_ice40(), pax_buffer, ili9341);
+            fpga_download(rp2040->queue, get_ice40(), &pax_buffer, ili9341);
         }
     } else {
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
-        display_boot_screen(pax_buffer, ili9341, buffer);
+        display_boot_screen(&pax_buffer, ili9341, buffer);
     }
 
     free(framebuffer);
