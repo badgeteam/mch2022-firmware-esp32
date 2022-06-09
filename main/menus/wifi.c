@@ -279,7 +279,14 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_insert_item(menu, "WPA3 PSK", NULL, (void*) ACTION_AUTH_WPA3_PSK, -1);
     // menu_insert_item(menu, "QQQQQQQQQQQQ", NULL, (void*) ACTION_AUTH_WPA2_WPA3_PSK, -1);
     // menu_insert_item(menu, "WAPI PSK", NULL, (void*) ACTION_AUTH_WAPI_PSK, -1);
-
+    
+    // Pre-select default authmode.
+    for (int i = 0; i < menu_get_length(menu); i++) {
+        if ((int) menu_get_callback_args(menu, i) - (int) ACTION_AUTH_OPEN == (int) default_mode) {
+            menu_navigate_to(menu, i);
+        }
+    }
+    
     bool render = true;
     menu_wifi_action_t action = ACTION_NONE;
     wifi_auth_mode_t pick = default_mode;
@@ -331,6 +338,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
         if (action != ACTION_NONE) {
             if (action == ACTION_BACK) {
+                pick = -1;
                 break;
             } else {
                 pick = (wifi_auth_mode_t) (action - ACTION_AUTH_OPEN);
@@ -353,7 +361,14 @@ int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
     menu_insert_item(menu, "MSCHAP", NULL, (void*) ACTION_PHASE2_MSCHAP, -1);
     menu_insert_item(menu, "PAP", NULL, (void*) ACTION_PHASE2_PAP, -1);
     menu_insert_item(menu, "CHAP", NULL, (void*) ACTION_PHASE2_CHAP, -1);
-
+    
+    // Pre-select default authmode.
+    for (int i = 0; i < menu_get_length(menu); i++) {
+        if ((int) menu_get_callback_args(menu, i) - (int) ACTION_PHASE2_EAP == (int) default_mode) {
+            menu_navigate_to(menu, i);
+        }
+    }
+    
     bool render = true;
     menu_wifi_action_t action = ACTION_NONE;
     esp_eap_ttls_phase2_types pick = default_mode;
@@ -485,12 +500,21 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         } else if (requiredSize < sizeof(ssid)) {
             res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
             if (res != ESP_OK) strcpy(ssid, "");
+            
             res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
             if (res != ESP_OK) {
                 strcpy(password, "");
             } else if (requiredSize < sizeof(password)) {
                 res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
                 if (res != ESP_OK) strcpy(password, "");
+            }
+            
+            res = nvs_get_str(handle, "wifi.username", NULL, &requiredSize);
+            if (res != ESP_OK) {
+                strcpy(username, "");
+            } else if (requiredSize < sizeof(username)) {
+                res = nvs_get_str(handle, "wifi.username", username, &requiredSize);
+                if (res != ESP_OK) strcpy(username, "");
             }
         }
         
@@ -499,7 +523,9 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         
         // Select auth mode.
         if (accepted) {
-            authmode = wifi_auth_menu(buttonQueue, pax_buffer, ili9341, -1);
+            uint8_t default_auth = authmode;
+            nvs_get_u8(handle, "wifi.authmode", &default_auth);
+            authmode = wifi_auth_menu(buttonQueue, pax_buffer, ili9341, default_auth);
             accepted = authmode != -1;
         }
     }
@@ -508,7 +534,9 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
         if (accepted) {
             // Phase2 method.
-            phase2 = wifi_phase2_menu(buttonQueue, pax_buffer, ili9341, -1);
+            uint8_t default_auth = authmode;
+            nvs_get_u8(handle, "wifi.phase2", &default_auth);
+            phase2 = wifi_phase2_menu(buttonQueue, pax_buffer, ili9341, default_auth);
             accepted = phase2 != -1;
         }
         if (accepted) {
@@ -529,6 +557,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             nvs_set_u8 (handle, "wifi.phase2", phase2);
         }
         display_boot_screen(pax_buffer, ili9341, "WiFi settings stored");
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
     nvs_close(handle);
 }
