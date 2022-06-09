@@ -139,10 +139,7 @@ void display_animation(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_background(pax_buffer, 0xFFFFFF);
     
     for (uint8_t frame = 0; frame < 28; frame++) {
-        pax_buf_t image;
-        pax_decode_png_buf(&image, (void*) animation_frames[frame], animation_frames_end[frame] - animation_frames[frame], PAX_BUF_16_565RGB, 0);
-        pax_draw_image(pax_buffer, &image, 0, 0);
-        pax_buf_destroy(&image);
+        pax_insert_png_buf(pax_buffer, (void*) animation_frames[frame], animation_frames_end[frame] - animation_frames[frame], 0, 0, 0);
         ili9341_write(ili9341, pax_buffer->buf);
         uint8_t brightness = (frame > 14) ? (frame - 14) : (0);
         led_data[1] = brightness;
