@@ -8,13 +8,6 @@
 #include "esp_wifi_types.h"
 #include "esp_wpa2.h"
 
-#define WIFI_MCH2022_SSID     "MCH2022"
-#define WIFI_MCH2022_USER     "mch2022"
-#define WIFI_MCH2022_IDENT    "mch2022"
-#define WIFI_MCH2022_PASSWORD "mch2022"
-#define WIFI_MCH2022_AUTH     WIFI_AUTH_WPA2_ENTERPRISE
-#define WIFI_MCH2022_PHASE2   ESP_EAP_TTLS_PHASE2_MSCHAPV2
-
 // Simpler interpretation of WiFi signal strength.
 typedef enum {
 	WIFI_STRENGTH_VERY_BAD,

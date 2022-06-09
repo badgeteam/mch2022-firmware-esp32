@@ -13,11 +13,13 @@
 #include "system_wrapper.h"
 #include "settings.h"
 #include "wifi_connection.h"
+#include "wifi_connect.h"
 
 static const char *TAG = "wifi_connect";
 
 bool wifi_connect_to_stored() {
     bool result = false;
+    bool setdefault_tried = false;
     // Open NVS.
     nvs_handle_t handle;
     nvs_open("system", NVS_READWRITE, &handle);
@@ -31,6 +33,7 @@ bool wifi_connect_to_stored() {
     
     // Read NVS.
     esp_err_t res;
+    start:
     // Read SSID.
     res = nvs_get_str(handle, "wifi.ssid", NULL, &len);
     if (res) goto errcheck;
@@ -87,8 +90,22 @@ bool wifi_connect_to_stored() {
     
     errcheck:
     if (res == ESP_ERR_NVS_NOT_FOUND || res == ESP_ERR_NVS_NOT_INITIALIZED) {
-        // When NVS is not initialised.
-        ESP_LOGI(TAG, "WiFi settings not stored in NVS.");
+        if (setdefault_tried) {
+            // Oh well, that didn't work.
+            ESP_LOGE(TAG, "Failed to set default settings.");
+        } else {
+            // When NVS is not initialised.
+            ESP_LOGI(TAG, "WiFi settings not stored in NVS, setting defaults.");
+            nvs_set_u8 (handle, "wifi.authmode",   WIFI_MCH2022_AUTH);
+            nvs_set_u8 (handle, "wifi.phase2",     WIFI_MCH2022_PHASE2);
+            nvs_set_str(handle, "wifi.ssid",       WIFI_MCH2022_SSID);
+            nvs_set_str(handle, "wifi.username",   WIFI_MCH2022_USER);
+            nvs_set_str(handle, "wifi.anon_ident", WIFI_MCH2022_IDENT);
+            nvs_set_str(handle, "wifi.password",   WIFI_MCH2022_PASSWORD);
+            // Try again, but only once.
+            setdefault_tried = true;
+            goto start;
+        }
     } else if (res) {
         // Other errors.
         ESP_LOGE(TAG, "Error connecting to WiFi: %s", esp_err_to_name(res));
