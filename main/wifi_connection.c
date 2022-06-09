@@ -22,6 +22,8 @@ static uint8_t retryCount = 0;
 static uint8_t maxRetries = 3;
 static bool isScanning = false;
 
+#define WIFI_SORT_ERRCHECK(err) do {int res = (err); if(res) {ESP_LOGE(TAG, "WiFi connection error: %s", esp_err_to_name(res)); goto error; } } while(0)
+
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data) {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         xEventGroupSetBits(wifiEventGroup, WIFI_STARTED_BIT);
@@ -85,12 +87,12 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
     wifi_config.sta.threshold.authmode = aAuthmode;
     
     // Set WiFi config.
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    WIFI_SORT_ERRCHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    WIFI_SORT_ERRCHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
     // Disable 11b as NOC asked.
     esp_wifi_config_11b_rate(WIFI_IF_STA, true);
     // Start WiFi.
-    ESP_ERROR_CHECK(esp_wifi_start());
+    WIFI_SORT_ERRCHECK(esp_wifi_start());
     
     ESP_LOGI(TAG, "Connecting to WiFi...");
     
@@ -103,11 +105,12 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
         return true;
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect");
-        ESP_ERROR_CHECK(esp_wifi_stop());
+        WIFI_SORT_ERRCHECK(esp_wifi_stop());
     } else {
         ESP_LOGE(TAG, "Unknown event received while waiting on connection");
-        ESP_ERROR_CHECK(esp_wifi_stop());
+        WIFI_SORT_ERRCHECK(esp_wifi_stop());
     }
+    error:
     return false;
 }
 
@@ -122,20 +125,20 @@ bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonId
     strncpy((char*) wifi_config.sta.ssid, aSsid, 32);
     
     // Set WiFi config.
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
+    WIFI_SORT_ERRCHECK(esp_wifi_set_mode(WIFI_MODE_STA) );
+    WIFI_SORT_ERRCHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config) );
     
     // Set WPA2 ENT config.
-    esp_wifi_sta_wpa2_ent_set_identity((const uint8_t *) aAnonIdent, strlen(aAnonIdent));
-    esp_wifi_sta_wpa2_ent_set_username((const uint8_t *) aIdent, strlen(aIdent));
-    esp_wifi_sta_wpa2_ent_set_password((const uint8_t *) aPassword, strlen(aPassword));
-    esp_wifi_sta_wpa2_ent_set_ttls_phase2_method(phase2);
+    WIFI_SORT_ERRCHECK(esp_wifi_sta_wpa2_ent_set_identity((const uint8_t *) aAnonIdent, strlen(aAnonIdent)));
+    WIFI_SORT_ERRCHECK(esp_wifi_sta_wpa2_ent_set_username((const uint8_t *) aIdent, strlen(aIdent)));
+    WIFI_SORT_ERRCHECK(esp_wifi_sta_wpa2_ent_set_password((const uint8_t *) aPassword, strlen(aPassword)));
+    WIFI_SORT_ERRCHECK(esp_wifi_sta_wpa2_ent_set_ttls_phase2_method(phase2));
     // Enable enterprise auth.
-    esp_wifi_sta_wpa2_ent_enable();
+    WIFI_SORT_ERRCHECK(esp_wifi_sta_wpa2_ent_enable());
     // Disable 11b as NOC asked.
-    esp_wifi_config_11b_rate(WIFI_IF_STA, true);
+    WIFI_SORT_ERRCHECK(esp_wifi_config_11b_rate(WIFI_IF_STA, true));
     // Start the connection.
-    esp_wifi_start();
+    WIFI_SORT_ERRCHECK(esp_wifi_start());
     
     ESP_LOGI(TAG, "Connecting to '%s' as '%s'/'%s': %s", aSsid, aIdent, aAnonIdent, aPassword);
     ESP_LOGI(TAG, "Phase2 mode: %d", phase2);
@@ -149,11 +152,12 @@ bool wifi_connect_ent(const char* aSsid, const char *aIdent, const char *aAnonId
         return true;
     } else if (bits & WIFI_FAIL_BIT) {
         ESP_LOGE(TAG, "Failed to connect");
-        ESP_ERROR_CHECK(esp_wifi_stop());
+        WIFI_SORT_ERRCHECK(esp_wifi_stop());
     } else {
         ESP_LOGE(TAG, "Unknown event received while waiting on connection");
-        ESP_ERROR_CHECK(esp_wifi_stop());
+        WIFI_SORT_ERRCHECK(esp_wifi_stop());
     }
+    error:
     return false;
 }
 
@@ -196,6 +200,7 @@ static inline void wifi_desc_record(wifi_ap_record_t *record) {
 // Scan for WiFi access points.
 size_t wifi_scan(wifi_ap_record_t **aps_out) {
     isScanning = true;
+    wifi_ap_record_t *aps = NULL;
     // Scan for any non-hidden APs on all channels.
     wifi_scan_config_t cfg = {
         .ssid    = NULL,
@@ -238,11 +243,17 @@ size_t wifi_scan(wifi_ap_record_t **aps_out) {
     
     // Allocate memory for AP list.
     uint16_t num_ap = 0;
-    esp_wifi_scan_get_ap_num(&num_ap);
-    wifi_ap_record_t *aps = malloc(sizeof(wifi_ap_record_t) * num_ap);
+    WIFI_SORT_ERRCHECK(esp_wifi_scan_get_ap_num(&num_ap));
+    aps = malloc(sizeof(wifi_ap_record_t) * num_ap);
+    if (!aps) {
+        ESP_LOGE(TAG, "Out of memory (%zd bytes)", sizeof(wifi_ap_record_t) * num_ap);
+        num_ap = 0;
+        esp_wifi_scan_get_ap_records(&num_ap, NULL);
+        return 0;
+    }
     
     // Collect APs and report findings.
-    esp_wifi_scan_get_ap_records(&num_ap, aps);
+    WIFI_SORT_ERRCHECK(esp_wifi_scan_get_ap_records(&num_ap, aps));
     for (uint16_t i = 0; i < num_ap; i++) {
         wifi_desc_record(&aps[i]);
     }
@@ -261,6 +272,10 @@ size_t wifi_scan(wifi_ap_record_t **aps_out) {
     }
     isScanning = false;
     return num_ap;
+    
+    error:
+    if (aps) free(aps);
+    return 0;
 }
 
 // Get the strength value for a given RSSI.
