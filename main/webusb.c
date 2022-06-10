@@ -8,6 +8,8 @@
 #include <esp_err.h>
 #include <esp_log.h>
 #include "driver/uart.h"
+#include "esp_vfs.h"
+#include "esp_vfs_fat.h"
 #include "hardware.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
@@ -245,10 +247,64 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length, pax_buf_t* pax_buffer,
     
     // -----
     
-    // Filesystem command: list folder
+    // Filesystem command: directory listing
     if (strncmp((char*) buffer, "FSLS", 4) == 0) {
         webusb_uart_mess("FSLS");
-        webusb_uart_mess("FAIL");
+        char* path = (char*) &buffer[4];
+        if (buffer[buffer_length - 1] != 0x00) {
+            webusb_uart_mess("ESTR");
+        } else {
+            DIR* dir = opendir(path);
+            if (dir == NULL) {
+                webusb_uart_mess("EPTH");
+                return;
+            }
+            
+            webusb_uart_mess("OKOK");
+
+            struct dirent *ent;
+            char tpath[255];
+            struct stat sb;
+            char *lpath = NULL;
+            int statok;
+
+            uint32_t nfiles = 0;
+            while ((ent = readdir(dir)) != NULL) {
+                sprintf(tpath, path);
+                if (path[strlen(path)-1] != '/') {
+                    strcat(tpath,"/");
+                }
+                strcat(tpath,ent->d_name);
+
+                // Get file stat
+                statok = stat(tpath, &sb);
+                
+                int size = (statok == 0) ? (int) sb.st_size : 0;
+                time_t time = (statok == 0) ? sb.st_mtime : 0;
+
+                if (ent->d_type == DT_REG) {
+                    webusb_uart_mess("FILE");
+                    uint32_t name_length = strlen(ent->d_name);
+                    uart_write_bytes(0, &name_length, sizeof(uint32_t));
+                    uart_write_bytes(0, ent->d_name, name_length);
+                    uart_write_bytes(0, &size, sizeof(int));
+                    uart_write_bytes(0, &time, sizeof(time_t));
+                    nfiles++;
+                } else {
+                    webusb_uart_mess("DIRR");
+                    uint32_t name_length = strlen(ent->d_name);
+                    uart_write_bytes(0, &name_length, sizeof(uint32_t));
+                    uart_write_bytes(0, ent->d_name, name_length);
+                    uart_write_bytes(0, &size, sizeof(int));
+                    uart_write_bytes(0, &time, sizeof(time_t));
+                }
+            }
+
+            closedir(dir);
+            free(lpath);
+            
+            webusb_uart_mess("OKOK");
+        }
         return;
     }
 
