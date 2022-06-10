@@ -16,6 +16,7 @@
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
 #include "appfs.h"
+#include "appfs_wrapper.h"
 
 void webusb_install_uart() {
     fflush(stdout);
@@ -58,14 +59,15 @@ void webusb_uart_mess(const char *mess) {
 }
 
 void webusb_print_status(pax_buf_t* pax_buffer, ILI9341* ili9341, char* message) {
+    const pax_font_t *font = pax_get_font("saira regular");
     pax_noclip(pax_buffer);
-    pax_background(pax_buffer, 0x325aa8);
-    pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "WebUSB mode");
-    pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
+    pax_background(pax_buffer, 0x000000);
+    pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 20, 0, 23*0, "WebUSB");
+    pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 20, 0, 23*1, message);
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-void webusb_handle(uint8_t* buffer, size_t buffer_length) {
+void webusb_handle(uint8_t* buffer, size_t buffer_length, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     if ((buffer_length < 4) || (strnlen((char*) buffer, 4) < 4)) { // All commands use 4 bytes of ASCII
         webusb_uart_mess("ENOC");
         return;
@@ -82,8 +84,8 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length) {
             appfs_fd = appfsNextEntry(appfs_fd);
             if (appfs_fd == APPFS_INVALID_FD) break;
             const char* name;
-            int file_size;
-            appfsEntryInfo(appfs_fd, &name, &file_size);
+            int app_size;
+            appfsEntryInfo(appfs_fd, &name, &app_size);
             amount_of_files++;
             buffer_size += sizeof(appfs_handle_t) + strlen(name);
         }
@@ -95,9 +97,9 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length) {
             appfs_fd = appfsNextEntry(appfs_fd);
             if (appfs_fd == APPFS_INVALID_FD) break;
             const char* name;
-            int file_size;
-            appfsEntryInfo(appfs_fd, &name, &file_size);
-            uart_write_bytes(0, &file_size, 4);
+            int app_size;
+            appfsEntryInfo(appfs_fd, &name, &app_size);
+            uart_write_bytes(0, &app_size, 4);
             uint32_t name_length = strlen(name);
             uart_write_bytes(0, &name_length, 4);
             uart_write_bytes(0, name, name_length);
@@ -130,7 +132,82 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length) {
 
     // AppFS command: open file (write)
     if (strncmp((char*) buffer, "APOW", 4) == 0) {
+        size_t buffer_pos = 4;
         webusb_uart_mess("APOW");
+        uint32_t name_length = (uint32_t) buffer[buffer_pos];
+        buffer_pos += sizeof(uint32_t);
+        char* name = malloc(name_length + 1);
+        if (name == NULL) {
+            webusb_uart_mess("EMEM");
+            webusb_print_status(pax_buffer, ili9341, "Memory allocation failed");
+            return;
+        }
+        memcpy(name, &buffer[buffer_pos], name_length);
+        name[name_length] = 0x00; // Just to be sure
+        buffer_pos += name_length;
+        
+        uint8_t run = (uint8_t) buffer[buffer_pos];
+        buffer_pos += 1;
+
+        if (buffer_pos >= buffer_length) {
+            webusb_uart_mess("EDAT");
+            webusb_print_status(pax_buffer, ili9341, "No data");
+            free(name);
+            return;
+        }
+        
+        size_t app_size = buffer_length - buffer_pos;
+
+        char strbuf[64];
+        snprintf(strbuf, sizeof(strbuf), "Creating file...\n%s\n%u bytes\nRun: %s", name, app_size, run ? "yes" : "no");
+        webusb_print_status(pax_buffer, ili9341, strbuf);
+
+        appfs_handle_t handle;
+
+        esp_err_t res = appfsCreateFile(name, app_size, &handle);
+        if (res != ESP_OK) {
+            webusb_uart_mess("EAPC");
+            webusb_print_status(pax_buffer, ili9341, "Failed to create app");
+            free(name);
+            return;
+        }
+
+        int roundedSize=(app_size+(SPI_FLASH_MMU_PAGE_SIZE-1))&(~(SPI_FLASH_MMU_PAGE_SIZE-1));
+        
+        snprintf(strbuf, sizeof(strbuf), "Erasing flash...\n%s\n%u bytes\nRun: %s", name, app_size, run ? "yes" : "no");
+        webusb_print_status(pax_buffer, ili9341, strbuf);
+
+        res = appfsErase(handle, 0, roundedSize);
+        if (res != ESP_OK) {
+            webusb_uart_mess("EAPE");
+            webusb_print_status(pax_buffer, ili9341, "Failed to erase app");
+            free(name);
+            return;
+        }
+        
+        snprintf(strbuf, sizeof(strbuf), "Writing data...\n%s\n%u bytes\nRun: %s", name, app_size, run ? "yes" : "no");
+        webusb_print_status(pax_buffer, ili9341, strbuf);
+
+        res = appfsWrite(handle, 0, &buffer[buffer_pos], app_size);
+        if (res != ESP_OK) {
+            webusb_uart_mess("EAPW");
+            webusb_print_status(pax_buffer, ili9341, "Failed to write app");
+            free(name);
+            return;
+        }
+
+        snprintf(strbuf, sizeof(strbuf), "Done.\n%s\n%u bytes\nRun: %s", name, app_size, run ? "yes" : "no");
+        webusb_print_status(pax_buffer, ili9341, strbuf);
+        
+        free(name);
+
+        webusb_uart_mess("OKOK");
+        
+        if (run) {
+            webusb_uart_mess("WUSB"); // Signal done to the host application before
+            vTaskDelay(500 / portTICK_PERIOD_MS);
+            appfs_boot_app(handle);
+        }
         return;
     }
 
@@ -224,9 +301,7 @@ void webusb_main(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili93
 
         webusb_uart_mess("OKOK");
         webusb_print_status(pax_buffer, ili9341, "Packet received");
-
-        webusb_handle(buffer, length);
-        
+        webusb_handle(buffer, length, pax_buffer, ili9341);
         free(buffer);
     }
     
