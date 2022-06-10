@@ -124,12 +124,6 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length, pax_buf_t* pax_buffer,
         return;
     }
 
-    // AppFS command: open file (read)
-    if (strncmp((char*) buffer, "APOR", 4) == 0) {
-        webusb_uart_mess("APOR");
-        return;
-    }
-
     // AppFS command: open file (write)
     if (strncmp((char*) buffer, "APOW", 4) == 0) {
         size_t buffer_pos = 4;
@@ -214,6 +208,38 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length, pax_buf_t* pax_buffer,
     // AppFS command: boot file
     if (strncmp((char*) buffer, "APBT", 4) == 0) {
         webusb_uart_mess("APBT");
+        char* filename = (char*) &buffer[4];
+        if (buffer[buffer_length - 1] != 0x00) {
+            webusb_uart_mess("ESTR");
+        } else {
+            appfs_handle_t fd = appfsOpen(filename);
+            if (fd == APPFS_INVALID_FD) {
+                webusb_uart_mess("FAIL");
+                return;
+            }
+            webusb_uart_mess("OKOKWUSB");
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+            appfs_boot_app(fd);
+        }
+        return;
+    }
+    
+    // AppFS command: open file (read)
+    if (strncmp((char*) buffer, "APOR", 4) == 0) {
+        webusb_uart_mess("APOR");
+        char* filename = (char*) &buffer[4];
+        if (buffer[buffer_length - 1] != 0x00) {
+            webusb_uart_mess("ESTR");
+        } else {
+            appfs_handle_t fd = appfsOpen(filename);
+            if (fd == APPFS_INVALID_FD) {
+                webusb_uart_mess("FAIL");
+                return;
+            }
+            //webusb_uart_mess("OKOK");
+            // Not yet implemented TODO
+            webusb_uart_mess("FAIL");
+        }
         return;
     }
     
@@ -222,36 +248,42 @@ void webusb_handle(uint8_t* buffer, size_t buffer_length, pax_buf_t* pax_buffer,
     // Filesystem command: list folder
     if (strncmp((char*) buffer, "FSLS", 4) == 0) {
         webusb_uart_mess("FSLS");
+        webusb_uart_mess("FAIL");
         return;
     }
 
     // Filesystem command: remove file / directory
     if (strncmp((char*) buffer, "FSRM", 4) == 0) {
         webusb_uart_mess("FSRM");
+        webusb_uart_mess("FAIL");
         return;
     }
 
     // Filesystem command: create directory
     if (strncmp((char*) buffer, "FSMD", 4) == 0) {
         webusb_uart_mess("FSMD");
+        webusb_uart_mess("FAIL");
         return;
     }
 
     // Filesystem command: open file (read)
     if (strncmp((char*) buffer, "FSOR", 4) == 0) {
         webusb_uart_mess("FSOR");
+        webusb_uart_mess("FAIL");
         return;
     }
 
     // Filesystem command: open file (write)
     if (strncmp((char*) buffer, "FSOW", 4) == 0) {
         webusb_uart_mess("FSOW");
+        webusb_uart_mess("FAIL");
         return;
     }
 
     // Filesystem command: open file (append)
     if (strncmp((char*) buffer, "FSOA", 4) == 0) {
         webusb_uart_mess("FSOA");
+        webusb_uart_mess("FAIL");
         return;
     }
 }

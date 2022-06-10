@@ -86,20 +86,18 @@ while timeout > 0:
                 got_rx_ok = True
             elif got_cmd_init:
                 got_cmd_ok = True
-            response = response[4:]
         elif response[:4] == b"APRM":
             got_cmd_init = True
-            response = response[4:]
         elif response[:4] == b"WUSB":
             got_end = True
-            response = response[4:]
             break
-        elif respone[:4] == b"ESTR":
+        elif response[:4] == b"ESTR":
             got_failed = True
-        elif respone[:4] == b"FAIL":
+        elif response[:4] == b"FAIL":
             got_failed = True
         else:
             print("Unknown response data:", response[:4])
+        response = response[4:]
 
     timeout -= 1
 
