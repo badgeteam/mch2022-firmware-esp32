@@ -29,10 +29,11 @@ device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_MODE, 0x0001, webu
 device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_RESET, 0x0000, webusb_esp32.bInterfaceNumber)
 device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_BAUDRATE, 9216, webusb_esp32.bInterfaceNumber)
 
+print("Sync...")
 while True:
     data = None
     try:
-        data = bytes(ep_in.read(4))
+        data = bytes(ep_in.read(32))
     except Exception as e:
         pass
     if (data == b"WUSB"):

@@ -51,7 +51,7 @@ print("Connecting...")
 while True:
     data = None
     try:
-        data = bytes(ep_in.read(4))
+        data = bytes(ep_in.read(32))
     except Exception as e:
         pass
     if (data == b"WUSB"):

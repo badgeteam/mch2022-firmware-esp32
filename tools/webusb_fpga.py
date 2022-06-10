@@ -43,7 +43,7 @@ print("Waiting for ESP32 to boot into FPGA download mode...")
 while True:
     data = None
     try:
-        data = bytes(esp32_ep_in.read(4))
+        data = bytes(esp32_ep_in.read(32))
     except Exception as e:
         #print(e)
         pass
