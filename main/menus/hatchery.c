@@ -12,68 +12,81 @@
 #include "pax_codecs.h"
 #include "menu.h"
 #include "rp2040.h"
+#include "hatchery_client.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
-typedef struct {
-    //appfs_handle_t fd;
-    //menu_launcher_action_t action;
-    void *data;
-} menu_hatchery_args_t;
+typedef void (*fill_menu_items_fn_t)(menu_t *menu, void *context);
+typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args);
 
-typedef void (*fill_menu_items_fn_t)(menu_t *menu);
-typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args);
-
-static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action);
-static void add_menu_item(menu_t *menu, const char *name, menu_hatchery_args_t *args);
+static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action, void *context);
+static void add_menu_item(menu_t *menu, const char *name, void *callback_args);
 
 
-static void fill_menu_items_apps(menu_t *menu) {
+static void fill_menu_items_apps(menu_t *menu, void *context) {
     add_menu_item(menu, "App A", NULL);
     add_menu_item(menu, "Test App", NULL);
     add_menu_item(menu, "App xx", NULL);
 }
 
-static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
+static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
+}
+
+typedef struct categories_context_t categories_context_t; 
+struct categories_context_t {
+    const char *url;
+    hatchery_category_t *categories;
+};
+
+static void fill_menu_items_categories(menu_t *menu, void *context) {
+    categories_context_t *categories_context = (categories_context_t*)context;
+
+    hatchery_query_categories(categories_context->url, &categories_context->categories);
+    for (hatchery_category_t *category = categories_context->categories; category != NULL; category = category->next) {
+        add_menu_item(menu, category->name, category);
+    }
+}
+
+static void action_categories(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps, NULL);
 }
 
 
-static void fill_menu_items_categories(menu_t *menu) {
-    add_menu_item(menu, "Fun", NULL);
-    add_menu_item(menu, "Test", NULL);
-    add_menu_item(menu, "Strange", NULL);
-}
-
-static void action_categories(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps);
-}
-
-
-static void fill_menu_items_types(menu_t *menu) {
+static void fill_menu_items_types(menu_t *menu, void *context) {
     add_menu_item(menu, "App", NULL);
     add_menu_item(menu, "Python", NULL);
     add_menu_item(menu, "FPGA", NULL);
 }
 
-static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_hatchery_args_t *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories);
+static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
+    categories_context_t context;
+    //context.url = "https://hatchery.badge.team/basket/sha2017/categories/json";
+    context.url = "https://37.97.208.91/basket/sha2017/categories/json";
+    
+    context.categories = NULL;
+
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories, &context);
+
+    hatchery_category_free(context.categories);
 }
 
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, NULL);
 }
 
 // Generic functions
 
-static void add_menu_item(menu_t *menu, const char *name, menu_hatchery_args_t *args) {
-    args = malloc(sizeof(menu_hatchery_args_t));
-    args->data = 0;
-    menu_insert_item(menu, name, NULL, (void*) args, -1);
+static void add_menu_item(menu_t *menu, const char *name, void *callback_args) {
+    static int nothing;
+    if (callback_args == NULL) {
+        callback_args = &nothing;
+    } 
+    menu_insert_item(menu, name, NULL, callback_args, -1);
 }
 
-static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action) {
+static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action, void *context) {
     menu_t* menu = menu_alloc("Hatchery", 34, 18);
     
     menu->fgColor           = 0xFF000000;
@@ -93,10 +106,10 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
 
     const pax_font_t *font = pax_get_font("saira regular");
 
-    fill_menu_items(menu);
+    fill_menu_items(menu, context);
     
     bool render = true;
-    menu_hatchery_args_t* menuArgs = NULL;
+    void* menuArgs = NULL;
     
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
@@ -158,9 +171,9 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
         }
     }
 
-    for (size_t index = 0; index < menu_get_length(menu); index++) {
-        free(menu_get_callback_args(menu, index));
-    }
+//    for (size_t index = 0; index < menu_get_length(menu); index++) {
+//        free(menu_get_callback_args(menu, index));
+//    }
 
     menu_free(menu);
     pax_buf_destroy(&icon_apps);
