@@ -47,7 +47,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         restart();
     }
 
-    if (fw_version < 0x03) { // Update required
+    if (fw_version < 0x04) { // Update required
         display_rp2040_update_state(pax_buffer, ili9341, "Starting bootloader...");
         rp2040_reboot_to_bootloader(rp2040);
         esp_restart();

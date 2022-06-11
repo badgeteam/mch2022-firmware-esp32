@@ -155,7 +155,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
         if (render) {
             char textBuffer[64];
-            snprintf(textBuffer, sizeof(textBuffer), "B%1.1fv U%1.1fv %03u%%%c v%s", battery_voltage, usb_voltage, battery_percent, battery_charging ? '+' : ' ', version);
+            snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
             render_start_help(pax_buffer, textBuffer);
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
