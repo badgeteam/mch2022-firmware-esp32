@@ -16,7 +16,7 @@
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
 
-void fpga_install_uart() {
+static void fpga_install_uart() {
     fflush(stdout);
     ESP_ERROR_CHECK(uart_driver_install(0, 2048, 0, 0, NULL, 0));
     uart_config_t uart_config = {
@@ -30,16 +30,16 @@ void fpga_install_uart() {
     ESP_ERROR_CHECK(uart_param_config(0, &uart_config));
 }
 
-void fpga_uninstall_uart() {
+static void fpga_uninstall_uart() {
     uart_driver_delete(0);
 }
 
-bool fpga_read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
+static bool fpga_read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
     int read = uart_read_bytes(0, buffer, len, timeout / portTICK_PERIOD_MS);
     return (read == len);
 }
 
-bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
+static bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
     uint8_t data[256];
     uart_read_bytes(0, data, sizeof(data), 10 / portTICK_PERIOD_MS);
     char command[] = "FPGA";
@@ -52,15 +52,15 @@ bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
     return true;
 }
 
-bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
+static bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
     return fpga_read_stdin(buffer, length, 3000);
 }
 
-void fpga_uart_mess(const char *mess) {
+static void fpga_uart_mess(const char *mess) {
     uart_write_bytes(0, mess, strlen(mess));
 }
 
-esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
+static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
 {
     rp2040_input_message_t buttonMessage = {0};
     while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
