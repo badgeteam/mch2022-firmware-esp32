@@ -22,26 +22,21 @@ bool fsob_uart_sync(uint32_t* size, uint16_t* command, uint32_t* message_id) {
 }
 
 void fsob_task(void *pvParameter) {
+    uint32_t size, message_id;
+    uint16_t command;
+    
     while (true) {
-        //webusb_print_status(pax_buffer, ili9341, "Waiting...");
-
-        // 1) Wait for WUSB followed by data length as uint32 and CRC32 of the data as uint32
-        uint32_t size, message_id;
-        uint16_t command;
+        // 1) Wait for webusb header
         while (!fsob_uart_sync(&size, &command, &message_id)) {
             vTaskDelay(10);
         }
 
-        //webusb_print_status(pax_buffer, ili9341, "Receiving...");
-
-        // 2) Allocate RAM for the data to be received
+        // 2) Allocate RAM for the data to be received if there is a payload
         uint8_t* buffer = NULL;
         if (size > 0) {
             buffer = malloc(size);
             if (buffer == NULL) {
-                //webusb_uart_mess("EMEM");
-                //webusb_print_status(pax_buffer, ili9341, "Error: malloc failed");
-                //vTaskDelay(100 / portTICK_PERIOD_MS);
+                ESP_LOGI(TAG, "Failed to allocate buffer")
                 continue;
             }
 
@@ -49,21 +44,15 @@ void fsob_task(void *pvParameter) {
             int read = uart_read_bytes(CONFIG_DRIVER_FSOVERBUS_UART_NUM, buffer, size, pdMS_TO_TICKS(50));
             if (read != size) {
                 free(buffer);
-                //webusb_uart_mess("ERCV");
-                char outputstring[100] = {0};
-                snprintf(outputstring, 100, "Error: rec %d %d", read, size);
-                //webusb_print_status(pax_buffer, ili9341, outputstring);
-                //vTaskDelay(pdMS_TO_TICKS(5000));
+                ESP_LOGI(TAG, "Failed to read all data")
                 continue;
             }
         }
 
-        //webusb_print_status(pax_buffer, ili9341, "Packet received");
         handleFSCommand(buffer, command, message_id, size, size, size);
         if(buffer != NULL) {
             free(buffer);
         }
-        //webusb_print_status(pax_buffer, ili9341, "Done");
     }
 }
 
