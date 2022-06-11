@@ -228,7 +228,7 @@ void app_main(void) {
     } else if (webusb_mode == 0x02) {
         display_boot_screen(&pax_buffer, ili9341, "FPGA download mode");
         while (true) {
-            fpga_download(rp2040->queue, get_ice40(), &pax_buffer, ili9341);
+            fpga_download(rp2040->queue, ice40, &pax_buffer, ili9341);
         }
     } else {
         char buffer[64];
