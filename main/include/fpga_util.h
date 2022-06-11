@@ -12,6 +12,13 @@
 #include "ice40.h"
 
 
+/* FPGA IRQ --------------------------------------------------------------- */
+
+esp_err_t fpga_irq_setup(ICE40 *ice40);
+void      fpga_irq_cleanup(ICE40 *ice40);
+bool      fpga_irq_wait(TickType_t wait);
+
+
 /* Wishbone bridge -------------------------------------------------------- */
 
 struct fpga_wb_cmdbuf;

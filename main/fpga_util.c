@@ -11,9 +11,84 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <driver/gpio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+
 #include "ice40.h"
 
 #include "fpga_util.h"
+
+
+/* ---------------------------------------------------------------------------
+ * FPGA IRQ
+ * ------------------------------------------------------------------------ */
+
+static SemaphoreHandle_t g_irq_trig;
+
+
+static void IRAM_ATTR
+fpga_irq_handler(void* arg)
+{
+    xSemaphoreGiveFromISR(g_irq_trig, NULL);
+    portYIELD_FROM_ISR();
+}
+
+esp_err_t
+fpga_irq_setup(ICE40 *ice40)
+{
+    esp_err_t res;
+
+    // Setup semaphore
+    g_irq_trig = xSemaphoreCreateBinary();
+
+    // Install handler
+    res = gpio_isr_handler_add(ice40->pin_int, fpga_irq_handler, NULL);
+    if (res != ESP_OK)
+        return res;
+
+    // Configure GPIO
+    gpio_config_t io_conf = {
+        .intr_type    = GPIO_INTR_NEGEDGE,
+        .mode         = GPIO_MODE_INPUT,
+        .pin_bit_mask = 1ULL << ice40->pin_int,
+        .pull_down_en = 0,
+        .pull_up_en   = 1,
+    };
+
+    res = gpio_config(&io_conf);
+    if (res != ESP_OK)
+        return res;
+
+    return ESP_OK;
+}
+
+void
+fpga_irq_cleanup(ICE40 *ice40)
+{
+    // Reconfigure GPIO
+    gpio_config_t io_conf = {
+        .intr_type    = GPIO_INTR_DISABLE,
+        .mode         = GPIO_MODE_INPUT,
+        .pin_bit_mask = 1ULL << ice40->pin_int,
+        .pull_down_en = 0,
+        .pull_up_en   = 1,
+    };
+    gpio_config(&io_conf);
+
+    // Remove handler
+    gpio_isr_handler_remove(ice40->pin_int);
+
+    // Release semaphore
+    vSemaphoreDelete(g_irq_trig);
+}
+
+bool
+fpga_irq_wait(TickType_t wait)
+{
+    return xSemaphoreTake(g_irq_trig, wait) == pdTRUE;
+}
+
 
 /* ---------------------------------------------------------------------------
  * Wishbone bridge
