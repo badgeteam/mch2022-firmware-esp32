@@ -135,12 +135,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
     pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
     pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Preparing...");
     ili9341_write(ili9341, pax_buffer->buf);
-    
+
     fpga_install_uart();
-    
+
     ice40_disable(ice40);
     ili9341_init(ili9341);
-    
+
     uint8_t counter = 0;
     uint32_t length = 0;
     uint32_t crc = 0;
@@ -154,14 +154,14 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         counter++;
         if (counter > 3) counter = 0;
     }
-    
+
     while (true) {
         pax_noclip(pax_buffer);
         pax_background(pax_buffer, 0x325aa8);
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
         pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Receiving bitstream...");
         ili9341_write(ili9341, pax_buffer->buf);
-        
+
         uint8_t* buffer = malloc(length);
         if (buffer == NULL) {
             pax_noclip(pax_buffer);
@@ -184,9 +184,9 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             fpga_uninstall_uart();
             return;
         }
-        
+
         uint32_t checkCrc = crc32_le(0, buffer, length);
-        
+
         if (checkCrc != crc) {
             free(buffer);
             pax_noclip(pax_buffer);
@@ -205,7 +205,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             return;
         }
         fpga_uart_mess("CRC correct\n");
-        
+
         ili9341_deinit(ili9341);
         ili9341_select(ili9341, false);
         vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -213,7 +213,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         esp_err_t res = ice40_load_bitstream(ice40, buffer, length);
         free(buffer);
-        
+
         if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
