@@ -300,7 +300,7 @@ static bool test_irq_n(uint32_t *rc) {
     esp_err_t res;
 
     /* Set pin as input */
-    res = gpio_set_direction(GPIO_INT_FPGA, GPIO_MODE_INPUT);
+    res = gpio_set_direction(ice40->pin_int, GPIO_MODE_INPUT);
     if (res != ESP_OK) {
         *rc = 32;
         return false;
@@ -316,7 +316,7 @@ static bool test_irq_n(uint32_t *rc) {
         return false;
 
     /* Check level is 0 */
-    if (gpio_get_level(GPIO_INT_FPGA) != 0) {
+    if (gpio_get_level(ice40->pin_int) != 0) {
         *rc = 16;
         return false;
     }
@@ -331,7 +331,7 @@ static bool test_irq_n(uint32_t *rc) {
         return false;
 
     /* Check level is 1 */
-    if (gpio_get_level(GPIO_INT_FPGA) != 1) {
+    if (gpio_get_level(ice40->pin_int) != 1) {
         *rc = 16;
         return false;
     }
