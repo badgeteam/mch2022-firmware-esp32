@@ -1,3 +1,4 @@
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include <sdkconfig.h>
@@ -58,6 +59,52 @@ static bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
 
 static void fpga_uart_mess(const char *mess) {
     uart_write_bytes(0, mess, strlen(mess));
+}
+
+static void fpga_display_message(
+        pax_buf_t* pax_buffer, ILI9341* ili9341,
+        uint32_t bg, uint32_t fg,
+        const char *fmt, ...
+    )
+{
+    char message[256];
+    va_list va;
+    char *c, *m;
+    int line;
+    bool done;
+
+    // Print message in internal buffer
+    va_start(va, fmt);
+    vsnprintf(message, sizeof(message), fmt, va);
+    va_end(va);
+
+    // Clear screen
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, bg);
+
+    // Scan
+    done = false;
+    line = 0;
+    m = c = message;
+
+    while (!done) {
+        // End ?
+        done = (*c == '\0');
+
+        // Print ?
+        if (*c == '\0' || *c == '\n') {
+            *c = '\0';
+            pax_draw_text(pax_buffer, fg, NULL, 18, 0, 20*line, m);
+            m = c + 1;
+            line++;
+        }
+
+        // Next char
+        c++;
+    }
+
+    // Send to screen
+    ili9341_write(ili9341, pax_buffer->buf);
 }
 
 static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
@@ -130,11 +177,8 @@ static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uin
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     char message[64];
 
-    pax_noclip(pax_buffer);
-    pax_background(pax_buffer, 0x325aa8);
-    pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-    pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Preparing...");
-    ili9341_write(ili9341, pax_buffer->buf);
+    fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
+        "FPGA download mode\nPreparing...");
 
     fpga_install_uart();
 
@@ -145,41 +189,28 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
     uint32_t length = 0;
     uint32_t crc = 0;
     while (!fpga_uart_sync(&length, &crc)) {
-        pax_noclip(pax_buffer);
-        pax_background(pax_buffer, 0x325aa8);
-        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-        snprintf(message, sizeof(message), "Waiting for bitstream%s%s%s", (counter > 0) ? "." : " ", (counter > 1) ? "." : " ", (counter > 2) ? "." : " ");
-        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
-        ili9341_write(ili9341, pax_buffer->buf);
-        counter++;
-        if (counter > 3) counter = 0;
+        const char *dots[] = { "", ".", "..", "..." };
+        fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
+            "FPGA download mode\nWaiting for bitstream%s", dots[counter]);
+        counter = (counter + 1) & 3;
     }
 
     while (true) {
-        pax_noclip(pax_buffer);
-        pax_background(pax_buffer, 0x325aa8);
-        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-        pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Receiving bitstream...");
-        ili9341_write(ili9341, pax_buffer->buf);
+        fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
+            "FPGA download mode\nReceiving bitstream...");
 
         uint8_t* buffer = malloc(length);
         if (buffer == NULL) {
-            pax_noclip(pax_buffer);
-            pax_background(pax_buffer, 0xa85a32);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Malloc failed");
-            ili9341_write(ili9341, pax_buffer->buf);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nMalloc failed");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
         }
         if (!fpga_uart_load(buffer, length)) {
             free(buffer);
-            pax_noclip(pax_buffer);
-            pax_background(pax_buffer, 0xa85a32);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "Timeout while loading");
-            ili9341_write(ili9341, pax_buffer->buf);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nTimeout while loading");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
@@ -189,18 +220,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         if (checkCrc != crc) {
             free(buffer);
-            pax_noclip(pax_buffer);
-            pax_background(pax_buffer, 0xa85a32);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, "CRC incorrect");
-            snprintf(message, sizeof(message), "Provided CRC:   %08X", crc);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*2, message);
-            snprintf(message, sizeof(message), "Calculated CRC: %08X", checkCrc);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*3, message);
-            ili9341_write(ili9341, pax_buffer->buf);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
+                crc, checkCrc);
             snprintf(message, sizeof(message), "CRC incorrect %08X %08x\n", crc, checkCrc);
             fpga_uart_mess(message);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
         }
@@ -217,15 +242,11 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
-            pax_noclip(pax_buffer);
-            pax_background(pax_buffer, 0xa85a32);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-            snprintf(message, sizeof(message), "Upload failed: %d", res);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
-            ili9341_write(ili9341, pax_buffer->buf);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nUpload failed: %d", res);
             snprintf(message, sizeof(message), "uploading bitstream failed with %d\n", res);
             fpga_uart_mess(message);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
         }
@@ -246,15 +267,11 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             if (res != ESP_OK) {
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
-                pax_noclip(pax_buffer);
-                pax_background(pax_buffer, 0xa85a32);
-                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "FPGA download mode");
-                snprintf(message, sizeof(message), "Error: %d", res);
-                pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*1, message);
-                ili9341_write(ili9341, pax_buffer->buf);
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                    "FPGA download mode\nError: %d", res);
                 snprintf(message, sizeof(message), "processing events failed with %d\n", res);
                 fpga_uart_mess(message);
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
                 fpga_uninstall_uart();
                 return;
             }
