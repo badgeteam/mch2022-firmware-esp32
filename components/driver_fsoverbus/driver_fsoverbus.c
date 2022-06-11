@@ -26,16 +26,15 @@
 #include "include/appfsfunctions.h"
 #include "include/functions.h"
 
-void fsob_timeout_function( TimerHandle_t xTimer );
-
-#define TAG "FSoverBus"
+#define TAG "fsob"
+#define min(a,b) (((a) < (b)) ? (a) : (b))
+#define CACHE_SIZE (2048)
 
 TimerHandle_t timeout;
-RingbufHandle_t buf_handle[2];
 
-uint8_t command_in[1024];
+uint8_t command_in[CACHE_SIZE];
+void fsob_timeout_function( TimerHandle_t xTimer );
 
-#define min(a,b) (((a) < (b)) ? (a) : (b))
 
 //Function lookup tables
 
@@ -47,15 +46,13 @@ void handleFSCommand(uint8_t *data, uint16_t command, uint32_t message_id, uint3
     if(received == length) { //First data of the packet
         write_pos = 0;
     }
-    uint8_t *buffer;
-    if(length > 1024){
+    uint8_t *buffer = command_in;
+    
+    if(length > CACHE_SIZE){  //Incoming buffer exceeds local cache, directly use buffer instead of copying
         buffer = data;
     } else if(length > 0) {
         memcpy(&command_in[write_pos], data, length);
         write_pos += length;
-        buffer = command_in;
-    } else {
-        buffer = command_in;
     }
 
     int return_val = 0;

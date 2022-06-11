@@ -12,6 +12,7 @@ if(CONFIG_DRIVER_FSOVERBUS_ENABLE)
         "packetutils.c"
         "specialfunctions.c"
         "uart_backend.c"
+        "uartnaive_backend.c"
     )
 else()
     set(srcs "")
