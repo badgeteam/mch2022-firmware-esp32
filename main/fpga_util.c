@@ -6,16 +6,20 @@
  * defined for the badge.
  *
  * Copyright (C) 2022  Sylvain Munaut
+ * Copyritht (C) 2022  Frans Faase
  */
 
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <esp_err.h>
 #include <driver/gpio.h>
 #include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include <freertos/semphr.h>
 
 #include "ice40.h"
+#include "rp2040.h"
 
 #include "fpga_util.h"
 
@@ -295,4 +299,89 @@ fpga_wb_exec(struct fpga_wb_cmdbuf *cb, ICE40* ice40)
     }
 
     return true;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Button reports
+ * ------------------------------------------------------------------------ */
+
+static uint16_t g_btn_state = 0;
+
+void
+fpga_btn_reset(void)
+{
+    g_btn_state = 0;
+}
+
+esp_err_t
+fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue)
+{
+    rp2040_input_message_t buttonMessage;
+
+    while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE)
+    {
+        uint8_t  pin   = buttonMessage.input;
+        bool     value = buttonMessage.state;
+        uint16_t btn_mask = 0;
+
+        switch(pin) {
+            case RP2040_INPUT_JOYSTICK_DOWN:
+                btn_mask = 1 << 0;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+                btn_mask = 1 << 1;
+                break;
+            case RP2040_INPUT_JOYSTICK_LEFT:
+                btn_mask = 1 << 2;
+                break;
+            case RP2040_INPUT_JOYSTICK_RIGHT:
+                btn_mask = 1 << 3;
+                break;
+            case RP2040_INPUT_JOYSTICK_PRESS:
+                btn_mask = 1 << 4;
+                break;
+            case RP2040_INPUT_BUTTON_HOME:
+                btn_mask = 1 << 5;
+                break;
+            case RP2040_INPUT_BUTTON_MENU:
+                btn_mask = 1 << 6;
+                break;
+            case RP2040_INPUT_BUTTON_SELECT:
+                btn_mask = 1 << 7;
+                break;
+            case RP2040_INPUT_BUTTON_START:
+                btn_mask = 1 << 8;
+                break;
+            case RP2040_INPUT_BUTTON_ACCEPT:
+                btn_mask = 1 << 9;
+                break;
+            case RP2040_INPUT_BUTTON_BACK:
+                btn_mask = 1 << 10;
+            default:
+                break;
+        }
+
+        if (btn_mask != 0)
+        {
+            if (value)
+                g_btn_state |=  btn_mask;
+            else
+                g_btn_state &= ~btn_mask;
+
+            uint8_t spi_message[5] = {
+                SPI_CMD_BUTTON_REPORT,
+                g_btn_state >> 8,
+                g_btn_state & 0xff,
+                btn_mask >> 8,
+                btn_mask & 0xff,
+            };
+
+            esp_err_t res = ice40_send(ice40, spi_message, 5);
+            if (res != ESP_OK)
+                return res;
+        }
+    }
+
+    return ESP_OK;
 }

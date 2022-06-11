@@ -16,6 +16,7 @@
 #include "system_wrapper.h"
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
+#include "fpga_util.h"
 
 static void fpga_install_uart() {
     fflush(stdout);
@@ -160,71 +161,6 @@ static void fpga_display_message(
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state)
-{
-    rp2040_input_message_t buttonMessage = {0};
-    while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
-        uint8_t pin = buttonMessage.input;
-        bool value = buttonMessage.state;
-        uint16_t key_mask = 0;
-        switch(pin) {
-            case RP2040_INPUT_JOYSTICK_DOWN:
-                key_mask = 1 << 0;
-                break;
-            case RP2040_INPUT_JOYSTICK_UP:
-                key_mask = 1 << 1;
-                break;
-            case RP2040_INPUT_JOYSTICK_LEFT:
-                key_mask = 1 << 2;
-                break;
-            case RP2040_INPUT_JOYSTICK_RIGHT:
-                key_mask = 1 << 3;
-                break;
-            case RP2040_INPUT_JOYSTICK_PRESS:
-                key_mask = 1 << 4;
-                break;
-            case RP2040_INPUT_BUTTON_HOME:
-                key_mask = 1 << 5;
-                break;
-            case RP2040_INPUT_BUTTON_MENU:
-                key_mask = 1 << 6;
-                break;
-            case RP2040_INPUT_BUTTON_SELECT:
-                key_mask = 1 << 7;
-                break;
-            case RP2040_INPUT_BUTTON_START:
-                key_mask = 1 << 8;
-                break;
-            case RP2040_INPUT_BUTTON_ACCEPT:
-                key_mask = 1 << 9;
-                break;
-            case RP2040_INPUT_BUTTON_BACK:
-                key_mask = 1 << 10;
-            default:
-                break;
-        }
-        if (key_mask != 0)
-        {
-            if (value) {
-                *key_state |= key_mask;
-            }
-            else {
-                *key_state &= ~key_mask;
-            }
-
-            uint8_t spi_message[5] = { 0xf4 };
-            spi_message[1] = *key_state >> 8;
-            spi_message[2] = *key_state & 0xff;
-            spi_message[3] = key_mask >> 8;
-            spi_message[4] = key_mask & 0xff;
-            esp_err_t res = ice40_send(ice40, spi_message, 5);
-            if (res != ESP_OK) {
-                return res;
-            }
-        }
-    }
-    return ESP_OK;
-}
 
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     uint8_t *buffer = NULL;
@@ -233,6 +169,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         "FPGA download mode\nPreparing...");
 
     fpga_install_uart();
+    fpga_btn_reset();
 
     ice40_disable(ice40);
     ili9341_init(ili9341);
@@ -301,12 +238,11 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         fpga_uart_mess("bitstream has uploaded\n");
 
         // Waiting for next download and sending key strokes to FPGA
-        uint16_t key_state = 0;
         while (true) {
             if (fpga_uart_sync(&length, &crc)) {
                 break;
             }
-            esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state);
+            esp_err_t res = fpga_btn_forward_events(ice40, buttonQueue);
             if (res != ESP_OK) {
                 ice40_disable(ice40);
                 ili9341_init(ili9341);

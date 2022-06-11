@@ -9,6 +9,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include <esp_err.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+
 #include "ice40.h"
 
 
@@ -47,3 +51,9 @@ bool fpga_wb_queue_write_burst(struct fpga_wb_cmdbuf *cb, int dev, uint32_t addr
 bool fpga_wb_queue_read_burst(struct fpga_wb_cmdbuf *cb, int dev, uint32_t addr, uint32_t *val, int n, bool inc);
 
 bool fpga_wb_exec(struct fpga_wb_cmdbuf *cb, ICE40* ice40);
+
+
+/* Button reports --------------------------------------------------------- */
+
+void      fpga_btn_reset(void);
+esp_err_t fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue);
