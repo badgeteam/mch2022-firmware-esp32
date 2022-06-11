@@ -10,6 +10,7 @@ idf_component_register(
          "wifi_ota.c"
 	 "hatchery_client.c"
          "fpga_download.c"
+         "fpga_util.c"
          "audio.c"
          "bootscreen.c"
          "menus/launcher.c"
