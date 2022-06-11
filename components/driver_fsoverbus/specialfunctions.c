@@ -22,7 +22,7 @@ int execfile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size
 int execfile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
     if(received != size) return 0;
 
-    sender(command, message_id);
+    sendns(command, message_id);
     return 1;
 }
 #endif
@@ -36,5 +36,11 @@ int heartbeat(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
 //Old function used in CZ20, currently unsupported. Function still exists to prevent reuse of the command.
 int pythonstdin(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
     sendok(command, message_id);
+    return 1;
+}
+
+int notsupported(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
+    if(received != size) return 1;
+    sendns(command, message_id);
     return 1;
 }

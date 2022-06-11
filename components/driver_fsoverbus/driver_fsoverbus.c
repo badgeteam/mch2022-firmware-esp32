@@ -101,6 +101,11 @@ esp_err_t driver_fsoverbus_init(void) {
     filefunction[APPFSDIR] = appfslist;
     filefunction[APPFSDEL] = appfsdel;
     filefunction[APPFSWRITE] = appfswrite;
+    #else
+    specialfunction[APPFSBOOT] = notsupported;
+    filefunction[APPFSDIR] = notsupported;
+    filefunction[APPFSDEL] = notsupported;
+    filefunction[APPFSWRITE] = notsupported;
     #endif
         
     fsob_init();

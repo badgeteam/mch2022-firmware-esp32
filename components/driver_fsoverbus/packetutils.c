@@ -42,9 +42,17 @@ void sendte(uint16_t command, uint32_t message_id) {
 
 //Timeout error
 void sendto(uint16_t command, uint32_t message_id) {
-     uint8_t header[PACKET_HEADER_SIZE+3];
+    uint8_t header[PACKET_HEADER_SIZE+3];
     createMessageHeader(header, command, 3, message_id);
     strcpy((char *) &header[PACKET_HEADER_SIZE], "to");
+    fsob_write_bytes((const char*) header, 15);
+}
+
+//Not supported error
+void sendns(uint16_t command, uint32_t message_id) {
+    uint8_t header[PACKET_HEADER_SIZE+3];
+    createMessageHeader(header, command, 3, message_id);
+    strcpy((char *) &header[PACKET_HEADER_SIZE], "ns");
     fsob_write_bytes((const char*) header, 15);
 }
 
