@@ -12,6 +12,21 @@
 #include "ice40.h"
 
 
+/* SPI protocol  ---------------------------------------------------------- */
+
+/* Commands */
+#define SPI_CMD_NOP1                0x00
+#define SPI_CMD_WISHBONE            0xf0
+#define SPI_CMD_LOOPBACK            0xf1
+#define SPI_CMD_LCD_PASSTHROUGH     0xf2
+#define SPI_CMD_BUTTON_REPORT       0xf4
+#define SPI_CMD_FREAD_GET           0xf8
+#define SPI_CMD_FREAD_PUT           0xf9
+#define SPI_CMD_IRQ_ACK             0xfd
+#define SPI_CMD_RESP_ACK            0xfe
+#define SPI_CMD_NOP2                0xff
+
+
 /* FPGA IRQ --------------------------------------------------------------- */
 
 esp_err_t fpga_irq_setup(ICE40 *ice40);

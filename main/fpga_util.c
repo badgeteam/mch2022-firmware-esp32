@@ -118,7 +118,7 @@ fpga_wb_alloc(int n)
     cb->buf = malloc(cb->len);
     cb->rd_ptr = malloc(64 * sizeof(uint32_t*));
 
-    cb->buf[0] = 0xf0;
+    cb->buf[0] = SPI_CMD_WISHBONE;
     cb->used = 1;
 
     return cb;
@@ -278,7 +278,7 @@ fpga_wb_exec(struct fpga_wb_cmdbuf *cb, ICE40* ice40)
 
     // Execute a half duplex transaction to get the read data back
     l = 2 + (cb->rd_cnt * 4);
-    cb->buf[0] = 0xfe; // RESP_ACK
+    cb->buf[0] = SPI_CMD_RESP_ACK;
 
     res = ice40_transaction(ice40, cb->buf, l, cb->buf, l);
     if (res != ESP_OK)
