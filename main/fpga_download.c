@@ -185,6 +185,7 @@ static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uin
 }
 
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    uint8_t *buffer = NULL;
 
     fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
         "FPGA download mode\nPreparing...");
@@ -208,34 +209,26 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
             "FPGA download mode\nReceiving bitstream...");
 
-        uint8_t* buffer = malloc(length);
+        buffer = malloc(length);
         if (buffer == NULL) {
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nMalloc failed");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            fpga_uninstall_uart();
-            return;
+            goto error;
         }
         if (!fpga_uart_load(buffer, length)) {
-            free(buffer);
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nTimeout while loading");
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            fpga_uninstall_uart();
-            return;
+            goto error;
         }
 
         uint32_t checkCrc = crc32_le(0, buffer, length);
 
         if (checkCrc != crc) {
-            free(buffer);
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
                 crc, checkCrc);
             fpga_uart_mess("CRC incorrect %08X %08x\n", crc, checkCrc);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            fpga_uninstall_uart();
-            return;
+            goto error;
         }
         fpga_uart_mess("CRC correct\n");
 
@@ -246,6 +239,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         esp_err_t res = ice40_load_bitstream(ice40, buffer, length);
         free(buffer);
+        buffer = NULL;
 
         if (res != ESP_OK) {
             ice40_disable(ice40);
@@ -253,9 +247,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nUpload failed: %d", res);
             fpga_uart_mess("uploading bitstream failed with %d\n", res);
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            fpga_uninstall_uart();
-            return;
+            goto error;
         }
         fpga_uart_mess("bitstream has uploaded\n");
 
@@ -276,9 +268,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
                 fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                     "FPGA download mode\nError: %d", res);
                 fpga_uart_mess("processing events failed with %d\n", res);
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-                fpga_uninstall_uart();
-                return;
+                goto error;
             }
             vTaskDelay(10 / portTICK_PERIOD_MS);
             idle_count++;
@@ -286,4 +276,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         ice40_disable(ice40);
         ili9341_init(ili9341);
     }
+
+    return;
+
+error:
+    free(buffer);
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    fpga_uninstall_uart();
+    return;
 }
