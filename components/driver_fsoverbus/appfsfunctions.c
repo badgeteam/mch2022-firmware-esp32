@@ -42,7 +42,7 @@ int appfslist(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
         appfsEntryInfo(appfs_fd, &name, &app_size);
         fsob_write_bytes((char *) &app_size, 4);
         uint32_t name_length = strlen(name);
-        fsob_write_bytes(&name_length, 4);
+        fsob_write_bytes((char *) &name_length, 4);
         fsob_write_bytes(name, name_length);
     }
     return 1;
