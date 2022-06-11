@@ -5,6 +5,28 @@ from enum import Enum
 import struct
 import time
 
+# Print iterations progress
+def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
+    """
+    Call in a loop to create terminal progress bar
+    @params:
+        iteration   - Required  : current iteration (Int)
+        total       - Required  : total iterations (Int)
+        prefix      - Optional  : prefix string (Str)
+        suffix      - Optional  : suffix string (Str)
+        decimals    - Optional  : positive number of decimals in percent complete (Int)
+        length      - Optional  : character length of bar (Int)
+        fill        - Optional  : bar fill character (Str)
+        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+    """
+    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
+    filledLength = int(length * iteration // total)
+    bar = fill * filledLength + '-' * (length - filledLength)
+    print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
+    # Print New Line on Complete
+    if iteration == total: 
+        print()
+
 class Commands(Enum):
     EXECFILE = 0
     HEARTBEAT = 1
@@ -43,23 +65,17 @@ class WebUSB():
             raise ValueError("Badge not found")
 
         self.configuration = self.device.get_active_configuration()
-
         self.webusb_esp32   = self.configuration[(4,0)]
-
-
-
         self.ep_out = usb.util.find_descriptor(self.webusb_esp32, custom_match = lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
         self.ep_in  = usb.util.find_descriptor(self.webusb_esp32, custom_match = lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
-        self.REQUEST_TYPE_CLASS_TO_INTERFACE = 0x21
-
+        self.REQUEST_TYPE_CLASS_TO_INTERFACE = usb.util.CTRL_TYPE_CLASS + usb.util.CTRL_RECIPIENT_INTERFACE
         self.REQUEST_STATE    = 0x22
         self.REQUEST_RESET    = 0x23
         self.REQUEST_BAUDRATE = 0x24
         self.REQUEST_MODE     = 0x25
 
         self.TIMEOUT = 15
-
         self.PAYLOADHEADERLEN = 12
 
         self.bootWebUSB()
@@ -108,13 +124,18 @@ class WebUSB():
         raise Exception("Timeout in receiving")
 
     
-    def sendPacket(self, packet):
+    def sendPacket(self, packet, transfersize=2048):
+        transfersize = 2048
         msg = packet.getMessage()
         starttime = time.time()
-        for i in range(0, len(msg), 2048):
-            self.ep_out.write(msg[i:i+2048])
+
+        if len(msg) > transfersize:
+            printProgressBar(0, len(msg) // transfersize, length=20)
+        for i in range(0, len(msg), transfersize):
+            self.ep_out.write(msg[i:i+transfersize])
             time.sleep(0.01)
-            print(f"{i // 2048}/{len(msg) // 2048}")
+            if len(msg) > transfersize:
+                printProgressBar(i//transfersize, len(msg) // transfersize, length=20)
         #self.ep_out.write(packet.getMessage())
         print(f"transfer speed: {len(msg)/(time.time()-starttime)}")
         command, message_id, data = self.receiveResponse()
@@ -129,7 +150,7 @@ class WebUSB():
         return data.decode()
 
     def getFSDir(self, dir):
-        data = self.sendPacket(WebUSBPacket(Commands.GETDIR, self.getMessageId(), dir.encode(encoding='utf-8')))
+        data = self.sendPacket(WebUSBPacket(Commands.GETDIR, self.getMessageId(), dir.encode(encoding='ascii')))
         data = data.decode()
         data = data.split("\n")
         result = dict()
@@ -147,18 +168,27 @@ class WebUSB():
     def appfsUpload(self, appname, file):
         payload = appname.encode(encoding="ascii") + b"\x00" + file
         data = self.sendPacket(WebUSBPacket(Commands.APPFSWRITE, self.getMessageId(), payload))
-        return data.decode() == "ok"
+        return data.decode().rstrip('\x00') == "ok"
     
     def appfsRemove(self, appname):
         payload = appname.encode(encoding="ascii") + b"\x00"
         data = self.sendPacket(WebUSBPacket(Commands.APPFSDEL, self.getMessageId(), payload))
-        return data.decode() == "ok"
+        return data.decode().rstrip('\x00') == "ok"
 
     def appfsExecute(self, appname):
         payload = appname.encode(encoding="ascii") + b"\x00"
         data = self.sendPacket(WebUSBPacket(Commands.APPFSBOOT, self.getMessageId(), payload))
-        return data.decode() == "ok"
+        return data.decode().rstrip('\x00') == "ok"
 
     def appfsList(self):
         data = self.sendPacket(WebUSBPacket(Commands.APPFSFDIR, self.getMessageId()))
-        print(data)
+        num_apps, = struct.unpack_from("<I", data)
+        data = data[4:]
+        res = list()
+        for i in range(0, num_apps):
+            appsize, lenname = struct.unpack_from("<II", data)
+            data = data[8:]
+            name = data[0:lenname].decode(encoding="ascii")
+            data = data[lenname:]
+            res.append({"name":name, "size":appsize})
+        return res
