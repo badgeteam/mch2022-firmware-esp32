@@ -82,8 +82,8 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
     
     // Create a config.
     wifi_config_t wifi_config = {0};
-    strcpy((char*) wifi_config.sta.ssid, aSsid);
-    strcpy((char*) wifi_config.sta.password, aPassword);
+    strncpy((char*) wifi_config.sta.ssid, aSsid, 32);
+    strncpy((char*) wifi_config.sta.password, aPassword, 64);
     wifi_config.sta.threshold.authmode = aAuthmode;
     
     // Set WiFi config.

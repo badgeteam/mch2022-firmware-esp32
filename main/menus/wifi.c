@@ -446,7 +446,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     
     char ssid[33] = {0};
     char username[33] = {0};
-    char password[33] = {0};
+    char password[65] = {0};
     nvs_handle_t handle;
     nvs_open("system", NVS_READWRITE, &handle);
     bool accepted = true;
@@ -485,7 +485,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             return;
         }
         // Copy the SSID in.
-        memcpy(ssid, pick->ssid, 33);
+        memcpy(ssid, pick->ssid, sizeof(ssid));
         authmode = pick->authmode;
         
         // Free memories.
