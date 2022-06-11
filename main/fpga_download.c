@@ -57,8 +57,18 @@ static bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
     return fpga_read_stdin(buffer, length, 3000);
 }
 
-static void fpga_uart_mess(const char *mess) {
-    uart_write_bytes(0, mess, strlen(mess));
+static void fpga_uart_mess(const char *fmt, ...) {
+    char message[64];
+    va_list va;
+    int l;
+
+    // Print message in internal buffer
+    va_start(va, fmt);
+    l = vsnprintf(message, sizeof(message), fmt, va);
+    va_end(va);
+
+    // Send message
+    uart_write_bytes(0, message, l);
 }
 
 static void fpga_display_message(
@@ -175,7 +185,6 @@ static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uin
 }
 
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    char message[64];
 
     fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
         "FPGA download mode\nPreparing...");
@@ -223,8 +232,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
                 crc, checkCrc);
-            snprintf(message, sizeof(message), "CRC incorrect %08X %08x\n", crc, checkCrc);
-            fpga_uart_mess(message);
+            fpga_uart_mess("CRC incorrect %08X %08x\n", crc, checkCrc);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
@@ -244,14 +252,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             ili9341_init(ili9341);
             fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                 "FPGA download mode\nUpload failed: %d", res);
-            snprintf(message, sizeof(message), "uploading bitstream failed with %d\n", res);
-            fpga_uart_mess(message);
+            fpga_uart_mess("uploading bitstream failed with %d\n", res);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             fpga_uninstall_uart();
             return;
         }
-        snprintf(message, sizeof(message), "bitstream has uploaded\n");
-        fpga_uart_mess(message);
+        fpga_uart_mess("bitstream has uploaded\n");
 
         // Waiting for next download and sending key strokes to FPGA
         uint16_t key_state = 0;
@@ -269,8 +275,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
                 ili9341_init(ili9341);
                 fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
                     "FPGA download mode\nError: %d", res);
-                snprintf(message, sizeof(message), "processing events failed with %d\n", res);
-                fpga_uart_mess(message);
+                fpga_uart_mess("processing events failed with %d\n", res);
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 fpga_uninstall_uart();
                 return;
