@@ -28,6 +28,7 @@ idf_component_register(
          "adc_test.c"
          "webusb.c"
          "wifi_test.c"
+         "sao_eeprom.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
