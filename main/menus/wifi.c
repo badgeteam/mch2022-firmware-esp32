@@ -150,7 +150,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 
     nvs_open("system", NVS_READWRITE, &handle);
     char ssid[33] = "<not set>";
-    char password[33] = "<not set>";
+    char password[65] = "<not set>";
     size_t requiredSize;
 
     esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
@@ -446,7 +446,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     
     char ssid[33] = {0};
     char username[33] = {0};
-    char password[33] = {0};
+    char password[65] = {0};
     nvs_handle_t handle;
     nvs_open("system", NVS_READWRITE, &handle);
     bool accepted = true;
