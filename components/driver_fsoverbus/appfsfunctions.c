@@ -1,4 +1,3 @@
-#include "appfs.h"
 #include "packetutils.h"
 #include <string.h>
 #include <esp_log.h>
@@ -8,8 +7,19 @@
 #include "soc/rtc_cntl_reg.h"
 #include "esp_sleep.h"
 #include "fsob_backend.h"
+#include "esp_spi_flash.h"
 
 #define TAG "fsob_appfs"
+#define APPFS_INVALID_FD (-1)
+
+typedef int appfs_handle_t;
+void appfsEntryInfo(appfs_handle_t fd, const char **name, int *size);
+appfs_handle_t appfsNextEntry(appfs_handle_t fd);
+esp_err_t appfsDeleteFile(const char *filename);
+esp_err_t appfsCreateFile(const char *filename, size_t size, appfs_handle_t *handle);
+esp_err_t appfsErase(appfs_handle_t fd, size_t start, size_t len);
+esp_err_t appfsWrite(appfs_handle_t fd, size_t start, uint8_t *buf, size_t len);
+appfs_handle_t appfsOpen(const char *filename);
 
 int appfslist(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
     if(received != size) return 0;

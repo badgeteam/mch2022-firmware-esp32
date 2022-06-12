@@ -3,6 +3,7 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <driver/uart.h>
+#include <esp_log.h>
 
 #define TAG "fsob_nuart"
 
@@ -36,7 +37,7 @@ void fsob_task(void *pvParameter) {
         if (size > 0) {
             buffer = malloc(size);
             if (buffer == NULL) {
-                ESP_LOGI(TAG, "Failed to allocate buffer")
+                ESP_LOGI(TAG, "Failed to allocate buffer");
                 continue;
             }
 
@@ -44,7 +45,7 @@ void fsob_task(void *pvParameter) {
             int read = uart_read_bytes(CONFIG_DRIVER_FSOVERBUS_UART_NUM, buffer, size, pdMS_TO_TICKS(50));
             if (read != size) {
                 free(buffer);
-                ESP_LOGI(TAG, "Failed to read all data")
+                ESP_LOGI(TAG, "Failed to read all data");
                 continue;
             }
         }

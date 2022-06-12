@@ -1,9 +1,3 @@
-set(includes
-    "include"
-    )
-
-set(depend_list "")
-
 if(CONFIG_DRIVER_FSOVERBUS_ENABLE)
     set(srcs
         "backend.c"
@@ -20,14 +14,8 @@ endif()
 
 if(CONFIG_DRIVER_FSOVERBUS_APPFS_SUPPORT)
     list(APPEND srcs "appfsfunctions.c")
-    list(APPEND depend_list appfs)
-endif()
-
-if(CONFIG_DRIVER_FSOVERBUS_RTCMEM_SUPPORT)
-    list(APPEND srcs "appfsfunctions.c")
-    list(APPEND depend_list driver_rtcmem)
 endif()
 
 idf_component_register(SRCS "${srcs}"
-                       INCLUDE_DIRS ${includes}
-                       REQUIRES appfs)
+                       INCLUDE_DIRS "include"
+                       REQUIRES spi_flash)
