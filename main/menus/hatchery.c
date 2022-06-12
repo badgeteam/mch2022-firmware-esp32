@@ -23,6 +23,7 @@ typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI
 static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char *select, fill_menu_items_fn_t fill_menu_items, action_fn_t action, void *context);
 static void add_menu_item(menu_t *menu, const char *name, void *callback_args);
 
+// Apps menu
 
 static void fill_menu_items_apps(menu_t *menu, void *context) {
     add_menu_item(menu, "App A", NULL);
@@ -33,47 +34,44 @@ static void fill_menu_items_apps(menu_t *menu, void *context) {
 static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
 }
 
-typedef struct categories_context_t categories_context_t; 
-struct categories_context_t {
-    const char *url;
-    hatchery_category_t *categories;
-};
+// Category menu
 
 static void fill_menu_items_categories(menu_t *menu, void *context) {
-    categories_context_t *categories_context = (categories_context_t*)context;
+    hatchery_app_type_t *app_type = (hatchery_app_type_t*)context;
 
-    hatchery_query_categories(categories_context->url, &categories_context->categories);
-    for (hatchery_category_t *category = categories_context->categories; category != NULL; category = category->next) {
+    hatchery_query_categories(app_type);
+    for (hatchery_category_t *category = app_type->categories; category != NULL; category = category->next) {
         add_menu_item(menu, category->name, category);
     }
 }
 
 static void action_categories(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps, NULL);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps, args);
 }
 
+// App types menu
 
 static void fill_menu_items_types(menu_t *menu, void *context) {
-    add_menu_item(menu, "App", NULL);
-    add_menu_item(menu, "Python", NULL);
-    add_menu_item(menu, "FPGA", NULL);
+    hatchery_server_t *server = (hatchery_server_t*)context;
+
+    hatchery_query_app_types(server);
+    for (hatchery_app_type_t *app_type = server->app_types; app_type != NULL; app_type = app_type->next) {
+        add_menu_item(menu, app_type->name, app_type);
+    }
 }
 
 static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
-    categories_context_t context;
-    //context.url = "https://hatchery.badge.team/basket/sha2017/categories/json";
-    context.url = "https://37.97.208.91/basket/sha2017/categories/json";
-    
-    context.categories = NULL;
-
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories, &context);
-
-    hatchery_category_free(context.categories);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories, args);
 }
 
+// Main entry function
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, NULL);
+    hatchery_server_t server;
+    server.url = "https://hatchery.badge.team/basket/sha2017/categories/json";
+    server.app_types = NULL;
+    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, &server);
+    hatchery_app_type_free(server.app_types);
 }
 
 // Generic functions
@@ -170,10 +168,6 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
             render = false;
         }
     }
-
-//    for (size_t index = 0; index < menu_get_length(menu); index++) {
-//        free(menu_get_callback_args(menu, index));
-//    }
 
     menu_free(menu);
     pax_buf_destroy(&icon_apps);

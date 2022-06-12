@@ -5,7 +5,7 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esp_ota_ops.h"
+#include <esp_err.h>
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "string.h"
@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include "esp_wifi.h"
 #include "bootscreen.h"
+
+#include "wifi_connect.h"
 
 #define HASH_LEN 32
 
@@ -61,7 +63,11 @@ static esp_err_t _http_event_handler_data_callback(esp_http_client_event_t *evt)
 
 static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callback)
 {
-    esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
+    if (!wifi_connect_to_stored()) {
+        return ESP_ERR_ESP_NETIF_INIT_FAILED;
+    }
+
+    //esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
     ESP_LOGI(TAG, "http get");
 
@@ -219,13 +225,15 @@ static void json_cb_parser_close(json_cb_parser_t *parser)
 
 static void json_cb_process(void *callback_data, const char *data, int data_len)
 {
+    ESP_LOGI(TAG, "received data %d", data_len);
 #define JSON_NEXT_CH parser->lc = __LINE__; goto next; case __LINE__:;
 
-    json_cb_parser_t *parser = (json_cb_parser_t*)data;
+    json_cb_parser_t *parser = (json_cb_parser_t*)callback_data;
 
     for (int i = 0; i < data_len; i++) {
         char ch = data[i];
 
+        ESP_LOGI(TAG, "'%c' %d", ch, parser->lc);
         switch(parser->lc) { case 0:
 
             for (;;) {
@@ -282,17 +290,74 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
  #undef JSON_NEXT_CH
 }
 
+// Query app types
+
+hatchery_app_type_t *new_app_type(hatchery_server_t *server) {
+    hatchery_app_type_t *app_type = (hatchery_app_type_t*)malloc(sizeof(hatchery_app_type_t));
+    if (app_type != NULL) {
+        app_type->slug = NULL;
+        app_type->name = NULL;
+        app_type->server = server;
+        app_type->categories = NULL;
+        app_type->next = NULL;
+    }
+    return app_type;
+}
+
+esp_err_t hatchery_query_app_types(hatchery_server_t *server) {
+    if (server->app_types != NULL) {
+        return ESP_OK;
+    }
+
+    hatchery_app_type_t *app_type = new_app_type(server);
+    if (app_type != NULL) {
+        app_type->name = (char*)malloc(sizeof(char)*4);
+        strcpy(app_type->name, "App");
+        server->app_types = app_type;
+    }
+
+    return ESP_OK;
+}
+
+void hatchery_app_type_free(hatchery_app_type_t *app_types) {
+
+    while (app_types != NULL) {
+        free(app_types->name);
+        free(app_types->slug);
+        hatchery_category_free(app_types->categories);
+        hatchery_app_type_t *next = app_types;
+        free(app_types);
+        app_types = next;
+    }
+}
+
+
 // Query categories
 
 typedef struct process_categories_t process_categories_t;
 struct process_categories_t {
     int cl;
+    hatchery_app_type_t *app_type;
     hatchery_category_t **cur;
 };
+
+static hatchery_category_t *new_category(hatchery_app_type_t *app_type) {
+    hatchery_category_t *category = (hatchery_category_t*)malloc(sizeof(hatchery_category_t ));
+    if (category != NULL) {
+        category->name = NULL;
+        category->slug = NULL;
+        category->nr_apps = -1; // Unknown
+        category->app_type = app_type;
+        category->apps = NULL;
+        category->next = NULL;
+    }
+    return category;
+}
 
 static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
 {
     process_categories_t *process_categories = (process_categories_t*)(parser->data);
+    ESP_LOGI(TAG, "category %d at line %d", state, process_categories->cl);
 #define NEXT process_categories->cl = __LINE__; return; case __LINE__:;
     
     switch(process_categories->cl) { case 0:
@@ -300,17 +365,13 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
         if (state == json_cb_open_array) {
             NEXT
             while (state == json_cb_open_object) {
-                *process_categories->cur = (hatchery_category_t*)malloc(sizeof(hatchery_category_t ));
-                (*process_categories->cur)->name = NULL;
-                (*process_categories->cur)->slug = NULL;
-                (*process_categories->cur)->nr_eggs = 0;
-                (*process_categories->cur)->next = NULL;
+                *process_categories->cur = new_category(process_categories->app_type);
                 NEXT
                 while (state == json_cb_string) {
                     if (string_appender_compare(&parser->string_appender, "slug") == 0) {
                         NEXT
                         if (state == json_cb_string) {
-                            if ((*process_categories->cur) != 0 && (*process_categories->cur)->slug == 0) {
+                            if ((*process_categories->cur) != NULL && (*process_categories->cur)->slug == NULL) {
                                 (*process_categories->cur)->slug = string_appender_copy(&parser->string_appender);
                             }
                             //printf("slug '%s'\n", slug);
@@ -320,7 +381,7 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                     else if (string_appender_compare(&parser->string_appender, "name") == 0) {
                         NEXT
                         if (state == json_cb_string) {
-                            if ((*process_categories->cur) != 0 && (*process_categories->cur)->name == 0) {
+                            if ((*process_categories->cur) != NULL && (*process_categories->cur)->name == NULL) {
                                 (*process_categories->cur)->name = string_appender_copy(&parser->string_appender);
                             }
                             //printf("name '%s'\n", name);
@@ -330,14 +391,14 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                     else if (string_appender_compare(&parser->string_appender, "eggs") == 0) {
                         NEXT
                         if (state == json_cb_int) {
-                            if ((*process_categories->cur) != 0) {
-                                (*process_categories->cur)->nr_eggs = parser->int_value;
+                            if ((*process_categories->cur) != NULL && (*process_categories->cur)->nr_apps == -1) {
+                                (*process_categories->cur)->nr_apps = parser->int_value;
                             }
                         }
                     }
                 }
                 if (state == json_cb_close_object) {
-                    if ((*process_categories->cur) != 0) {
+                    if ((*process_categories->cur) != NULL) {
                         process_categories->cur = &(*process_categories->cur)->next;
                     }
                     NEXT
@@ -352,11 +413,16 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
 #undef NEXT
 }
 
-esp_err_t hatchery_query_categories(const char *url, hatchery_category_t **ref_categories) {
+esp_err_t hatchery_query_categories(hatchery_app_type_t *app_type) {
+
+    if (app_type->categories != NULL) {
+        return ESP_OK;
+    }
 
     process_categories_t process_categories_data;
     process_categories_data.cl = 0;
-    process_categories_data.cur = ref_categories;
+    process_categories_data.app_type = app_type;
+    process_categories_data.cur = &app_type->categories;
     
     json_cb_parser_t parser;
     json_cb_parser_init(&parser, hatchery_process_categories, &process_categories_data);
@@ -365,6 +431,7 @@ esp_err_t hatchery_query_categories(const char *url, hatchery_category_t **ref_c
     data_callback.data = &parser;
     data_callback.fn = json_cb_process;
 
+    const char *url = app_type->server->url;
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
@@ -374,16 +441,26 @@ esp_err_t hatchery_query_categories(const char *url, hatchery_category_t **ref_c
 
 void hatchery_category_free(hatchery_category_t *catagories) {
 
-    while (catagories != 0)
-    {
-        if (catagories->slug != 0) {
-            free(catagories->slug);
-        }
-        if (catagories->name != 0) {
-            free(catagories->name);
-        }
+    while (catagories != NULL) {
+        free(catagories->slug);
+        free(catagories->name);
+        hatchery_app_free(catagories->apps);
         hatchery_category_t *next = catagories->next;
         free(catagories);
         catagories = next;
+    }
+}
+
+void hatchery_app_free(hatchery_app_t *apps) {
+
+    while (apps != NULL) {
+        free(apps->slug);
+        free(apps->name);
+        free(apps->author);
+        free(apps->license);
+        free(apps->description);
+        hatchery_app_t *next = apps->next;
+        free(apps);
+        apps = next;
     }
 }
