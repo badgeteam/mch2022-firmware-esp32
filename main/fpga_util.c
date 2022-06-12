@@ -11,6 +11,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #include <esp_err.h>
 #include <driver/gpio.h>
@@ -393,4 +395,100 @@ fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *err)
     }
 
     return work_done;
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Request processing
+ * ------------------------------------------------------------------------ */
+
+bool
+fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err)
+{
+    esp_err_t res;
+    uint8_t buf[12];
+    uint8_t req;
+
+    // Default is no error
+    *err = ESP_OK;
+
+    // If the FPGA isn't requesting anything ... we have nothing to do !
+    if (!fpga_irq_wait(wait))
+        return false;
+
+    // Poll status byte to see what's up
+    buf[0] = SPI_CMD_NOP2;
+    res = ice40_transaction(ice40, buf, 2, buf, 2);
+    if (res != ESP_OK)
+        goto error;
+
+    req = buf[1] & 0xf;
+
+    // File requests
+    if (req & SPI_REQ_FREAD) {
+        static FILE *s_fh = NULL;
+        static uint32_t s_fid = 0;
+
+        uint32_t req_file_id;
+        uint32_t req_offset;
+        uint16_t req_length;
+        uint8_t *buf_req;
+
+        // Get file request: Command
+        buf[0] = SPI_CMD_FREAD_GET;
+        res = ice40_send(ice40, buf, 1);
+        if (res != ESP_OK)
+            goto error;
+
+        // Get file request: Response
+        buf[0] = SPI_CMD_RESP_ACK;
+        res = ice40_transaction(ice40, buf, 12, buf, 12);
+        if (res != ESP_OK)
+            goto error;
+
+        req_file_id = (buf[2] << 24) | (buf[3] << 16) | (buf[4] << 8) | buf[5];
+        req_offset  = (buf[6] << 24) | (buf[7] << 16) | (buf[8] << 8) | buf[9];
+        req_length  = ((buf[10] << 8) | buf[11]) + 1;
+
+        // Get buffer
+        buf_req = malloc(req_length + 1);
+
+        // Load data from file
+        if (!s_fh || (s_fid != req_file_id)) {
+            char fname[32];
+            if (s_fh)
+                fclose(s_fh);
+            snprintf(fname, sizeof(fname), "/sd/fpga_%08x.dat", req_file_id);
+            s_fh  = fopen(fname, "rb");
+            s_fid = req_file_id;
+        }
+
+        if (s_fh) {
+            // Seek and Read
+            fseek(s_fh, req_offset, SEEK_SET);
+            fread(&buf_req[1], 1, req_length, s_fh);
+        } else {
+            // No such file ... fill with 0x00
+            memset(&buf_req[1], 0x00, req_length);
+        }
+
+        // Send data
+        buf_req[0] = SPI_CMD_FREAD_PUT;
+        res = ice40_send(ice40, buf_req, req_length+1);
+        if (res != ESP_OK) {
+            free(buf_req);
+            goto error;
+        }
+
+        // Done with buffer
+        free(buf_req);
+    }
+
+    // Done !
+    return true;
+
+error:
+    if (err)
+        *err = res;
+    return false;
 }
