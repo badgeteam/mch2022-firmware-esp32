@@ -79,6 +79,11 @@ bool wifi_connect(const char* aSsid, const char* aPassword, wifi_auth_mode_t aAu
     // Set the retry counts.
     retryCount = 0;
     maxRetries = aRetryMax;
+
+    // Disable WiFi if it was active, reset event bits
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+    xEventGroupClearBits(wifiEventGroup, 0xFF);
     
     // Create a config.
     wifi_config_t wifi_config = {0};

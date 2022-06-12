@@ -119,3 +119,8 @@ bool wifi_connect_to_stored() {
     
     return result;
 }
+
+void wifi_disconnect_and_disable() {
+    esp_wifi_disconnect();
+    esp_wifi_stop();
+}
