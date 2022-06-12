@@ -52,6 +52,8 @@
 #include "fpga_download.h"
 #include "webusb.h"
 
+#include "sao_eeprom.h"
+
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
 
@@ -213,6 +215,10 @@ void app_main(void) {
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
     
     if (webusb_mode == 0x00) { // Normal boot
+        /* Add-on */
+
+        sao_identify();
+
         /* Rick that roll */
         play_bootsound();
 
