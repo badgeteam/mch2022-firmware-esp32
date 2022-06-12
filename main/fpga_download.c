@@ -169,6 +169,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         "FPGA download mode\nPreparing...");
 
     fpga_install_uart();
+    fpga_irq_setup(ice40);
     fpga_btn_reset();
 
     ice40_disable(ice40);
@@ -268,6 +269,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 error:
     free(buffer);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    fpga_irq_cleanup(ice40);
     fpga_uninstall_uart();
     return;
 }
