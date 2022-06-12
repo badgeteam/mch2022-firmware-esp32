@@ -37,5 +37,7 @@ while port.is_open:
             print(data)
         else:
             print(data, end='')
+    else:
+        time.sleep(0.01)
 port.close()
 print("\n")
