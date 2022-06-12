@@ -101,9 +101,9 @@ void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             snprintf(buffer, sizeof(buffer), "JOY UP     %s", btn_joy_up ? "PRESSED" : "released");
             pax_draw_text(pax_buffer, btn_joy_up_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*2, buffer);
             snprintf(buffer, sizeof(buffer), "JOY LEFT   %s", btn_joy_left ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_right_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*3, buffer);
+            pax_draw_text(pax_buffer, btn_joy_left_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*3, buffer);
             snprintf(buffer, sizeof(buffer), "JOY RIGHT  %s", btn_joy_right ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_left_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*4, buffer);
+            pax_draw_text(pax_buffer, btn_joy_right_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*4, buffer);
             snprintf(buffer, sizeof(buffer), "JOY PRESS  %s", btn_joy_press ? "PRESSED" : "released");
             pax_draw_text(pax_buffer, btn_joy_press_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*5, buffer);
             snprintf(buffer, sizeof(buffer), "BTN HOME   %s", btn_home ? "PRESSED" : "released");
