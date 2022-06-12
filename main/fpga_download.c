@@ -160,7 +160,7 @@ static void fpga_display_message(
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
+static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state)
 {
     rp2040_input_message_t buttonMessage = {0};
     while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
@@ -222,7 +222,6 @@ static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uin
                 return res;
             }
         }
-        *idle_count = 0;
     }
     return ESP_OK;
 }
@@ -303,13 +302,11 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         // Waiting for next download and sending key strokes to FPGA
         uint16_t key_state = 0;
-        uint16_t idle_count = 0;
         while (true) {
             if (fpga_uart_sync(&length, &crc)) {
-                idle_count = 0;
                 break;
             }
-            esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state, &idle_count);
+            esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state);
             if (res != ESP_OK) {
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
