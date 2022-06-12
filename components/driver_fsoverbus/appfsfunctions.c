@@ -10,8 +10,12 @@
 #include "esp_spi_flash.h"
 
 #define TAG "fsob_appfs"
-#define APPFS_INVALID_FD (-1)
 
+/**
+ * @brief Redefine the appfs functions used. This allows to compile the component when appfs support is disabled.
+ * 
+ */
+#define APPFS_INVALID_FD (-1)
 typedef int appfs_handle_t;
 void appfsEntryInfo(appfs_handle_t fd, const char **name, int *size);
 appfs_handle_t appfsNextEntry(appfs_handle_t fd);

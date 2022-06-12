@@ -8,6 +8,7 @@
 #define TAG "fsoveruart_sf"
 
 #if CONFIG_DRIVER_FSOVERBUS_RTCMEM_SUPPORT
+//This function is provided by the rtcmem driver.
 esp_err_t driver_rtcmem_string_write(const char* str);
 
 int execfile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
