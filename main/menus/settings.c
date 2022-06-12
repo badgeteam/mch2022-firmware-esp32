@@ -21,6 +21,7 @@
 #include "wifi_ota.h"
 #include "wifi.h"
 #include "uninstall.h"
+#include "wifi_test.h"
 
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
@@ -31,7 +32,8 @@ typedef enum action {
     ACTION_WIFI,
     ACTION_OTA,
     ACTION_RP2040_BL,
-    ACTION_UNINSTALL
+    ACTION_UNINSTALL,
+    ACTION_WIFI_TEST
 } menu_settings_action_t;
 
 void render_settings_help(pax_buf_t* pax_buffer) {
@@ -63,6 +65,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
     menu_insert_item(menu, "Uninstall app", NULL, (void*) ACTION_UNINSTALL, -1);
+    menu_insert_item(menu, "Test WiFi connection", NULL, (void*) ACTION_WIFI_TEST, -1);
 
     bool render = true;
     menu_settings_action_t action = ACTION_NONE;
@@ -118,14 +121,9 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 rp2040_reboot_to_bootloader(get_rp2040());
                 esp_restart();
             } else if (action == ACTION_OTA) {
-                display_boot_screen(pax_buffer, ili9341, "Connecting to WiFi...");
-                if (wifi_connect_to_stored()) {
-                    display_boot_screen(pax_buffer, ili9341, "Starting firmware update...");
-                    ota_update(pax_buffer, ili9341);
-                } else {
-                    display_boot_screen(pax_buffer, ili9341, "Failed to connect to WiFi");
-                    vTaskDelay(500 / portTICK_PERIOD_MS);
-                }
+                ota_update(pax_buffer, ili9341);
+            } else if (action == ACTION_WIFI_TEST) {
+                wifi_connection_test(pax_buffer, ili9341);
             } else if (action == ACTION_WIFI) {
                 menu_wifi(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_UNINSTALL) {
