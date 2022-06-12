@@ -18,6 +18,7 @@
 #include "wifi.h"
 #include "wifi_connect.h"
 
+#define MAX_HTTP_OUTPUT_BUFFER 2048
 static const char *TAG = "WiFi test";
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_isrgrootx1_pem_start");
@@ -25,12 +26,15 @@ extern const uint8_t server_cert_pem_end[] asm("_binary_isrgrootx1_pem_end");
 
 esp_err_t _test_http_event_handler(esp_http_client_event_t *evt)
 {
+    static int output_len;
     switch (evt->event_id) {
     case HTTP_EVENT_ERROR:
         ESP_LOGI(TAG, "HTTP_EVENT_ERROR");
+        output_len = 0;
         break;
     case HTTP_EVENT_ON_CONNECTED:
         ESP_LOGI(TAG, "HTTP_EVENT_ON_CONNECTED");
+        output_len = 0;
         break;
     case HTTP_EVENT_HEADERS_SENT:
         ESP_LOGI(TAG, "HTTP_EVENT_HEADERS_SENT");
@@ -40,12 +44,21 @@ esp_err_t _test_http_event_handler(esp_http_client_event_t *evt)
         break;
     case HTTP_EVENT_ON_DATA:
         ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        if (evt->user_data) {
+            if (output_len + evt->data_len > MAX_HTTP_OUTPUT_BUFFER) {
+                ESP_LOGE(TAG, "Data does not fit the buffer!");
+            } else {
+                memcpy(evt->user_data + output_len, evt->data, evt->data_len);
+                output_len += evt->data_len;
+            }
+        }
         break;
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
         break;
     case HTTP_EVENT_DISCONNECTED:
         ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
+        output_len = 0;
         break;
     }
     return ESP_OK;
@@ -77,11 +90,14 @@ void wifi_connection_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
 
     ESP_LOGI(TAG, "Starting connection test...");
 
+    char local_response_buffer[MAX_HTTP_OUTPUT_BUFFER] = {0};
+
     esp_http_client_config_t config = {
-        .url = "https://ota.bodge.team/test.json",
+        .url = "https://hatchery.badge.team/basket/mch2021/categories/json",//"https://ota.bodge.team/test.json",
         .crt_bundle_attach = esp_crt_bundle_attach,
         .cert_pem = (char *)server_cert_pem_start,
         .event_handler = _test_http_event_handler,
+        .user_data = local_response_buffer,
         .keep_alive_enable = true
     };
 
@@ -93,6 +109,7 @@ void wifi_connection_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
                 esp_http_client_get_status_code(client),
                 esp_http_client_get_content_length(client));
         display_test_state(pax_buffer, ili9341, "WiFi test completed!");
+        ESP_LOG_BUFFER_HEX(TAG, local_response_buffer, strlen(local_response_buffer));
         vTaskDelay(2000 / portTICK_PERIOD_MS);
     } else {
         ESP_LOGE(TAG, "HTTP GET request failed: %s", esp_err_to_name(err));
