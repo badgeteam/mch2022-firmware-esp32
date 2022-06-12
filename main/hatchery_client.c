@@ -69,7 +69,7 @@ static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callba
 
     //esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
-    ESP_LOGI(TAG, "http get");
+    //ESP_LOGI(TAG, "http get");
 
     esp_http_client_config_t config = {
         .url = url,
@@ -84,7 +84,7 @@ static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callba
     esp_err_t err = esp_http_client_perform(client);
     esp_http_client_cleanup(client);
 
-    ESP_LOGI(TAG, "http get done %d", err);
+    //ESP_LOGI(TAG, "http get done %d", err);
 
     return err;
 }
@@ -225,7 +225,6 @@ static void json_cb_parser_close(json_cb_parser_t *parser)
 
 static void json_cb_process(void *callback_data, const char *data, int data_len)
 {
-    ESP_LOGI(TAG, "received data %d", data_len);
 #define JSON_NEXT_CH parser->lc = __LINE__; goto next; case __LINE__:;
 
     json_cb_parser_t *parser = (json_cb_parser_t*)callback_data;
@@ -233,7 +232,6 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
     for (int i = 0; i < data_len; i++) {
         char ch = data[i];
 
-        ESP_LOGI(TAG, "'%c' %d", ch, parser->lc);
         switch(parser->lc) { case 0:
 
             for (;;) {
@@ -357,7 +355,6 @@ static hatchery_category_t *new_category(hatchery_app_type_t *app_type) {
 static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
 {
     process_categories_t *process_categories = (process_categories_t*)(parser->data);
-    ESP_LOGI(TAG, "category %d at line %d", state, process_categories->cl);
 #define NEXT process_categories->cl = __LINE__; return; case __LINE__:;
     
     switch(process_categories->cl) { case 0:
