@@ -239,10 +239,14 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         // Waiting for next download and sending key strokes to FPGA
         while (true) {
+            esp_err_t res;
+            bool work_done = false;
+
             if (fpga_uart_sync(&length, &crc)) {
                 break;
             }
-            esp_err_t res = fpga_btn_forward_events(ice40, buttonQueue);
+
+            work_done |= fpga_btn_forward_events(ice40, buttonQueue, &res);
             if (res != ESP_OK) {
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
@@ -251,7 +255,9 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
                 fpga_uart_mess("processing events failed with %d\n", res);
                 goto error;
             }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+
+            if (!work_done)
+                vTaskDelay(10 / portTICK_PERIOD_MS);
         }
         ice40_disable(ice40);
         ili9341_init(ili9341);

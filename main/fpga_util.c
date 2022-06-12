@@ -314,10 +314,14 @@ fpga_btn_reset(void)
     g_btn_state = 0;
 }
 
-esp_err_t
-fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue)
+bool
+fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *err)
 {
     rp2040_input_message_t buttonMessage;
+    bool work_done = false;
+
+    if (err)
+        *err = ESP_OK;
 
     while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE)
     {
@@ -364,6 +368,8 @@ fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue)
 
         if (btn_mask != 0)
         {
+            work_done = true;
+
             if (value)
                 g_btn_state |=  btn_mask;
             else
@@ -378,10 +384,13 @@ fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue)
             };
 
             esp_err_t res = ice40_send(ice40, spi_message, 5);
-            if (res != ESP_OK)
-                return res;
+            if (res != ESP_OK) {
+                if (err)
+                    *err = res;
+                return work_done;
+            }
         }
     }
 
-    return ESP_OK;
+    return work_done;
 }
