@@ -302,8 +302,10 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         // Waiting for next download and sending key strokes to FPGA
         uint16_t key_state = 0;
+        uint16_t idle_count = 0;
         while (true) {
             if (fpga_uart_sync(&length, &crc)) {
+                idle_count = 0;
                 break;
             }
             esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state, &idle_count);
