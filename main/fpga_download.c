@@ -41,16 +41,58 @@ static bool fpga_read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
 }
 
 static bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
-    uint8_t data[256];
-    uart_read_bytes(0, data, sizeof(data), 10 / portTICK_PERIOD_MS);
-    char command[] = "FPGA";
-    uart_write_bytes(0, command, 4);
-    uint8_t rx_buffer[4 * 3];
-    fpga_read_stdin(rx_buffer, sizeof(rx_buffer), 1000);
-    if (memcmp(rx_buffer, "FPGA", 4) != 0) return false;
-    memcpy((uint8_t*) length, &rx_buffer[4 * 1], 4);
-    memcpy((uint8_t*) crc, &rx_buffer[4 * 2], 4);
-    return true;
+    static int step = 0;
+    static int l;
+    static uint8_t data[8];
+    static int64_t timeout;
+
+    if (step && (esp_timer_get_time() > timeout))
+        step = 0;
+
+    switch (step) {
+    /* Step 0: Flush pending data and send sync word */
+    case 0:
+        uart_flush(0);
+        uart_write_bytes(0, "FPGA", 4);
+        step++;
+        l = 0;
+        timeout = esp_timer_get_time() + 500000; /* setup 0.5s timeout */
+        /* fall-through */
+
+    /* Step 1: Receive the 'FPGA' header */
+    case 1:
+        l += uart_read_bytes(0, &data[l], 4-l, 0);
+        if (l != 4)
+            break;
+        if (memcmp(data, "FPGA", 4) != 0) {
+            step = 0;
+            break;
+        }
+        step++;
+        l = 0;
+        /* fall-through */
+
+    /* Step 2: Receive the length and CRC */
+    case 2:
+        l += uart_read_bytes(0, &data[l], 8-l, 0);
+        if (l != 8)
+            break;
+        memcpy((uint8_t*) length, &data[0], 4);
+        memcpy((uint8_t*) crc,    &data[4], 4);
+        step++;
+        return true;
+
+    /* Step 3: Just wait for next attempt */
+    case 3:
+        break;
+
+    /* Unknown: Reset */
+    default:
+        step = 0;
+        break;
+    }
+
+    return false;
 }
 
 static bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
@@ -195,14 +237,21 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
     ice40_disable(ice40);
     ili9341_init(ili9341);
 
-    uint8_t counter = 0;
+    uint8_t  counter = 0;
     uint32_t length = 0;
     uint32_t crc = 0;
-    while (!fpga_uart_sync(&length, &crc)) {
+
+    while (!fpga_uart_sync(&length, &crc))
+    {
         const char *dots[] = { "", ".", "..", "..." };
-        fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
-            "FPGA download mode\nWaiting for bitstream%s", dots[counter]);
-        counter = (counter + 1) & 3;
+        uint8_t counter_new = (esp_timer_get_time() >> 19) & 0x3;
+        if (counter != counter_new) {
+            fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
+                "FPGA download mode\nWaiting for bitstream%s", dots[counter]);
+            counter = counter_new;
+        } else {
+            vTaskDelay(10 / portTICK_PERIOD_MS);
+        }
     }
 
     while (true) {
@@ -253,13 +302,9 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
 
         // Waiting for next download and sending key strokes to FPGA
         uint16_t key_state = 0;
-        uint16_t idle_count = 0;
         while (true) {
-            if (idle_count >= 200) {
-                if (fpga_uart_sync(&length, &crc)) {
-                    break;
-                }
-                idle_count = 0;
+            if (fpga_uart_sync(&length, &crc)) {
+                break;
             }
             esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state, &idle_count);
             if (res != ESP_OK) {
@@ -271,7 +316,6 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
                 goto error;
             }
             vTaskDelay(10 / portTICK_PERIOD_MS);
-            idle_count++;
         }
         ice40_disable(ice40);
         ili9341_init(ili9341);
