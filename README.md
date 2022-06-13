@@ -22,10 +22,30 @@ Source code included as submodules is licensed separately, please check the foll
 | components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |
 | components/ws2812           | MIT                               | Unlicense / Public domain                              |
 
-## How to make
+## How to build the firmware
 ```sh
 git clone --recursive https://github.com/badgeteam/mch2022-firmware-esp32
 cd mch2022-firmware-esp32
 make prepare
-make
+make build
+```
+
+## How to flash and start the monitor
+```sh
+make flash
+make monitor
+```
+
+## Linux permissions
+Create `/etc/udev/rules.d/99-mch2022.rules` with the following contents:
+
+```
+SUBSYSTEM=="usb", ATTR{idVendor}=="16d0", ATTR{idProduct}=="0f9a", MODE="0666"
+```
+
+Then run the following commands to apply the new rule:
+
+```
+sudo udevadm control --reload-rules
+sudo udevadm trigger
 ```

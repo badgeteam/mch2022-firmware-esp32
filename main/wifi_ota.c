@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #include "esp_wifi.h"
 #include "bootscreen.h"
+#include "wifi.h"
+#include "wifi_connect.h"
 
 #define HASH_LEN 32
 
@@ -59,24 +61,30 @@ static esp_err_t validate_image_header(esp_app_desc_t *new_app_info) {
     const esp_partition_t *running = esp_ota_get_running_partition();
     esp_app_desc_t running_app_info;
     if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
-        ESP_LOGI(TAG, "Running firmware version: %s", running_app_info.version);
+        ESP_LOGI(TAG, "Running firmware version: %s, available firmware version: %s", running_app_info.version, new_app_info->version);
+        if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
+            ESP_LOGW(TAG, "Already up-to-date!");
+            return ESP_FAIL;
+        }
+    } else {
+        ESP_LOGW(TAG, "Unable to check current firmware version");
     }
-
-/*
-    if (memcmp(new_app_info->version, running_app_info.version, sizeof(new_app_info->version)) == 0) {
-        ESP_LOGW(TAG, "Current running version is the same as a new. We will not continue the update.");
-        return ESP_FAIL;
-    }
-*/
 
     return ESP_OK;
 }
 
 static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client) {
-    esp_err_t err = ESP_OK;
-    /* Uncomment to add custom headers to HTTP request */
-    // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
-    return err;
+    if (esp_http_client_set_header(http_client, "Badge-Type", "MCH2022") != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to add type header");
+    }
+    const esp_partition_t *running = esp_ota_get_running_partition();
+    esp_app_desc_t running_app_info;
+    if (esp_ota_get_partition_description(running, &running_app_info) == ESP_OK) {
+        if (esp_http_client_set_header(http_client, "Badge-Firmware", running_app_info.version) != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to add version header");
+        }
+    }
+    return ESP_OK;
 }
 
 static void print_sha256(const uint8_t *image_hash, const char *label) {
@@ -106,7 +114,7 @@ static void get_sha256_of_partitions(void) {
 
 void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text) {
     pax_noclip(pax_buffer);
-    const pax_font_t* font = pax_get_font("sky mono");
+    const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_vec1_t title_size = pax_text_size(font, 18, "Firmware update");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, "Firmware update");
@@ -117,6 +125,15 @@ void display_ota_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text
 
 
 void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    display_ota_state(pax_buffer, ili9341, "Connecting to WiFi...");
+
+    if (!wifi_connect_to_stored()) {
+        display_ota_state(pax_buffer, ili9341, "Failed to connect to WiFi");
+        vTaskDelay(500 / portTICK_PERIOD_MS);
+        return;
+    }
+
+    display_ota_state(pax_buffer, ili9341, "Starting update...");
     esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
     ESP_LOGI(TAG, "Starting OTA update");
@@ -128,7 +145,7 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
         .event_handler = _http_event_handler,
         .keep_alive_enable = true
     };
-    
+
     esp_https_ota_config_t ota_config = {
         .http_config = &config,
         .http_client_init_cb = _http_client_init_cb, // Register a callback to be invoked after esp_http_client is initialized
@@ -141,16 +158,17 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     //config.skip_cert_common_name_check = true;
 
     ESP_LOGI(TAG, "Attempting to download update from %s", config.url);
-    
+
     display_ota_state(pax_buffer, ili9341, "Starting download...");
-    
+
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t err = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
+        wifi_disconnect_and_disable();
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
         display_ota_state(pax_buffer, ili9341, "Failed to start download");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
-        esp_restart();
+        return;
     }
 
     esp_app_desc_t app_desc;
@@ -158,17 +176,18 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "esp_https_ota_read_img_desc failed");
         esp_https_ota_abort(https_ota_handle);
+        wifi_disconnect_and_disable();
         display_ota_state(pax_buffer, ili9341, "Failed to read image desc");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
-        esp_restart();
+        return;
     }
     err = validate_image_header(&app_desc);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "image header verification failed");
         esp_https_ota_abort(https_ota_handle);
-        display_ota_state(pax_buffer, ili9341, "Image header verification failed");
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-        esp_restart();
+        wifi_disconnect_and_disable();
+        display_ota_state(pax_buffer, ili9341, "Already up-to-date!");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        return;
     }
 
     esp_err_t ota_finish_err = ESP_OK;
@@ -178,7 +197,7 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
         if (err != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             break;
         }
-        
+
         int len_total = esp_https_ota_get_image_size(https_ota_handle);
         int len_read = esp_https_ota_get_image_len_read(https_ota_handle);
         int percent = (len_read * 100) / len_total;
@@ -217,10 +236,10 @@ void ota_update(pax_buf_t* pax_buffer, ILI9341* ili9341) {
             esp_restart();
         }
     }
-    
+
     esp_https_ota_abort(https_ota_handle);
     esp_restart();
-    
+
     while (1) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }

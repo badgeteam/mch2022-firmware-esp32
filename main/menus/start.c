@@ -14,6 +14,7 @@
 #include "menu.h"
 #include "rp2040.h"
 #include "launcher.h"
+#include "hatchery.h"
 #include "settings.h"
 #include "dev.h"
 #include "bootscreen.h"
@@ -154,7 +155,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
         if (render) {
             char textBuffer[64];
-            snprintf(textBuffer, sizeof(textBuffer), "B%1.1fv U%1.1fv %03u%%%c v%s", battery_voltage, usb_voltage, battery_percent, battery_charging ? '+' : ' ', version);
+            snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
             render_start_help(pax_buffer, textBuffer);
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
@@ -165,8 +166,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             if (action == ACTION_APPS) {
                 menu_launcher(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_HATCHERY) {
-                // Not implemented
-                display_boot_screen(pax_buffer, ili9341, "Not implemented");
+                menu_hatchery(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SETTINGS) {
                 menu_settings(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "pax_gfx.h"
 #include "ili9341.h"
 

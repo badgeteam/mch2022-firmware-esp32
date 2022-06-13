@@ -150,7 +150,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 
     nvs_open("system", NVS_READWRITE, &handle);
     char ssid[33] = "<not set>";
-    char password[33] = "<not set>";
+    char password[65] = "<not set>";
     size_t requiredSize;
 
     esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
@@ -170,6 +170,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     pax_background(pax_buffer, 0xFFFFFF);
     snprintf(buffer, sizeof(buffer), "WiFi SSID:\n%s\nWiFi password:\n%s", ssid, password);
     pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 0, buffer);
+    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 18, "[A] test [B] back");
     ili9341_write(ili9341, pax_buffer->buf);
 
     bool quit = false;
@@ -181,11 +182,20 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
             switch(pin) {
                 case RP2040_INPUT_BUTTON_HOME:
                 case RP2040_INPUT_BUTTON_BACK:
+                    if (value) quit = true;
+                    break;
                 case RP2040_INPUT_BUTTON_ACCEPT:
                 case RP2040_INPUT_JOYSTICK_PRESS:
                 case RP2040_INPUT_BUTTON_SELECT:
                 case RP2040_INPUT_BUTTON_START:
-                    if (value) quit = true;
+                    if (value) {
+                        pax_vec1_t size = pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 240 - 3*18, "Connecting...");
+                        ili9341_write(ili9341, pax_buffer->buf);
+                        bool connected = wifi_connect_to_stored();
+                        pax_draw_rect(pax_buffer, 0xFFFFFFFF, 0, 240 - 3*18, size.x, size.y);
+                        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 240 - 3*18, connected ? "Connected !!  " : "Failed  !!   ");
+                        ili9341_write(ili9341, pax_buffer->buf);
+                    }
                     break;
                 default:
                     break;
