@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 from webusb import *
-
-import binascii
-import time
-import sys
 import argparse
 
 parser = argparse.ArgumentParser(description='MCH2022 badge app boot tool')

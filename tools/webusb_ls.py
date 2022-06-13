@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 from webusb import *
 
-import binascii, time, sys, argparse
-
 dev = WebUSB()
 apps = dev.appfsList()
 

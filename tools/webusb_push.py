@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
-import binascii
-import time
-import sys
-import argparse
-
 from webusb import *
+import argparse
 
 parser = argparse.ArgumentParser(description='MCH2022 badge app sideloading tool')
 parser.add_argument("name", help="AppFS filename")

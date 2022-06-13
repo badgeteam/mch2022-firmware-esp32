@@ -1,4 +1,3 @@
-import enum
 import usb.core
 import usb.util
 from enum import Enum
@@ -244,7 +243,7 @@ class WebUSB():
         returns:
             list : list of dicts containing 'name' and 'size'        
         """
-        
+
         data = self.sendPacket(WebUSBPacket(Commands.APPFSFDIR, self.getMessageId()))
         num_apps, = struct.unpack_from("<I", data)
         data = data[4:]
