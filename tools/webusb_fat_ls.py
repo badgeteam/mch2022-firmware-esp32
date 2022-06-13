@@ -2,8 +2,8 @@
 from webusb import *
 import argparse
 
-parser = argparse.ArgumentParser(description='MCH2022 badge app remove tool')
-parser.add_argument("name", help="AppFS filename")
+parser = argparse.ArgumentParser(description='MCH2022 fs list tool')
+parser.add_argument("name", help="directory name")
 args = parser.parse_args()
 
 name = args.name

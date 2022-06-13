@@ -118,7 +118,7 @@ int writefile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
     if(fptr == NULL && failed_open == 0) {
         for(int i = 0; i < received; i++) {
             if(data[i] == 0) {
-                if(received > 250) {
+                if(i > 250) {
                     failed_open = 1;
                     return 1;
                 }

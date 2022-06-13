@@ -185,6 +185,23 @@ class WebUSB():
                 result["dirs"].append(fd[1:])
         return result
 
+    def pushFSfile(self, filename, file):
+        """
+        Upload file to fs
+        root path should /flash or /sdcard
+
+        parameters:
+            filename (str) : name of the file
+            file (bytes) : file contents as byte array
+
+        returns:
+            bool : true if file was uploaded        
+        """
+
+        payload = filename.encode(encoding='ascii') + b"\x00" + file
+        data = self.sendPacket(WebUSBPacket(Commands.WRITEFILE, self.getMessageId(), payload))
+        return data.decode().rstrip('\x00') == "ok"
+
     def appfsUpload(self, appname, file):
         """
         Upload app to appfs
