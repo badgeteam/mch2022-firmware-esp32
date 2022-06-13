@@ -146,10 +146,31 @@ class WebUSB():
         return data
 
     def sendHeartbeat(self):
+        """
+        Send heartbeat towards the badges
+
+        parameters:
+            None
+
+        returns:
+            bool : True if badge responded, false if no response
+        """
+
         data = self.sendPacket(WebUSBPacket(Commands.HEARTBEAT, self.getMessageId()))
-        return data.decode()
+        return data.decode().rstrip('\x00') == "ok"
 
     def getFSDir(self, dir):
+        """
+        Get files and directories on the badge filesystem
+
+        parameters:
+            dir (str) : Directory to get contents from
+
+        returns:
+            res (dict) : Dict containing 'dir' which is the requested directory, 'files' list of files in the directory, 'dirs' list of directories
+
+        """
+
         data = self.sendPacket(WebUSBPacket(Commands.GETDIR, self.getMessageId(), dir.encode(encoding='ascii')))
         data = data.decode()
         data = data.split("\n")
@@ -166,21 +187,64 @@ class WebUSB():
         return result
 
     def appfsUpload(self, appname, file):
+        """
+        Upload app to appfs
+
+        parameters:
+            appname (str) : name of the app
+            file (bytes) : the app to be upload
+        
+        returns:
+            bool : true if app was uploaded succesfully
+        """
+
         payload = appname.encode(encoding="ascii") + b"\x00" + file
         data = self.sendPacket(WebUSBPacket(Commands.APPFSWRITE, self.getMessageId(), payload))
         return data.decode().rstrip('\x00') == "ok"
     
     def appfsRemove(self, appname):
+        """
+        Remove app from appfs
+
+        parameters:
+            appname (str) : name of the app to be removed
+        
+        returns:
+            bool : true if app was deleted succesfully
+        """
+        
         payload = appname.encode(encoding="ascii") + b"\x00"
         data = self.sendPacket(WebUSBPacket(Commands.APPFSDEL, self.getMessageId(), payload))
         return data.decode().rstrip('\x00') == "ok"
 
     def appfsExecute(self, appname):
+        """
+        Execute app from appfs
+
+        parameters:
+            appname (str) : name of the app to be executed
+
+        returns:
+            bool : true if app was executed
+        
+        """
+        
+
         payload = appname.encode(encoding="ascii") + b"\x00"
         data = self.sendPacket(WebUSBPacket(Commands.APPFSBOOT, self.getMessageId(), payload))
         return data.decode().rstrip('\x00') == "ok"
 
     def appfsList(self):
+        """
+        Get apps from appfs
+
+        parameters:
+            None
+        
+        returns:
+            list : list of dicts containing 'name' and 'size'        
+        """
+        
         data = self.sendPacket(WebUSBPacket(Commands.APPFSFDIR, self.getMessageId()))
         num_apps, = struct.unpack_from("<I", data)
         data = data[4:]
