@@ -215,10 +215,6 @@ void app_main(void) {
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
     
     if (webusb_mode == 0x00) { // Normal boot
-        /* Add-on */
-
-        sao_identify();
-
         /* Rick that roll */
         play_bootsound();
 
