@@ -495,7 +495,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             return;
         }
         // Copy the SSID in.
-        memcpy(ssid, pick->ssid, 33);
+        memcpy(ssid, pick->ssid, sizeof(ssid));
         authmode = pick->authmode;
         
         // Free memories.
