@@ -7,8 +7,6 @@ idf_component_register(
          "rp2040_updater.c"
          "settings.c"
          "system_wrapper.c"
-         "wifi_connection.c"
-         "wifi_connect.c"
          "wifi_ota.c"
          "fpga_download.c"
          "audio.c"
