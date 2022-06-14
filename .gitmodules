@@ -43,3 +43,6 @@
 [submodule "components/eeprom"]
 	path = components/eeprom
 	url = https://github.com/Nicolai-Electronics/esp32-component-i2c-eeprom.git
+[submodule "components/i2c-bme680"]
+	path = components/i2c-bme680
+	url = https://github.com/badgeteam/esp32-component-bme680.git
