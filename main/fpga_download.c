@@ -139,6 +139,7 @@ static void fpga_display_message(
     line = 0;
     m = c = message;
 
+    const pax_font_t *font = pax_get_font("saira regular");
     while (!done) {
         // End ?
         done = (*c == '\0');
@@ -146,7 +147,7 @@ static void fpga_display_message(
         // Print ?
         if (*c == '\0' || *c == '\n') {
             *c = '\0';
-            pax_draw_text(pax_buffer, fg, NULL, 18, 0, 20*line, m);
+            pax_draw_text(pax_buffer, fg, font, 18, 0, 20*line, m);
             m = c + 1;
             line++;
         }

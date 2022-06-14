@@ -22,6 +22,7 @@
 #include "wifi_connection.h"
 #include "wifi_ota.h"
 #include "graphics_wrapper.h"
+#include "esp_wpa2.h"
 
 static const char *TAG = "wifi menu";
 
@@ -146,11 +147,15 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 }
 
 void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const pax_font_t *font = pax_get_font("saira regular");
     nvs_handle_t handle;
 
     nvs_open("system", NVS_READWRITE, &handle);
     char ssid[33] = "<not set>";
     char password[65] = "<not set>";
+    char username[129] = "<not set>";
+    wifi_auth_mode_t authmode;
+    esp_eap_ttls_phase2_types phase2;
     size_t requiredSize;
 
     esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
@@ -162,15 +167,36 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     if ((res == ESP_OK) && (requiredSize < sizeof(password))) {
         res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
     }
+    
+    uint8_t dummy = 0;
+    res = nvs_get_u8(handle, "wifi.authmode", &dummy);
+    authmode = dummy;
+    
+    if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
+        res = nvs_get_str(handle, "wifi.username", NULL, &requiredSize);
+        if ((res == ESP_OK) && (requiredSize < sizeof(username))) {
+            res = nvs_get_str(handle, "wifi.username", username, &requiredSize);
+        }
+        
+        dummy = 0;
+        res = nvs_get_u8(handle, "wifi.phase2", &dummy);
+        phase2 = dummy;
+    }
 
     nvs_close(handle);
 
     char buffer[300];
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
-    snprintf(buffer, sizeof(buffer), "WiFi SSID:\n%s\nWiFi password:\n%s", ssid, password);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 0, buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 5, 240 - 18, "[A] test [B] back");
+    if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
+        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  WPA2 enterprise\nUsername:\n  %s\nPassword:\n  %s", ssid, username, password);
+    } else if (authmode != WIFI_AUTH_OPEN) {
+        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, "", password);
+    } else {
+        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  None", ssid);
+    }
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] test [B] back");
     ili9341_write(ili9341, pax_buffer->buf);
 
     bool quit = false;
@@ -189,11 +215,11 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
                 case RP2040_INPUT_BUTTON_SELECT:
                 case RP2040_INPUT_BUTTON_START:
                     if (value) {
-                        pax_vec1_t size = pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 240 - 3*18, "Connecting...");
+                        pax_vec1_t size = pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3*18, "Connecting...");
                         ili9341_write(ili9341, pax_buffer->buf);
                         bool connected = wifi_connect_to_stored();
-                        pax_draw_rect(pax_buffer, 0xFFFFFFFF, 0, 240 - 3*18, size.x, size.y);
-                        pax_draw_text(pax_buffer, 0xFF000000, NULL, 18, 0, 240 - 3*18, connected ? "Connected !!  " : "Failed  !!   ");
+                        pax_draw_rect(pax_buffer, 0xFFFFFFFF, 0, 240 - 3*18, 320, size.y);
+                        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3*18, connected ? "Connected successfully" : "Failed to connect");
                         ili9341_write(ili9341, pax_buffer->buf);
                     }
                     break;
