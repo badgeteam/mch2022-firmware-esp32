@@ -8,6 +8,8 @@
 #include "rp2040.h"
 
 void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const pax_font_t *font = pax_get_font("saira regular");
+    
     bool render = true;
     bool quit = false;
 
@@ -94,30 +96,30 @@ void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
         if (render) {
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0x325aa8);
-            pax_draw_text(pax_buffer, 0xFFFFFFFF, NULL, 18, 0, 20*0, "Press HOME + START to exit");
+            pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20*0, "Press HOME + START to exit");
             char buffer[64];
             snprintf(buffer, sizeof(buffer), "JOY DOWN   %s", btn_joy_down ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_down_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*1, buffer);
+            pax_draw_text(pax_buffer, btn_joy_down_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*1, buffer);
             snprintf(buffer, sizeof(buffer), "JOY UP     %s", btn_joy_up ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_up_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*2, buffer);
+            pax_draw_text(pax_buffer, btn_joy_up_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*2, buffer);
             snprintf(buffer, sizeof(buffer), "JOY LEFT   %s", btn_joy_left ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_left_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*3, buffer);
+            pax_draw_text(pax_buffer, btn_joy_left_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*3, buffer);
             snprintf(buffer, sizeof(buffer), "JOY RIGHT  %s", btn_joy_right ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_right_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*4, buffer);
+            pax_draw_text(pax_buffer, btn_joy_right_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*4, buffer);
             snprintf(buffer, sizeof(buffer), "JOY PRESS  %s", btn_joy_press ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_joy_press_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*5, buffer);
+            pax_draw_text(pax_buffer, btn_joy_press_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*5, buffer);
             snprintf(buffer, sizeof(buffer), "BTN HOME   %s", btn_home ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_home_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*6, buffer);
+            pax_draw_text(pax_buffer, btn_home_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*6, buffer);
             snprintf(buffer, sizeof(buffer), "BTN MENU   %s", btn_menu ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_menu_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*7, buffer);
+            pax_draw_text(pax_buffer, btn_menu_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*7, buffer);
             snprintf(buffer, sizeof(buffer), "BTN SELECT %s", btn_select ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_select_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*8, buffer);
+            pax_draw_text(pax_buffer, btn_select_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*8, buffer);
             snprintf(buffer, sizeof(buffer), "BTN START  %s", btn_start ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_start_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*9, buffer);
+            pax_draw_text(pax_buffer, btn_start_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*9, buffer);
             snprintf(buffer, sizeof(buffer), "BTN A      %s", btn_accept ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_accept_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*10, buffer);
+            pax_draw_text(pax_buffer, btn_accept_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*10, buffer);
             snprintf(buffer, sizeof(buffer), "BTN B      %s", btn_back ? "PRESSED" : "released");
-            pax_draw_text(pax_buffer, btn_back_green ? 0xFF00FF00 : 0xFFFFFFFF, NULL, 18, 0, 20*11, buffer);
+            pax_draw_text(pax_buffer, btn_back_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20*11, buffer);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
