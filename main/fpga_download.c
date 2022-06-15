@@ -16,6 +16,7 @@
 #include "system_wrapper.h"
 #include "graphics_wrapper.h"
 #include "esp32/rom/crc.h"
+#include "fpga_util.h"
 
 static void fpga_install_uart() {
     fflush(stdout);
@@ -40,10 +41,10 @@ static bool fpga_read_stdin(uint8_t* buffer, uint32_t len, uint32_t timeout) {
     return (read == len);
 }
 
-static bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
+static bool fpga_uart_sync(void) {
     static int step = 0;
     static int l;
-    static uint8_t data[8];
+    static uint8_t data[4];
     static int64_t timeout;
 
     if (step && (esp_timer_get_time() > timeout))
@@ -69,21 +70,10 @@ static bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
             break;
         }
         step++;
-        l = 0;
-        /* fall-through */
-
-    /* Step 2: Receive the length and CRC */
-    case 2:
-        l += uart_read_bytes(0, &data[l], 8-l, 0);
-        if (l != 8)
-            break;
-        memcpy((uint8_t*) length, &data[0], 4);
-        memcpy((uint8_t*) crc,    &data[4], 4);
-        step++;
         return true;
 
-    /* Step 3: Just wait for next attempt */
-    case 3:
+    /* Step 2: Just wait for next attempt */
+    case 2:
         break;
 
     /* Unknown: Reset */
@@ -96,7 +86,7 @@ static bool fpga_uart_sync(uint32_t* length, uint32_t* crc) {
 }
 
 static bool fpga_uart_load(uint8_t* buffer, uint32_t length) {
-    return fpga_read_stdin(buffer, length, 3000);
+    return fpga_read_stdin(buffer, length, 1000);
 }
 
 static void fpga_uart_mess(const char *fmt, ...) {
@@ -160,89 +150,127 @@ static void fpga_display_message(
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-static esp_err_t fpga_process_events(xQueueHandle buttonQueue, ICE40* ice40, uint16_t *key_state, uint16_t *idle_count)
-{
-    rp2040_input_message_t buttonMessage = {0};
-    while (xQueueReceive(buttonQueue, &buttonMessage, 0) == pdTRUE) {
-        uint8_t pin = buttonMessage.input;
-        bool value = buttonMessage.state;
-        uint16_t key_mask = 0;
-        switch(pin) {
-            case RP2040_INPUT_JOYSTICK_DOWN:
-                key_mask = 1 << 0;
-                break;
-            case RP2040_INPUT_JOYSTICK_UP:
-                key_mask = 1 << 1;
-                break;
-            case RP2040_INPUT_JOYSTICK_LEFT:
-                key_mask = 1 << 2;
-                break;
-            case RP2040_INPUT_JOYSTICK_RIGHT:
-                key_mask = 1 << 3;
-                break;
-            case RP2040_INPUT_JOYSTICK_PRESS:
-                key_mask = 1 << 4;
-                break;
-            case RP2040_INPUT_BUTTON_HOME:
-                key_mask = 1 << 5;
-                break;
-            case RP2040_INPUT_BUTTON_MENU:
-                key_mask = 1 << 6;
-                break;
-            case RP2040_INPUT_BUTTON_SELECT:
-                key_mask = 1 << 7;
-                break;
-            case RP2040_INPUT_BUTTON_START:
-                key_mask = 1 << 8;
-                break;
-            case RP2040_INPUT_BUTTON_ACCEPT:
-                key_mask = 1 << 9;
-                break;
-            case RP2040_INPUT_BUTTON_BACK:
-                key_mask = 1 << 10;
-            default:
-                break;
-        }
-        if (key_mask != 0)
-        {
-            if (value) {
-                *key_state |= key_mask;
-            }
-            else {
-                *key_state &= ~key_mask;
+static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    TickType_t timeout = 1000 / portTICK_PERIOD_MS;
+    uint8_t *buffer = NULL;
+    bool done = false;
+    struct {
+        uint8_t  type;
+        uint32_t fid;
+        uint32_t len;
+        uint32_t crc;
+    } __attribute__((packed)) header;
+
+    while (!done)
+    {
+        // Header
+        uart_read_bytes(0, &header, sizeof(header), timeout);
+
+#if 0
+        fpga_uart_mess("hdr: type=%d, fid=%08x, len=%08x, crc=%08x\n", header.type, header.fid, header.len, header.crc);
+#endif
+
+        // Payload
+        if (header.len) {
+            // Alloc zone to store content
+            buffer = malloc(header.len);
+            if (buffer == NULL) {
+                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                    "FPGA download mode\nMalloc failed");
+                return false;
             }
 
-            uint8_t spi_message[5] = { 0xf4 };
-            spi_message[1] = *key_state >> 8;
-            spi_message[2] = *key_state & 0xff;
-            spi_message[3] = key_mask >> 8;
-            spi_message[4] = key_mask & 0xff;
-            esp_err_t res = ice40_send(ice40, spi_message, 5);
-            if (res != ESP_OK) {
-                return res;
+            // Read data in
+            if (!fpga_uart_load(buffer, header.len)) {
+                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                    "FPGA download mode\nTimeout while loading");
+                return false;
             }
+
+            // Validate CRC
+            uint32_t checkCrc = crc32_le(0, buffer, header.len);
+            if (checkCrc != header.crc) {
+                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                    "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
+                    header.crc, checkCrc);
+                return false;
+            }
+        } else {
+            buffer = NULL;
         }
-        *idle_count = 0;
+
+        switch (header.type) {
+        case 'C': { // Clear
+            fpga_req_del_file(header.fid);
+            break;
+        }
+
+        case 'F': { // File alias
+            char *path = malloc(header.len + 1);
+            memcpy(path, buffer, header.len);
+            path[header.len] = '\x00';
+            fpga_req_add_file_alias(header.fid, path);
+            free(path);
+            break;
+        }
+
+        case 'D': { // Data block
+            fpga_req_add_file_data(header.fid, buffer, header.len);
+            break;
+        }
+
+        case 'B': { // Bitstream
+            done = true;
+            break;
+        }
+
+        default:
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "Invalid packet type");
+            return false;
+        }
+
+        if (!done)
+            free(buffer);
     }
-    return ESP_OK;
+
+    // Bitstream ready, load it
+    ili9341_deinit(ili9341);
+    ili9341_select(ili9341, false);
+    vTaskDelay(200 / portTICK_PERIOD_MS);
+    ili9341_select(ili9341, true);
+
+    esp_err_t res = ice40_load_bitstream(ice40, buffer, header.len);
+    free(buffer);
+    if (res != ESP_OK) {
+        ice40_disable(ice40);
+        ili9341_init(ili9341);
+        fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nUpload failed: %d", res);
+        fpga_uart_mess("uploading bitstream failed with %d\n", res);
+        return false;
+    }
+    fpga_uart_mess("bitstream has uploaded\n");
+
+    return true;
 }
 
-void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    uint8_t *buffer = NULL;
 
+void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
         "FPGA download mode\nPreparing...");
 
     fpga_install_uart();
+    fpga_irq_setup(ice40);
+    fpga_req_setup();
+    fpga_btn_reset();
 
     ice40_disable(ice40);
     ili9341_init(ili9341);
 
     uint8_t  counter = 0;
-    uint32_t length = 0;
-    uint32_t crc = 0;
 
-    while (!fpga_uart_sync(&length, &crc))
+    while (!fpga_uart_sync())
     {
         const char *dots[] = { "", ".", "..", "..." };
         uint8_t counter_new = (esp_timer_get_time() >> 19) & 0x3;
@@ -259,66 +287,37 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
             "FPGA download mode\nReceiving bitstream...");
 
-        buffer = malloc(length);
-        if (buffer == NULL) {
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                "FPGA download mode\nMalloc failed");
+        if (!fpga_uart_download(ice40, pax_buffer, ili9341))
             goto error;
-        }
-        if (!fpga_uart_load(buffer, length)) {
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                "FPGA download mode\nTimeout while loading");
-            goto error;
-        }
-
-        uint32_t checkCrc = crc32_le(0, buffer, length);
-
-        if (checkCrc != crc) {
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
-                crc, checkCrc);
-            fpga_uart_mess("CRC incorrect %08X %08x\n", crc, checkCrc);
-            goto error;
-        }
-        fpga_uart_mess("CRC correct\n");
-
-        ili9341_deinit(ili9341);
-        ili9341_select(ili9341, false);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
-        ili9341_select(ili9341, true);
-
-        esp_err_t res = ice40_load_bitstream(ice40, buffer, length);
-        free(buffer);
-        buffer = NULL;
-
-        if (res != ESP_OK) {
-            ice40_disable(ice40);
-            ili9341_init(ili9341);
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                "FPGA download mode\nUpload failed: %d", res);
-            fpga_uart_mess("uploading bitstream failed with %d\n", res);
-            goto error;
-        }
-        fpga_uart_mess("bitstream has uploaded\n");
 
         // Waiting for next download and sending key strokes to FPGA
-        uint16_t key_state = 0;
-        uint16_t idle_count = 0;
         while (true) {
-            if (fpga_uart_sync(&length, &crc)) {
-                idle_count = 0;
+            esp_err_t res;
+            bool work_done = false;
+
+            if (fpga_uart_sync()) {
                 break;
             }
-            esp_err_t res = fpga_process_events(buttonQueue, ice40, &key_state, &idle_count);
+
+            work_done |= fpga_btn_forward_events(ice40, buttonQueue, &res);
             if (res != ESP_OK) {
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
                 fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                    "FPGA download mode\nError: %d", res);
-                fpga_uart_mess("processing events failed with %d\n", res);
+                    "FPGA download mode\nBTN error: %d", res);
+                fpga_uart_mess("processing buttons events failed with %d\n", res);
                 goto error;
             }
-            vTaskDelay(10 / portTICK_PERIOD_MS);
+
+            fpga_req_process(ice40, work_done ? 0 : (50 / portTICK_PERIOD_MS), &res);
+            if (res != ESP_OK) {
+                ice40_disable(ice40);
+                ili9341_init(ili9341);
+                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                    "FPGA download mode\nREQ error: %d", res);
+                fpga_uart_mess("processing fpga requests failed with %d\n", res);
+                goto error;
+            }
         }
         ice40_disable(ice40);
         ili9341_init(ili9341);
@@ -327,8 +326,9 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
     return;
 
 error:
-    free(buffer);
     vTaskDelay(1000 / portTICK_PERIOD_MS);
+    fpga_req_cleanup();
+    fpga_irq_cleanup(ice40);
     fpga_uninstall_uart();
     return;
 }
