@@ -206,7 +206,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                     break;
                 } else {
                     printf("File selected: %s\n", menuArgs->path);
-                    appfs_store_app(pax_buffer, ili9341, menuArgs->path, menuArgs->label);
+                    appfs_store_app(pax_buffer, ili9341, menuArgs->path, menuArgs->label, menuArgs->label, 0);
                 }
                 menuArgs = NULL;
                 render = true;

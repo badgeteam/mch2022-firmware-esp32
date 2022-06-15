@@ -48,7 +48,7 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* label) {
+void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
     esp_err_t res;
     appfs_handle_t handle;
@@ -70,7 +70,7 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, char* 
 
     ESP_LOGI(TAG, "Application size %d", app_size);
 
-    res = appfsCreateFile(label, app_size, &handle);
+    res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
         display_boot_screen(pax_buffer, ili9341, "Failed to create file");
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
