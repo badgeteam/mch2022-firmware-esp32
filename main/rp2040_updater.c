@@ -22,19 +22,18 @@ extern const uint8_t rp2040_firmware_bin_end[] asm("_binary_rp2040_firmware_bin_
 #define RP2040_FIRMWARE_ADDR 0x10010000
 #define RP2040_SECTOR_SIZE 0x1000
 
-void pax_draw_text_centered(pax_buf_t* pax_buffer, const pax_font_t* font, pax_col_t color, int offset, const char* text) {
-    pax_vec1_t size = pax_text_size(font, 18, text);
-    pax_draw_text(pax_buffer, color, font, 18, (320 / 2) - (size.x / 2), (240 / 2) - (size.y / 2) + offset, text);
+static void draw_text_centered(pax_buf_t* pax_buffer, const pax_font_t* font, pax_col_t color, int offset, const char* text) {
+    pax_center_text(pax_buffer, color, font, 18, pax_buffer->width/2, pax_buffer->height/2+offset, text);
 }
 
 void display_rp2040_update_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text1, const char* text2) {
     pax_noclip(pax_buffer);
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
-    pax_draw_text_centered(pax_buffer, font, 0xFF000000, -16, "Co-processor update");
-    pax_draw_text_centered(pax_buffer, font, 0xFF000000, 8, text1);
+    draw_text_centered(pax_buffer, font, 0xFF000000, -16, "Co-processor update");
+    draw_text_centered(pax_buffer, font, 0xFF000000, 8, text1);
     if (text2 != NULL) {
-        pax_draw_text_centered(pax_buffer, font, 0xFF000000, 32, text2);
+        draw_text_centered(pax_buffer, font, 0xFF000000, 32, text2);
     }
     ili9341_write(ili9341, pax_buffer->buf);
 }
@@ -43,8 +42,8 @@ void display_rp2040_update_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const 
     pax_noclip(pax_buffer);
     const pax_font_t *font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xa85a32);
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, -8, "ERROR");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 8, text);
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, -8, "ERROR");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 8, text);
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
@@ -55,18 +54,18 @@ void display_rp2040_update_old_bootloader(pax_buf_t* pax_buffer, ILI9341* ili934
 
     int line_height = 16;
 
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-7, "Hi there prototype user,");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-6, "please flash the new bootloader!");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-7, "Hi there prototype user,");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-6, "please flash the new bootloader!");
 
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-4, "You can do so by downloading");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-3, "the UF2 file at the site below.");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-4, "You can do so by downloading");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-3, "the UF2 file at the site below.");
 
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-1, "Hold SELECT while powering on");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 0, "your badge and copy the file to");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*1, "the RPI-R2 disk that appears.");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*-1, "Hold SELECT while powering on");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 0, "your badge and copy the file to");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*1, "the RPI-R2 disk that appears.");
 
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*3, "ota.bodge.team/mch2022.uf2");
-    pax_draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*4, "(that's bodge, with an o)");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*3, "ota.bodge.team/mch2022.uf2");
+    draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height*4, "(that's bodge, with an o)");
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
