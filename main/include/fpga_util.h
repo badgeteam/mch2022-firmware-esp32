@@ -64,4 +64,10 @@ bool fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *
 
 /* Request processing ----------------------------------------------------- */
 
+void fpga_req_setup(void);
+void fpga_req_cleanup(void);
+int  fpga_req_add_file_alias(uint32_t fid, const char *path);
+int  fpga_req_add_file_data(uint32_t fid, void *data, size_t len);
+void fpga_req_del_file(uint32_t fid);
+
 bool fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err);

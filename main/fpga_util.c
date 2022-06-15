@@ -9,6 +9,7 @@
  * Copyritht (C) 2022  Frans Faase
  */
 
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -402,6 +403,222 @@ fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *err)
  * Request processing
  * ------------------------------------------------------------------------ */
 
+struct req_entry {
+    struct req_entry *next;
+
+    uint32_t fid;
+    FILE   * fh;
+    void   * data;
+    size_t   len;
+    size_t   ofs;
+};
+
+struct req_entry *g_req_entries;
+
+
+static void
+_fpga_req_delete_entry(uint32_t fid)
+{
+    struct req_entry **re_ptr;
+    struct req_entry *re;
+
+    // Scan entries for a matching one
+    re_ptr = &g_req_entries;
+    re = *re_ptr;
+
+    while (re) {
+        // Match ?
+        if (re->fid == fid) {
+            // Remove from list
+            *re_ptr = re->next;
+
+            // Release
+            if (re->fh)
+                fclose(re->fh);
+            free(re);
+        }
+
+        // Next
+        re_ptr = &re->next;
+        re = *re_ptr;
+    }
+}
+
+static struct req_entry *
+_fpga_req_open_file(uint32_t fid, const char *path)
+{
+    struct req_entry *re;
+    FILE *fh;
+
+    // Open file
+    fh = fopen(path, "rb");
+    if (!fh)
+        return NULL;
+
+    // Alloc new entry
+    re = calloc(1, sizeof(struct req_entry));
+    if (!re)
+        return NULL;
+
+    // Add it to list
+    re->next = g_req_entries;
+    g_req_entries = re;
+
+    // Init fields
+    re->fid = fid;
+    re->fh  = fh;
+    re->ofs = 0;
+
+    fseek(fh, 0, SEEK_END);
+    re->len = ftell(fh);
+    fseek(fh, 0, SEEK_SET);
+
+    // Done
+    return re;
+}
+
+static struct req_entry *
+_fpga_req_get_file(uint32_t fid)
+{
+    struct req_entry *re;
+    char path[32];
+
+    // Scan entries for a matching one
+    for (re=g_req_entries; re; re=re->next)
+        if (re->fid == fid)
+            return re;
+
+    // Nothing found, try to open file
+    snprintf(path, sizeof(path), "/sd/fpga_%08x.dat", fid);
+    return _fpga_req_open_file(fid, path);
+}
+
+static ssize_t
+_fpga_req_fread(uint32_t fid, void *buf, size_t nbyte, size_t ofs)
+{
+    struct req_entry *re;
+
+    // Get or create entry
+    re = _fpga_req_get_file(fid);
+
+#if 0
+    printf("rd: %08x %p %6d %6d\n", fid, re, nbyte, ofs);
+#endif
+
+    // If not found, or past end, just fill
+    if (!re || (ofs >= re->len)) {
+        memset(buf, 0x00, nbyte);
+        return 0;
+    }
+
+    // Deal with requests too large
+    if ((ofs + nbyte) > re->len) {
+        size_t l = re->len - ofs;
+        memset(buf+l, 0x00, nbyte-l);
+        nbyte = l;
+    }
+
+    // Is it a file
+    if (re->fh) {
+        // Seek ?
+        if (ofs != re->ofs)
+            fseek(re->fh, ofs, SEEK_SET);
+
+        re->ofs = ofs + nbyte;
+
+        // Read data
+        nbyte = fread(buf, 1, nbyte, re->fh);
+    }
+
+    // Or a raw data block
+    else if (re->data) {
+        memcpy(buf, re->data + ofs, nbyte);
+    }
+
+    return nbyte;
+}
+
+
+void
+fpga_req_setup(void)
+{
+    g_req_entries = NULL;
+}
+
+void
+fpga_req_cleanup(void)
+{
+    struct req_entry *re_cur, *re_nxt;
+
+    re_cur = g_req_entries;
+
+    while (re_cur)
+    {
+        re_nxt = re_cur->next;
+        if (re_cur->fh)
+            fclose(re_cur->fh);
+        free(re_cur);
+        re_cur = re_nxt;
+    }
+
+    g_req_entries = NULL;
+}
+
+int
+fpga_req_add_file_alias(uint32_t fid, const char *path)
+{
+    struct req_entry *re;
+
+    // Remove any previous entries
+    _fpga_req_delete_entry(fid);
+
+    // Open new one
+    re = _fpga_req_open_file(fid, path);
+    if (!re)
+        return -ENOENT;
+
+    return 0;
+}
+
+int
+fpga_req_add_file_data(uint32_t fid, void *data, size_t len)
+{
+    struct req_entry *re;
+    void *buf;
+
+    // Remove any previous entries
+    _fpga_req_delete_entry(fid);
+
+    // Alloc new entry
+    buf = malloc(sizeof(struct req_entry) + len);
+    if (!buf)
+        return -ENOMEM;
+
+    re = buf;
+    memset(re, 0x00, sizeof(struct req_entry));
+
+    // Add it to list
+    re->next = g_req_entries;
+    g_req_entries = re;
+
+    // Init fields
+    re->fid  = fid;
+    re->data = buf + sizeof(struct req_entry);
+    re->len  = len;
+
+    // Copy actual data
+    memcpy(re->data, data, len);
+
+    // Done
+    return 0;
+}
+
+void
+fpga_req_del_file(uint32_t fid)
+{
+    _fpga_req_delete_entry(fid);
+}
+
 bool
 fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err)
 {
@@ -426,9 +643,6 @@ fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err)
 
     // File requests
     if (req & SPI_REQ_FREAD) {
-        static FILE *s_fh = NULL;
-        static uint32_t s_fid = 0;
-
         uint32_t req_file_id;
         uint32_t req_offset;
         uint16_t req_length;
@@ -454,23 +668,7 @@ fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err)
         buf_req = malloc(req_length + 1);
 
         // Load data from file
-        if (!s_fh || (s_fid != req_file_id)) {
-            char fname[32];
-            if (s_fh)
-                fclose(s_fh);
-            snprintf(fname, sizeof(fname), "/sd/fpga_%08x.dat", req_file_id);
-            s_fh  = fopen(fname, "rb");
-            s_fid = req_file_id;
-        }
-
-        if (s_fh) {
-            // Seek and Read
-            fseek(s_fh, req_offset, SEEK_SET);
-            fread(&buf_req[1], 1, req_length, s_fh);
-        } else {
-            // No such file ... fill with 0x00
-            memset(&buf_req[1], 0x00, req_length);
-        }
+        _fpga_req_fread(req_file_id, &buf_req[1], req_length, req_offset);
 
         // Send data
         buf_req[0] = SPI_CMD_FREAD_PUT;
