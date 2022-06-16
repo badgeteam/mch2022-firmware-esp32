@@ -25,3 +25,4 @@ else:
 
 if run:
     dev.appfsExecute(name)
+    dev.disconnect()
