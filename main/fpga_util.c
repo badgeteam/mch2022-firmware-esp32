@@ -436,6 +436,9 @@ _fpga_req_delete_entry(uint32_t fid)
             if (re->fh)
                 fclose(re->fh);
             free(re);
+
+            // Done
+            return;
         }
 
         // Next

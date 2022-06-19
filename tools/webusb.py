@@ -272,3 +272,9 @@ class WebUSB():
             data = data[lenname:]
             res.append({"name":name, "size":appsize})
         return res
+
+    def disconnect(self):
+        self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_BAUDRATE, 1152, self.webusb_esp32.bInterfaceNumber)
+        self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_MODE, 0x0000, self.webusb_esp32.bInterfaceNumber)
+        self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_STATE, 0x0000, self.webusb_esp32.bInterfaceNumber)
+

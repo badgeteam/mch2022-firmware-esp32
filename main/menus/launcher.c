@@ -54,11 +54,21 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         appfs_fd = appfsNextEntry(appfs_fd);
         if (appfs_fd == APPFS_INVALID_FD) break;
         const char* name = NULL;
-        appfsEntryInfo(appfs_fd, &name, NULL);
+        const char* title = NULL;
+        uint16_t version = 0xFFFF;
+        appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
         menu_launcher_args_t* args = malloc(sizeof(menu_launcher_args_t));
         args->fd = appfs_fd;
         args->action = ACTION_APPFS;
-        menu_insert_item(menu, name, NULL, (void*) args, -1);
+
+        char label[64];
+        if (version < 0xFFFF) {
+            snprintf(label, sizeof(label), "%s (r%u)", title, version);
+        } else {
+            snprintf(label, sizeof(label), "%s (dev)", title);
+        }
+
+        menu_insert_item(menu, label, NULL, (void*) args, -1);
     }
 
     bool render = true;

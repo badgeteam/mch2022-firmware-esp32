@@ -52,6 +52,8 @@
 #include "fpga_download.h"
 #include "webusb.h"
 
+#include "sao_eeprom.h"
+
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
 
