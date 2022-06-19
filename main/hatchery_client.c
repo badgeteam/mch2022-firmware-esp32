@@ -687,6 +687,7 @@ static hatchery_file_t *new_file() {
         file->name = NULL;
         file->url = NULL;
         file->size = -1;
+        file->contents = NULL;
         file->next = NULL;
     }
     return file;
@@ -834,6 +835,59 @@ esp_err_t hatchery_query_app(hatchery_app_t *app) {
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
+
+    return result;
+}
+
+// Query file
+
+typedef struct process_file_t process_file_t;
+struct process_file_t {
+    hatchery_file_t *file;
+    int loaded;
+};
+
+static void file_data_cb_process(void *callback_data, const char *data, int data_len) {
+    process_file_t *process_file_data = (process_file_t*)callback_data;
+    hatchery_file_t *file = process_file_data->file;
+
+    if (file->contents == NULL) {
+        return;
+    }
+    if (process_file_data->loaded + data_len > file->size) {
+        // Received more data than expected
+        free(file->contents);
+        file->contents = NULL;
+        return;        
+    }
+
+    memcpy(file->contents + process_file_data->loaded, data, data_len);
+    process_file_data->loaded += data_len;
+}
+
+esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file) {
+
+    if (file->contents != NULL || file->size <= 0) {
+        return ESP_OK;
+    }
+    file->contents = (uint8_t*)malloc(file->size);
+    if (file->contents == NULL) {
+        return ESP_OK;
+    }
+    process_file_t process_file_data;
+    process_file_data.file = file;
+    process_file_data.loaded = 0;
+
+    data_callback_t data_callback;
+    data_callback.data = &process_file_data;
+    data_callback.fn = file_data_cb_process;
+
+    esp_err_t result = hatchery_http_get(file->url, &data_callback);
+
+    if (file->contents != NULL || process_file_data.loaded != file->size) {
+        free(file->contents);
+        file->contents = NULL;
+    }
 
     return result;
 }
