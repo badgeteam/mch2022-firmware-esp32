@@ -74,7 +74,7 @@ class WebUSB():
         self.REQUEST_BAUDRATE = 0x24
         self.REQUEST_MODE     = 0x25
 
-        self.TIMEOUT = 15
+        self.TIMEOUT = 60
         self.PAYLOADHEADERLEN = 12
 
         self.bootWebUSB()
