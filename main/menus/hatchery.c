@@ -26,12 +26,68 @@ static void add_menu_item(menu_t *menu, const char *name, void *callback_args);
 // Apps menu
 
 static void fill_menu_items_apps(menu_t *menu, void *context) {
-    add_menu_item(menu, "App A", NULL);
-    add_menu_item(menu, "Test App", NULL);
-    add_menu_item(menu, "App xx", NULL);
+    hatchery_category_t *category = (hatchery_category_t*)context;
+
+    hatchery_query_apps(category);
+    for (hatchery_app_t *apps = category->apps; apps != NULL; apps = apps->next) {
+        add_menu_item(menu, apps->name, apps);
+    }
+}
+
+static void load_app(hatchery_app_t *app) {
+    // Load the app
 }
 
 static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
+    hatchery_app_t *app = (hatchery_app_t*)args;
+
+    if (app->files == NULL) {
+        hatchery_query_app(app);
+    }
+
+    // Show information about app and give user option to install app
+    pax_background(pax_buffer, 0xFFFFFF);
+    pax_noclip(pax_buffer);
+    ili9341_write(ili9341, pax_buffer->buf);
+
+    bool quit = false;
+
+    while (1) {
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin = buttonMessage.input;
+            bool value = buttonMessage.state;
+            switch(pin) {
+                case RP2040_INPUT_JOYSTICK_DOWN:
+                case RP2040_INPUT_JOYSTICK_UP:
+                    break;
+                case RP2040_INPUT_BUTTON_HOME:
+                case RP2040_INPUT_BUTTON_BACK:
+                    if (value) {
+                        quit = true;
+                    }
+                    break;
+                case RP2040_INPUT_BUTTON_ACCEPT:
+                case RP2040_INPUT_JOYSTICK_PRESS:
+                case RP2040_INPUT_BUTTON_SELECT:
+                case RP2040_INPUT_BUTTON_START:
+                    if (value) {
+                        void load_app(app);
+                        quit = true;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (quit) {
+            break;
+        }
+    }
+
+    //pax_buf_destroy(&icon_apps);
+
 }
 
 // Category menu
@@ -68,7 +124,7 @@ static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     hatchery_server_t server;
-    server.url = "https://hatchery.badge.team/basket/sha2017/categories/json";
+    server.url = "https://hatchery.badge.team/api/mch2022";
     server.app_types = NULL;
     menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, &server);
     hatchery_app_type_free(server.app_types);

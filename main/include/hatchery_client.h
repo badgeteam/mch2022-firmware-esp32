@@ -45,8 +45,7 @@ typedef struct hatchery_file_t hatchery_file_t;
 struct hatchery_file_t {
     char *name;
     char *url;
-    int size;
-    hatchery_category_t *category;
+    int size; // -1: Unknown
     hatchery_file_t *next;
 };
 
@@ -57,6 +56,7 @@ struct hatchery_app_t {
     char *license;
     char *description;
     hatchery_file_t *files;
+    hatchery_category_t *category;
     hatchery_app_t *next;
 };
 
