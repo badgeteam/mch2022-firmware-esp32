@@ -40,6 +40,8 @@ typedef enum action {
     ACTION_SCAN,
     // Manually edit the current WiFi settings.
     ACTION_MANUAL,
+    // Reset WiFi settings to default.
+    ACTION_DEFAULTS,
     
     /* ==== AUTH MODES ==== */
     ACTION_AUTH_OPEN,
@@ -78,6 +80,7 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     menu_insert_item(menu, "Show current settings", NULL, (void*) ACTION_SHOW, -1);
     menu_insert_item(menu, "Scan for networks", NULL, (void*) ACTION_SCAN, -1);
     menu_insert_item(menu, "Configure manually", NULL, (void*) ACTION_MANUAL, -1);
+    menu_insert_item(menu, "Reset to default settings", NULL, (void*) ACTION_DEFAULTS, -1);
 
     bool render = true;
     menu_wifi_action_t action = ACTION_NONE;
@@ -129,11 +132,19 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 
         if (action != ACTION_NONE) {
             if (action == ACTION_SHOW) {
+                // Show the current WiFi settings.
                 wifi_show(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SCAN) {
+                // Set network by scanning for it.
                 wifi_setup(buttonQueue, pax_buffer, ili9341, true);
             } else if (action == ACTION_MANUAL) {
+                // Set network manually.
                 wifi_setup(buttonQueue, pax_buffer, ili9341, false);
+            } else if (action == ACTION_DEFAULTS) {
+                // Set network to default settings.
+                wifi_set_defaults();
+                display_boot_screen(pax_buffer, ili9341, "WiFi reset to default!");
+                vTaskDelay(pdMS_TO_TICKS(750));
             } else if (action == ACTION_BACK) {
                 break;
             }
