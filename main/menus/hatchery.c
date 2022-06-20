@@ -13,6 +13,7 @@
 #include "menu.h"
 #include "rp2040.h"
 #include "hatchery_client.h"
+#include "appfs_wrapper.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -34,10 +35,6 @@ static void fill_menu_items_apps(menu_t *menu, void *context) {
     }
 }
 
-static void load_app(hatchery_app_t *app) {
-    // Load the app
-}
-
 static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, void *args) {
     hatchery_app_t *app = (hatchery_app_t*)args;
 
@@ -45,11 +42,38 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
         hatchery_query_app(app);
     }
 
+    const pax_font_t *font = pax_get_font("saira regular");
+
+    float entry_height = 34;
+    float text_height = 18;
+    float text_offset = ((entry_height - text_height) / 2) + 1;
+
+    pax_buf_t icon_apps;
+    pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
+
     // Show information about app and give user option to install app
     pax_background(pax_buffer, 0xFFFFFF);
+
     pax_noclip(pax_buffer);
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 5, 240 - 18, "[A] Install [B] Back");
+
+    pax_simple_rect(pax_buffer, 0xFF491d88, 0, 0, 320, entry_height);
+    pax_clip(pax_buffer, 1, text_offset, 320 - 2, text_height);
+    pax_draw_text(pax_buffer, 0xFFfa448c, font, text_height, icon_apps.width + 1, text_offset, "Hatchery");
+    pax_noclip(pax_buffer);
+    pax_draw_image(pax_buffer, &icon_apps, 0, 0);
+    pax_noclip(pax_buffer);
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 40, app->name);
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 60, app->author);
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 80, app->license);
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 100, app->description);
+    char buffer[21];
+    snprintf(buffer, 20, "version %d", 1);
+    buffer[20] = '\0';
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 120, buffer);
     ili9341_write(ili9341, pax_buffer->buf);
 
+    bool load_app = false;
     bool quit = false;
 
     while (1) {
@@ -72,8 +96,7 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
                 case RP2040_INPUT_BUTTON_SELECT:
                 case RP2040_INPUT_BUTTON_START:
                     if (value) {
-                        void load_app(app);
-                        quit = true;
+                        load_app = true;
                     }
                     break;
                 default:
@@ -81,6 +104,22 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341
             }
         }
 
+        if (load_app) {
+            if (app->files == NULL) {
+                return;
+            }
+            
+            hatchery_query_file(app, app->files);
+
+            if (app->files->contents != NULL) {
+                appfs_store_in_memory_app(pax_buffer, ili9341, app->slug, app->name, app->version, app->files->size, app->files->contents);
+            }
+
+            free(app->files->contents);
+            app->files->contents = NULL;
+
+            break;
+        }
         if (quit) {
             break;
         }
@@ -124,7 +163,8 @@ static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     hatchery_server_t server;
-    server.url = "https://hatchery.badge.team/api/mch2022";
+    //server.url = "https://hatchery.badge.team/api/mch2022";
+    server.url = "http://www.iwriteiam.nl/mch2022";
     server.app_types = NULL;
     menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, &server);
     hatchery_app_type_free(server.app_types);

@@ -365,17 +365,6 @@ esp_err_t hatchery_query_app_types(hatchery_server_t *server) {
         return ESP_OK;
     }
 
-    hatchery_app_type_t *app_type = new_app_type(server);
-    if (app_type != NULL) {
-        app_type->name = (char*)malloc(sizeof(char)*4);
-        strcpy(app_type->name, "App");
-        app_type->slug = (char*)malloc(sizeof(char)*4);
-        strcpy(app_type->slug, "app");
-        server->app_types = app_type;
-    }
-
-    return ESP_OK;
-
     process_app_types_t process_app_types_data;
     process_app_types_data.cl = 0;
     process_app_types_data.server = server;
@@ -391,6 +380,7 @@ esp_err_t hatchery_query_app_types(hatchery_server_t *server) {
     char url[MAX_URL_LEN+1];
     snprintf(url, MAX_URL_LEN, "%s/types", server->url);
     url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_app_types %s", url);
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
@@ -510,8 +500,8 @@ esp_err_t hatchery_query_categories(hatchery_app_type_t *app_type) {
     char url[MAX_URL_LEN+1];
     snprintf(url, MAX_URL_LEN, "%s/%s/categories", app_type->server->url, app_type->slug);
     url[MAX_URL_LEN] = '\0';
-    const char *urltest = app_type->server->url;
-    esp_err_t result = hatchery_http_get(urltest, &data_callback);
+    ESP_LOGI(TAG, "query_categories %s", url);
+    esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
 
@@ -547,6 +537,7 @@ static hatchery_app_t *new_app(hatchery_category_t *category) {
         app->author = NULL;
         app->license = NULL;
         app->description = NULL;
+        app->version = 0;
         app->files = NULL;
         app->category = category;
         app->next = NULL;
@@ -612,6 +603,15 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                             NEXT
                         }
                     }
+                    else if (string_appender_compare(&parser->string_appender, "version") == 0) {
+                        NEXT
+                        if (state == json_cb_int) {
+                            if ((*process_apps->cur) != NULL) {
+                                (*process_apps->cur)->version = parser->int_value;
+                            }
+                            NEXT
+                        }
+                    }
                 }
                 if (state == json_cb_close_object) {
                     if ((*process_apps->cur) != NULL) {
@@ -651,6 +651,7 @@ esp_err_t hatchery_query_apps(hatchery_category_t *category) {
     char url[MAX_URL_LEN+1];
     snprintf(url, MAX_URL_LEN, "%s/%s/%s/apps", app_type->server->url, app_type->slug, category->slug);
     url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_apps %s", url);
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
@@ -752,6 +753,13 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                         NEXT
                     }
                 }
+                else if (string_appender_compare(&parser->string_appender, "version") == 0) {
+                    NEXT
+                    if (state == json_cb_int) {
+                        process_app->app->version = parser->int_value;
+                        NEXT
+                    }
+                }
                 else if (string_appender_compare(&parser->string_appender, "files") == 0) {
                     NEXT
                     if (state == json_cb_open_array) {
@@ -832,6 +840,7 @@ esp_err_t hatchery_query_app(hatchery_app_t *app) {
     char url[MAX_URL_LEN+1];
     snprintf(url, MAX_URL_LEN, "%s/%s/%s/%s", app_type->server->url, app_type->slug, category->slug, app->slug);
     url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_app %s", url);
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
@@ -882,6 +891,7 @@ esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file) {
     data_callback.data = &process_file_data;
     data_callback.fn = file_data_cb_process;
 
+    ESP_LOGI(TAG, "query_file %s %d", file->url, file->size);
     esp_err_t result = hatchery_http_get(file->url, &data_callback);
 
     if (file->contents != NULL || process_file_data.loaded != file->size) {
