@@ -26,7 +26,7 @@ esp_err_t appfs_init(void) {
     return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE);
 }
 
-uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
+static uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
     fseek(fd, 0, SEEK_END);
     *fsize = ftell(fd);
     fseek(fd, 0, SEEK_SET);
@@ -48,7 +48,7 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, const char* name, const char* title, uint16_t version) {
+void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
     esp_err_t res;
     appfs_handle_t handle;
@@ -61,6 +61,7 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, char* path, const 
     }
     size_t app_size;
     uint8_t* app = load_file_to_ram(app_fd, &app_size);
+    fclose(app_fd);
     if (app == NULL) {
         display_boot_screen(pax_buffer, ili9341, "Failed to load app to RAM");
         ESP_LOGE(TAG, "Failed to load application into RAM");
