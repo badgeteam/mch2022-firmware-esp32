@@ -255,6 +255,39 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
     return true;
 }
 
+bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341, bool enable_uart) {
+    while (true) {
+        bool work_done = false;
+
+        if (enable_uart) {
+            if (fpga_uart_sync()) {
+                return true;
+            }
+        }
+        
+        esp_err_t res;
+
+        work_done |= fpga_btn_forward_events(ice40, buttonQueue, &res);
+        if (res != ESP_OK) {
+            ice40_disable(ice40);
+            ili9341_init(ili9341);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nBTN error: %d", res);
+            if (enable_uart) fpga_uart_mess("processing buttons events failed with %d\n", res);
+            return false;
+        }
+
+        fpga_req_process(ice40, work_done ? 0 : (50 / portTICK_PERIOD_MS), &res);
+        if (res != ESP_OK) {
+            ice40_disable(ice40);
+            ili9341_init(ili9341);
+            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
+                "FPGA download mode\nREQ error: %d", res);
+            if (enable_uart) fpga_uart_mess("processing fpga requests failed with %d\n", res);
+            return false;
+        }
+    }
+}
 
 void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF,
@@ -291,34 +324,8 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
             goto error;
 
         // Waiting for next download and sending key strokes to FPGA
-        while (true) {
-            esp_err_t res;
-            bool work_done = false;
-
-            if (fpga_uart_sync()) {
-                break;
-            }
-
-            work_done |= fpga_btn_forward_events(ice40, buttonQueue, &res);
-            if (res != ESP_OK) {
-                ice40_disable(ice40);
-                ili9341_init(ili9341);
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                    "FPGA download mode\nBTN error: %d", res);
-                fpga_uart_mess("processing buttons events failed with %d\n", res);
-                goto error;
-            }
-
-            fpga_req_process(ice40, work_done ? 0 : (50 / portTICK_PERIOD_MS), &res);
-            if (res != ESP_OK) {
-                ice40_disable(ice40);
-                ili9341_init(ili9341);
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF,
-                    "FPGA download mode\nREQ error: %d", res);
-                fpga_uart_mess("processing fpga requests failed with %d\n", res);
-                goto error;
-            }
-        }
+        bool uart_triggered = fpga_host(buttonQueue, ice40, pax_buffer, ili9341, true);
+        if (!uart_triggered) goto error;
         ice40_disable(ice40);
         ili9341_init(ili9341);
     }
