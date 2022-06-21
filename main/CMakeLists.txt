@@ -33,12 +33,10 @@ idf_component_register(
                  "include"
                  "menus"
     EMBED_TXTFILES ${project_dir}/resources/isrgrootx1.pem
-    EMBED_FILES ${project_dir}/resources/wallpaper.png
-                ${project_dir}/resources/fpga_selftest.bin
+    EMBED_FILES ${project_dir}/resources/fpga_selftest.bin
                 ${project_dir}/resources/rp2040_firmware.bin
                 ${project_dir}/resources/boot.snd
                 ${project_dir}/resources/mch2022_logo.png
-                ${project_dir}/resources/logo_screen.png
                 ${project_dir}/resources/icons/dev.png
                 ${project_dir}/resources/icons/home.png
                 ${project_dir}/resources/icons/settings.png
