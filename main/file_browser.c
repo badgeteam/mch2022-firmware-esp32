@@ -19,6 +19,7 @@
 #include "fpga_download.h"
 #include "ice40.h"
 #include "hardware.h"
+#include "fpga_util.h"
 
 static const char *TAG = "file browser";
 
@@ -208,7 +209,9 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
             free(bitstream);
             fclose(fd);
             if (res == ESP_OK) {
+                fpga_irq_setup(ice40);
                 fpga_host(buttonQueue, ice40, pax_buffer, ili9341, false);
+                fpga_irq_cleanup(ice40);
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
             } else {
