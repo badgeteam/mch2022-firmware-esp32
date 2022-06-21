@@ -4,7 +4,7 @@ IDF_PATH ?= $(shell pwd)/esp-idf
 IDF_EXPORT_QUIET ?= 0
 SHELL := /usr/bin/env bash
 
-.PHONY: prepare clean build flash erase monitor menuconfig image qemu install size size-components size-files
+.PHONY: prepare clean build flash erase monitor menuconfig image qemu install size size-components size-files format
 
 all: prepare build flash
 
@@ -49,3 +49,6 @@ size-components:
 
 size-files:
 	source "$(IDF_PATH)/export.sh" && idf.py size-files
+
+format:
+	find main/ -iname '*.h' -o -iname '*.cpp' | xargs clang-format -i
