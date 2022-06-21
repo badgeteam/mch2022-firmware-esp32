@@ -20,7 +20,6 @@
 #include "hardware.h"
 #include "file_browser.h"
 #include "fpga_test.h"
-#include "animation.h"
 #include "button_test.h"
 #include "adc_test.h"
 #include "sao.h"
@@ -35,7 +34,6 @@ typedef enum action {
     ACTION_FPGA_TEST,
     ACTION_FILE_BROWSER,
     ACTION_FILE_BROWSER_INT,
-    ACTION_ANIMATION,
     ACTION_BUTTON_TEST,
     ACTION_ADC_TEST,
     ACTION_SAO
@@ -70,7 +68,6 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
     menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
-    menu_insert_item(menu, "Animation", NULL, (void*) ACTION_ANIMATION, -1);
     menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
     menu_insert_item(menu, "Analog inputs", NULL, (void*) ACTION_ADC_TEST, -1);
     menu_insert_item(menu, "SAO", NULL, (void*) ACTION_SAO, -1);
@@ -132,8 +129,6 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
                 file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
             } else if (action == ACTION_FILE_BROWSER_INT) {
                 file_browser(buttonQueue, pax_buffer, ili9341, "/internal");
-            } else if (action == ACTION_ANIMATION) {
-                display_animation(pax_buffer, ili9341);
             } else if (action == ACTION_BUTTON_TEST) {
                 test_buttons(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_ADC_TEST) {
