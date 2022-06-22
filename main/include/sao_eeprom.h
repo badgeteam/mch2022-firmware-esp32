@@ -1,5 +1,8 @@
 #pragma once
 
+#include <esp_system.h>
+#include <stdint.h>
+
 typedef enum _sao_type { SAO_UNFORMATTED, SAO_BINARY, SAO_JSON } sao_type_t;
 
 typedef struct _SAO {

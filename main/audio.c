@@ -1,5 +1,6 @@
 #include "audio.h"
 
+#include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <stdio.h>
 #include <string.h>
@@ -7,7 +8,6 @@
 #include "driver/i2s.h"
 #include "driver/rtc_io.h"
 #include "esp_system.h"
-#include "freertos/FreeRTOS.h"
 
 void _audio_init(int i2s_num) {
     i2s_config_t i2s_config = {.mode                 = I2S_MODE_MASTER | I2S_MODE_TX,

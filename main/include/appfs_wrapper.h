@@ -11,6 +11,8 @@
 #include <string.h>
 
 #include "appfs.h"
+#include "ili9341.h"
+#include "pax_gfx.h"
 
 esp_err_t appfs_init(void);
 void      appfs_boot_app(int fd);
