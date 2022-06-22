@@ -1,42 +1,36 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
+#include "sao.h"
+
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "appfs.h"
 #include "ili9341.h"
-#include "pax_gfx.h"
-#include "pax_codecs.h"
-#include "menu.h"
-#include "rp2040.h"
 #include "launcher.h"
-#include "settings.h"
-#include "sao.h"
+#include "menu.h"
+#include "pax_codecs.h"
+#include "pax_gfx.h"
+#include "rp2040.h"
 #include "sao_eeprom.h"
+#include "settings.h"
 
-static uint8_t testdata[] = {
-    0x4c, 0x49, 0x46, 0x45, 0x10, 0x0a, 0x04, 0x00,  0x4d, 0x79, 0x20, 0x61, 0x6d, 0x61, 0x7a, 0x69,
-    0x6e, 0x67, 0x20, 0x61, 0x64, 0x64, 0x6f, 0x6e,  0x61, 0x6d, 0x61, 0x7a, 0x69, 0x6e, 0x67, 0x2e,
-    0x70, 0x79, 0x01, 0xff, 0xff, 0xff};
+static uint8_t testdata[] = {0x4c, 0x49, 0x46, 0x45, 0x10, 0x0a, 0x04, 0x00, 0x4d, 0x79, 0x20, 0x61, 0x6d, 0x61, 0x7a, 0x69, 0x6e, 0x67, 0x20,
+                             0x61, 0x64, 0x64, 0x6f, 0x6e, 0x61, 0x6d, 0x61, 0x7a, 0x69, 0x6e, 0x67, 0x2e, 0x70, 0x79, 0x01, 0xff, 0xff, 0xff};
 
-static uint8_t cloud[] = {
-    0x4c, 0x49, 0x46, 0x45, 0x05, 0x08, 0x04, 0x00,  0x63, 0x6C, 0x6F, 0x75, 0x64, 0x68, 0x61, 0x74,
-    0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08,  0x07
-};
+static uint8_t cloud[] = {0x4c, 0x49, 0x46, 0x45, 0x05, 0x08, 0x04, 0x00, 0x63, 0x6C, 0x6F, 0x75, 0x64,
+                          0x68, 0x61, 0x74, 0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08, 0x07};
 
-static uint8_t cassette[] = {
-    0x4c, 0x49, 0x46, 0x45, 0x08, 0x08, 0x04, 0x00,  0x63, 0x61, 0x73, 0x73, 0x65, 0x74, 0x74, 0x65,
-    0x68, 0x61, 0x74, 0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08,  0x07
-};
+static uint8_t cassette[] = {0x4c, 0x49, 0x46, 0x45, 0x08, 0x08, 0x04, 0x00, 0x63, 0x61, 0x73, 0x73, 0x65, 0x74,
+                             0x74, 0x65, 0x68, 0x61, 0x74, 0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08, 0x07};
 
-static uint8_t diskette[] = {
-    0x4c, 0x49, 0x46, 0x45, 0x08, 0x08, 0x04, 0x00,  0x64, 0x69, 0x73, 0x6B, 0x65, 0x74, 0x74, 0x65,
-    0x68, 0x61, 0x74, 0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08,  0x07
-};
+static uint8_t diskette[] = {0x4c, 0x49, 0x46, 0x45, 0x08, 0x08, 0x04, 0x00, 0x64, 0x69, 0x73, 0x6B, 0x65, 0x74,
+                             0x74, 0x65, 0x68, 0x61, 0x74, 0x63, 0x68, 0x65, 0x72, 0x79, 0x00, 0x50, 0x08, 0x07};
 
 static void program_sao(uint8_t type) {
     switch (type) {
@@ -56,12 +50,16 @@ static void program_sao(uint8_t type) {
 }
 
 static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     char buffer[64];
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 0, "SAO information");
-    snprintf(buffer, sizeof(buffer), "Type: %s", (sao->type == SAO_BINARY) ? "binary data" : (sao->type == SAO_JSON) ? "json data" : (sao->type == SAO_UNFORMATTED) ? "unformatted" : "unknown");
+    snprintf(buffer, sizeof(buffer), "Type: %s",
+             (sao->type == SAO_BINARY)        ? "binary data"
+             : (sao->type == SAO_JSON)        ? "json data"
+             : (sao->type == SAO_UNFORMATTED) ? "unformatted"
+                                              : "unknown");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 20, buffer);
     snprintf(buffer, sizeof(buffer), "Name: %s", (sao->name != NULL) ? sao->name : "----");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, buffer);
@@ -78,7 +76,7 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
 }
 
 static void render_sao_not_detected(pax_buf_t* pax_buffer) {
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFAAAA);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 0, "No SAO detected");
@@ -90,9 +88,9 @@ void menu_sao(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     while (!exit) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 200 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.input;
-            bool value = buttonMessage.state;
-            switch(pin) {
+            uint8_t pin   = buttonMessage.input;
+            bool    value = buttonMessage.state;
+            switch (pin) {
                 case RP2040_INPUT_JOYSTICK_LEFT:
                     if (value) {
                         program_sao(0);

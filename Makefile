@@ -51,4 +51,4 @@ size-files:
 	source "$(IDF_PATH)/export.sh" && idf.py size-files
 
 format:
-	find main/ -iname '*.h' -o -iname '*.cpp' | xargs clang-format -i
+	find main/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' | xargs clang-format -i

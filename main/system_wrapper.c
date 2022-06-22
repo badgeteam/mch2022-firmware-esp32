@@ -1,10 +1,11 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
+#include "system_wrapper.h"
+
 #include <esp_system.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include "system_wrapper.h"
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
 
 void restart() {
     /*for (int i = 3; i >= 0; i--) {

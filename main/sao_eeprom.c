@@ -1,34 +1,33 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
+#include "sao_eeprom.h"
+
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "eeprom.h"
-#include "sao_eeprom.h"
 
-static const char *TAG = "SAO";
+static const char* TAG = "SAO";
 
-EEPROM sao_eeprom = {
-    .i2c_bus = 0,
-    .i2c_address = 0x50
-};
+EEPROM sao_eeprom = {.i2c_bus = 0, .i2c_address = 0x50};
 
 SAO* sao_identify() {
-    SAO* sao = NULL;
+    SAO*    sao = NULL;
     uint8_t header[8];
     if (eeprom_read(&sao_eeprom, 0, header, sizeof(header)) != ESP_OK) {
         return NULL;
     }
     if (memcmp(header, "LIFE", 4) == 0) {
         // https://badge.a-combinator.com/addons/addon-id/
-        uint8_t name_length = header[4];
-        uint8_t driver_length = header[5];
+        uint8_t name_length        = header[4];
+        uint8_t driver_length      = header[5];
         uint8_t driver_data_length = header[6];
-        size_t total_length = name_length + driver_length + driver_data_length;
+        size_t  total_length       = name_length + driver_length + driver_data_length;
 
         uint8_t* buffer = malloc(total_length);
-        sao = malloc(sizeof(SAO));
+        sao             = malloc(sizeof(SAO));
 
         if ((buffer == NULL) || (sao == NULL)) {
             if (buffer != NULL) free(buffer);
@@ -44,10 +43,10 @@ SAO* sao_identify() {
 
         memset(sao, 0, sizeof(SAO));
         sao->driver_data_length = driver_data_length;
-        sao->type = SAO_BINARY;
-        sao->name = malloc(name_length+1); // +1 for string terminator
-        sao->driver = malloc(driver_length+1); // +1 for string terminator
-        sao->driver_data = malloc(driver_data_length);
+        sao->type               = SAO_BINARY;
+        sao->name               = malloc(name_length + 1);    // +1 for string terminator
+        sao->driver             = malloc(driver_length + 1);  // +1 for string terminator
+        sao->driver_data        = malloc(driver_data_length);
 
         if ((sao->name == NULL) || (sao->driver == NULL) || (sao->driver_data == NULL)) {
             free(buffer);
@@ -65,10 +64,9 @@ SAO* sao_identify() {
         memcpy(sao->driver_data, &buffer[name_length + driver_length], driver_data_length);
         free(buffer);
 
-        /*ESP_LOGI(TAG, "SAO with binary descriptor detected: \"%s\", driver: \"%s\", containing %u bytes of driver data", sao->name, sao->driver, sao->driver_data_length);
-        printf("SAO driver data: ");
-        for (size_t index = 0; index < driver_data_length; index++) {
-            printf("%02X ", sao->driver_data[index]);
+        /*ESP_LOGI(TAG, "SAO with binary descriptor detected: \"%s\", driver: \"%s\", containing %u bytes of driver data", sao->name, sao->driver,
+        sao->driver_data_length); printf("SAO driver data: "); for (size_t index = 0; index < driver_data_length; index++) { printf("%02X ",
+        sao->driver_data[index]);
         }
         printf("\n");*/
     } else if (memcmp(header, "JSON", 4) == 0) {
@@ -100,6 +98,4 @@ esp_err_t sao_free(SAO* sao) {
     return ESP_OK;
 }
 
-esp_err_t sao_write_raw(size_t offset, uint8_t* buffer, size_t buffer_length) {
-    return eeprom_write(&sao_eeprom, offset, buffer, buffer_length);
-}
+esp_err_t sao_write_raw(size_t offset, uint8_t* buffer, size_t buffer_length) { return eeprom_write(&sao_eeprom, offset, buffer, buffer_length); }
