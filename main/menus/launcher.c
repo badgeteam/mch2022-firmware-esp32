@@ -1,37 +1,34 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "appfs.h"
-#include "ili9341.h"
-#include "pax_gfx.h"
-#include "pax_codecs.h"
-#include "menu.h"
-#include "rp2040.h"
 #include "appfs_wrapper.h"
+#include "ili9341.h"
+#include "menu.h"
+#include "pax_codecs.h"
+#include "pax_gfx.h"
+#include "rp2040.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
-typedef enum {
-    ACTION_NONE,
-    ACTION_APPFS,
-    ACTION_BACK
-} menu_launcher_action_t;
+typedef enum { ACTION_NONE, ACTION_APPFS, ACTION_BACK } menu_launcher_action_t;
 
 typedef struct {
-    appfs_handle_t fd;
+    appfs_handle_t         fd;
     menu_launcher_action_t action;
 } menu_launcher_args_t;
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     menu_t* menu = menu_alloc("Apps", 34, 18);
-    
+
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
@@ -41,25 +38,25 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu->titleBgColor      = 0xFF491d88;
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
-     
+
     pax_buf_t icon_apps;
     pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
-    
+
     menu_set_icon(menu, &icon_apps);
-    
-    const pax_font_t *font = pax_get_font("saira regular");
-    
+
+    const pax_font_t* font = pax_get_font("saira regular");
+
     appfs_handle_t appfs_fd = APPFS_INVALID_FD;
     while (1) {
         appfs_fd = appfsNextEntry(appfs_fd);
         if (appfs_fd == APPFS_INVALID_FD) break;
-        const char* name = NULL;
-        const char* title = NULL;
-        uint16_t version = 0xFFFF;
+        const char* name    = NULL;
+        const char* title   = NULL;
+        uint16_t    version = 0xFFFF;
         appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
         menu_launcher_args_t* args = malloc(sizeof(menu_launcher_args_t));
-        args->fd = appfs_fd;
-        args->action = ACTION_APPFS;
+        args->fd                   = appfs_fd;
+        args->action               = ACTION_APPFS;
 
         char label[64];
         if (version < 0xFFFF) {
@@ -71,9 +68,9 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         menu_insert_item(menu, label, NULL, (void*) args, -1);
     }
 
-    bool render = true;
+    bool                  render   = true;
     menu_launcher_args_t* menuArgs = NULL;
-    
+
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start app  [B] back");
@@ -83,9 +80,9 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.input;
-            bool value = buttonMessage.state;
-            switch(pin) {
+            uint8_t pin   = buttonMessage.input;
+            bool    value = buttonMessage.state;
+            switch (pin) {
                 case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);
@@ -129,7 +126,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
             }
             break;
         }
-        
+
         if (quit) {
             break;
         }

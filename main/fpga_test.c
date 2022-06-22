@@ -1,39 +1,40 @@
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
+#include "fpga_test.h"
+
+#include <driver/gpio.h>
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <driver/gpio.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "hardware.h"
-#include "ili9341.h"
 #include "ice40.h"
-#include "rp2040.h"
-#include "fpga_test.h"
+#include "ili9341.h"
 #include "pax_gfx.h"
+#include "rp2040.h"
 #include "test_common.h"
 
 extern const uint8_t fpga_selftest_bin_start[] asm("_binary_fpga_selftest_bin_start");
 extern const uint8_t fpga_selftest_bin_end[] asm("_binary_fpga_selftest_bin_end");
 
-
-static const char *TAG = "fpga_test";
+static const char* TAG = "fpga_test";
 
 /* SPI commands */
-#define SPI_CMD_NOP1                0x00
-#define SPI_CMD_SOC_MSG             0x10
-#define SPI_CMD_REG_ACCESS          0xf0
-#define SPI_CMD_LOOPBACK            0xf1
-#define SPI_CMD_LCD_PASSTHROUGH     0xf2
-#define SPI_CMD_BUTTON_REPORT       0xf4
-#define SPI_CMD_IRQ_ACK             0xfd
-#define SPI_CMD_RESP_ACK            0xfe
-#define SPI_CMD_NOP2                0xff
+#define SPI_CMD_NOP1            0x00
+#define SPI_CMD_SOC_MSG         0x10
+#define SPI_CMD_REG_ACCESS      0xf0
+#define SPI_CMD_LOOPBACK        0xf1
+#define SPI_CMD_LCD_PASSTHROUGH 0xf2
+#define SPI_CMD_BUTTON_REPORT   0xf4
+#define SPI_CMD_IRQ_ACK         0xfd
+#define SPI_CMD_RESP_ACK        0xfe
+#define SPI_CMD_NOP2            0xff
 
 /* Messages to self-test SoC */
-#define SOC_CMD_PING                0x00
-#define SOC_CMD_PING_PARAM          0xc0ffee
-#define SOC_CMD_PING_RESP           0xcafebabe
+#define SOC_CMD_PING       0x00
+#define SOC_CMD_PING_PARAM 0xc0ffee
+#define SOC_CMD_PING_RESP  0xcafebabe
 
 #define SOC_CMD_RGB_STATE_SET       0x10
 #define SOC_CMD_IRQN_SET            0x11
@@ -41,35 +42,33 @@ static const char *TAG = "fpga_test";
 #define SOC_CMD_PMOD_CYCLE_SET      0x13
 #define SOC_CMD_LCD_PASSTHROUGH_SET 0x14
 
-#define SOC_CMD_PSRAM_TEST          0x20
-#define SOC_CMD_UART_LOOPBACK_TEST  0x21
-#define SOC_CMD_PMOD_OPEN_TEST      0x22
-#define SOC_CMD_PMOD_PLUG_TEST      0x23
-#define SOC_CMD_LCD_INIT_TEST       0x24
+#define SOC_CMD_PSRAM_TEST         0x20
+#define SOC_CMD_UART_LOOPBACK_TEST 0x21
+#define SOC_CMD_PMOD_OPEN_TEST     0x22
+#define SOC_CMD_PMOD_PLUG_TEST     0x23
+#define SOC_CMD_LCD_INIT_TEST      0x24
 
-#define SOC_CMD_LCD_CHECK_MODE      0x30
+#define SOC_CMD_LCD_CHECK_MODE 0x30
 
-#define SOC_RESP_OK                 0x00000000
-
+#define SOC_RESP_OK 0x00000000
 
 /* SoC commands */
 
-static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t *resp, TickType_t ticks_to_wait) {
+static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t* resp, TickType_t ticks_to_wait) {
     esp_err_t res;
-    uint8_t data_tx[6];
-    uint8_t data_rx[6];
+    uint8_t   data_tx[6];
+    uint8_t   data_rx[6];
 
     /* Default delay */
-    ticks_to_wait /= 10;    /* We do 10 retries */
-    if (!ticks_to_wait)
-        ticks_to_wait = pdMS_TO_TICKS(50);
+    ticks_to_wait /= 10; /* We do 10 retries */
+    if (!ticks_to_wait) ticks_to_wait = pdMS_TO_TICKS(50);
 
     /* Prepare message */
     data_tx[0] = SPI_CMD_SOC_MSG;
     data_tx[1] = cmd;
     data_tx[2] = (param >> 16) & 0xff;
-    data_tx[3] = (param >>  8) & 0xff;
-    data_tx[4] = (param      ) & 0xff;
+    data_tx[3] = (param >> 8) & 0xff;
+    data_tx[4] = (param) &0xff;
 
     /* Send message to PicoRV */
     res = ice40_send_turbo(ice40, data_tx, 5);
@@ -81,7 +80,7 @@ static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t *res
     /* Poll until we get a response */
     data_tx[0] = SPI_CMD_RESP_ACK;
 
-    for (int i=0; i<10; i++) {
+    for (int i = 0; i < 10; i++) {
         /* Poll */
         res = ice40_transaction(ice40, data_tx, 6, data_rx, 6);
         if (res != ESP_OK) {
@@ -90,8 +89,7 @@ static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t *res
         }
 
         /* Was response valid ? */
-        if (data_rx[1] & 0x80)
-            break;
+        if (data_rx[1] & 0x80) break;
 
         /* Wait before retry */
         vTaskDelay(ticks_to_wait);
@@ -105,18 +103,16 @@ static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t *res
     /* Report response */
     if (resp) {
         *resp = 0;
-        for (int i=0; i<4; i++)
-            *resp = (*resp << 8) | data_rx[2+i];
+        for (int i = 0; i < 4; i++) *resp = (*resp << 8) | data_rx[2 + i];
     }
 
     return true;
 }
 
-
 /* Test routines */
 
-static bool test_bitstream_load(uint32_t *rc) {
-    ICE40* ice40 = get_ice40();
+static bool test_bitstream_load(uint32_t* rc) {
+    ICE40*    ice40 = get_ice40();
     esp_err_t res;
 
     res = ice40_load_bitstream(ice40, fpga_selftest_bin_start, fpga_selftest_bin_end - fpga_selftest_bin_start);
@@ -131,13 +127,12 @@ static bool test_bitstream_load(uint32_t *rc) {
 
 static bool _test_spi_loopback_one(ICE40* ice40) {
     esp_err_t res;
-    uint8_t data_tx[257];
-    uint8_t data_rx[258];
+    uint8_t   data_tx[257];
+    uint8_t   data_rx[258];
 
     /* Generate pseudo random sequence */
     data_tx[1] = 1;
-    for (int i = 2; i < 257; i++)
-        data_tx[i] = (data_tx[i-1] << 1) ^ ((data_tx[i-1] & 0x80) ? 0x1d : 0x00);
+    for (int i = 2; i < 257; i++) data_tx[i] = (data_tx[i - 1] << 1) ^ ((data_tx[i - 1] & 0x80) ? 0x1d : 0x00);
 
     /* Send 256 bytes at high speed with echo command */
     data_tx[0] = SPI_CMD_LOOPBACK;
@@ -164,8 +159,7 @@ static bool _test_spi_loopback_one(ICE40* ice40) {
     /* Validate RX data (only 254 byte got read) */
     if (memcmp(&data_rx[2], &data_tx[1], 254)) {
         ESP_LOGE(TAG, "SPI loopback transaction 1->2 integrity fail:\n");
-        for (int i = 0; i < 254; i++)
-            printf("%02X%c", data_rx[i], ((i&0xf)==0xf) ? '\n' : ' ');
+        for (int i = 0; i < 254; i++) printf("%02X%c", data_rx[i], ((i & 0xf) == 0xf) ? '\n' : ' ');
         printf("\n");
         return false;
     }
@@ -196,9 +190,8 @@ static bool _test_spi_loopback_one(ICE40* ice40) {
 
         /* Validate RX data (only 254 byte got read) */
         if (memcmp(&data_rx[2], &data_tx[1], 254)) {
-            ESP_LOGE(TAG, "SPI loopback transaction %d->3.%d integrity fail:\n", 1+t, t);
-            for (int i = 0; i < 254; i++)
-                printf("%02X%c", data_rx[i], ((i&0xf)==0xf) ? '\n' : ' ');
+            ESP_LOGE(TAG, "SPI loopback transaction %d->3.%d integrity fail:\n", 1 + t, t);
+            for (int i = 0; i < 254; i++) printf("%02X%c", data_rx[i], ((i & 0xf) == 0xf) ? '\n' : ' ');
             printf("\n");
             return false;
         }
@@ -221,15 +214,14 @@ static bool _test_spi_loopback_one(ICE40* ice40) {
     return true;
 }
 
-static bool test_spi_loopback(uint32_t *rc) {
+static bool test_spi_loopback(uint32_t* rc) {
     int i;
-    
+
     ICE40* ice40 = get_ice40();
 
     /* Run test 256 times */
-    for (i=0; i<256; i++) {
-        if (!_test_spi_loopback_one(ice40))
-            break;
+    for (i = 0; i < 256; i++) {
+        if (!_test_spi_loopback_one(ice40)) break;
     }
 
     /* Failure ? */
@@ -243,7 +235,7 @@ static bool test_spi_loopback(uint32_t *rc) {
     return true;
 }
 
-static bool test_soc_loopback(uint32_t *rc) {
+static bool test_soc_loopback(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     /* Execute command */
@@ -253,15 +245,14 @@ static bool test_soc_loopback(uint32_t *rc) {
     }
 
     /* Check response */
-    if (*rc != SOC_CMD_PING_RESP)
-        return false;
+    if (*rc != SOC_CMD_PING_RESP) return false;
 
     /* Success */
     *rc = 0;
     return true;
 }
 
-static bool test_uart_loopback(uint32_t *rc) {
+static bool test_uart_loopback(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     /* Enable loopback mode of RP2040 */
@@ -281,7 +272,7 @@ static bool test_uart_loopback(uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_psram(uint32_t *rc) {
+static bool test_psram(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     /* Execute command */
@@ -294,7 +285,7 @@ static bool test_psram(uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_irq_n(uint32_t *rc) {
+static bool test_irq_n(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     esp_err_t res;
@@ -312,8 +303,7 @@ static bool test_irq_n(uint32_t *rc) {
         return false;
     }
 
-    if (*rc != SOC_RESP_OK)
-        return false;
+    if (*rc != SOC_RESP_OK) return false;
 
     /* Check level is 0 */
     if (gpio_get_level(ice40->pin_int) != 0) {
@@ -327,8 +317,7 @@ static bool test_irq_n(uint32_t *rc) {
         return false;
     }
 
-    if (*rc != SOC_RESP_OK)
-        return false;
+    if (*rc != SOC_RESP_OK) return false;
 
     /* Check level is 1 */
     if (gpio_get_level(ice40->pin_int) != 1) {
@@ -339,13 +328,13 @@ static bool test_irq_n(uint32_t *rc) {
     return true;
 }
 
-static bool test_lcd_mode(uint32_t *rc) {
-    ICE40* ice40 = get_ice40();
+static bool test_lcd_mode(uint32_t* rc) {
+    ICE40*    ice40 = get_ice40();
     esp_err_t res;
-    bool ok;
+    bool      ok;
 
     /* Defaults */
-    ok = true;
+    ok  = true;
     *rc = 0;
 
     /* Check state is 0 */
@@ -354,8 +343,7 @@ static bool test_lcd_mode(uint32_t *rc) {
         return false;
     }
 
-    if (*rc != SOC_RESP_OK)
-        return false;
+    if (*rc != SOC_RESP_OK) return false;
 
     /* Set LCD mode to 1 */
     res = gpio_set_level(GPIO_LCD_MODE, 1);
@@ -367,11 +355,10 @@ static bool test_lcd_mode(uint32_t *rc) {
     /* Check state is 1 */
     if (!soc_message(ice40, SOC_CMD_LCD_CHECK_MODE, 1, rc, 0)) {
         *rc = 17;
-        ok = false;
+        ok  = false;
     }
 
-    if (*rc != SOC_RESP_OK)
-        ok = false;
+    if (*rc != SOC_RESP_OK) ok = false;
 
     /* Set LCD mode back to 0 */
     res = gpio_set_level(GPIO_LCD_MODE, 0);
@@ -384,7 +371,7 @@ static bool test_lcd_mode(uint32_t *rc) {
     return ok;
 }
 
-static bool test_pmod_open(uint32_t *rc) {
+static bool test_pmod_open(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
     /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PMOD_OPEN_TEST, 0, rc, 0)) {
@@ -396,7 +383,7 @@ static bool test_pmod_open(uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_pmod_plug(uint32_t *rc) {
+static bool test_pmod_plug(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     /* Execute command */
@@ -409,7 +396,7 @@ static bool test_pmod_plug(uint32_t *rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_lcd_init(uint32_t *rc) {
+static bool test_lcd_init(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
     /* Execute command */
@@ -423,10 +410,10 @@ static bool test_lcd_init(uint32_t *rc) {
 }
 
 bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    ICE40* ice40 = get_ice40();
-    const pax_font_t *font;
-    int line = 0;
-    bool ok = true;
+    ICE40*            ice40 = get_ice40();
+    const pax_font_t* font;
+    int               line = 0;
+    bool              ok   = true;
 
     /* Screen init */
     font = pax_get_font("sky mono");
@@ -437,18 +424,18 @@ bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* il
 
     /* Run mandatory tests */
     RUN_TEST_MANDATORY("Bitstream load", test_bitstream_load);
-    RUN_TEST_MANDATORY("SPI loopback",   test_spi_loopback);
-    RUN_TEST_MANDATORY("SoC loopback",   test_soc_loopback);
+    RUN_TEST_MANDATORY("SPI loopback", test_spi_loopback);
+    RUN_TEST_MANDATORY("SoC loopback", test_soc_loopback);
 
     /* Set indicator to "in-progress" */
     soc_message(ice40, SOC_CMD_RGB_STATE_SET, 1, NULL, 0);
 
     /* Run non-interactive tests */
-    RUN_TEST("UART loopback",   test_uart_loopback);
-    RUN_TEST("PSRAM",           test_psram);
-    RUN_TEST("IRQ_n signal",    test_irq_n);
+    RUN_TEST("UART loopback", test_uart_loopback);
+    RUN_TEST("PSRAM", test_psram);
+    RUN_TEST("IRQ_n signal", test_irq_n);
     RUN_TEST("LCD_MODE signal", test_lcd_mode);
-    RUN_TEST("PMOD open",       test_pmod_open);
+    RUN_TEST("PMOD open", test_pmod_open);
 
     /* Show instructions for interactive test */
     /*pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+ 0, "Insert PMOD plug");
@@ -458,17 +445,17 @@ bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* il
     ili9341_write(ili9341, pax_buffer->buf);*/
 
     /* Wait for button */
-    //wait_button(buttonQueue);
+    // wait_button(buttonQueue);
 
     /* Clear the instructions from buffer */
-    //pax_draw_rect(pax_buffer, 0xff8060f0, 0, 20*line, 320, 240-20*line);
+    // pax_draw_rect(pax_buffer, 0xff8060f0, 0, 20*line, 320, 240-20*line);
 
     /* Handover LCD to FPGA */
     ili9341_deinit(ili9341);
 
     /* Run interactive tests */
-    //RUN_TEST("PMOD plug", test_pmod_plug);
-    RUN_TEST("LCD init",  test_lcd_init);
+    // RUN_TEST("PMOD plug", test_pmod_plug);
+    RUN_TEST("LCD init", test_lcd_init);
 
     /* Wait a second (for user to see color bars) */
     vTaskDelay(pdMS_TO_TICKS(1000));
@@ -491,9 +478,9 @@ error:
 
     /* Pass / Fail result on screen */
     if (ok)
-        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 0, 20*line, "PASS");
+        pax_draw_text(pax_buffer, 0xff00ff00, font, 36, 0, 20 * line, "PASS");
     else
-        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20*line, "FAIL");
+        pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20 * line, "FAIL");
 
     ili9341_write(ili9341, pax_buffer->buf);
 

@@ -1,43 +1,36 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "appfs.h"
-#include "ili9341.h"
-#include "pax_gfx.h"
-#include "pax_codecs.h"
-#include "menu.h"
-#include "rp2040.h"
 #include "appfs_wrapper.h"
-#include "hardware.h"
-#include "system_wrapper.h"
 #include "bootscreen.h"
+#include "hardware.h"
+#include "ili9341.h"
+#include "menu.h"
+#include "pax_codecs.h"
+#include "pax_gfx.h"
+#include "rp2040.h"
+#include "system_wrapper.h"
+#include "uninstall.h"
+#include "wifi.h"
 #include "wifi_connect.h"
 #include "wifi_ota.h"
-#include "wifi.h"
-#include "uninstall.h"
 #include "wifi_test.h"
 
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action {
-    ACTION_NONE,
-    ACTION_BACK,
-    ACTION_WIFI,
-    ACTION_OTA,
-    ACTION_RP2040_BL,
-    ACTION_UNINSTALL,
-    ACTION_WIFI_TEST
-} menu_settings_action_t;
+typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_RP2040_BL, ACTION_UNINSTALL, ACTION_WIFI_TEST } menu_settings_action_t;
 
 void render_settings_help(pax_buf_t* pax_buffer) {
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
@@ -55,19 +48,19 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu->titleBgColor      = 0xFF43b5a0;
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
-     
+
     pax_buf_t icon_settings;
     pax_decode_png_buf(&icon_settings, (void*) settings_png_start, settings_png_end - settings_png_start, PAX_BUF_32_8888ARGB, 0);
-    
+
     menu_set_icon(menu, &icon_settings);
-    
+
     menu_insert_item(menu, "WiFi configuration", NULL, (void*) ACTION_WIFI, -1);
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
     menu_insert_item(menu, "Uninstall app", NULL, (void*) ACTION_UNINSTALL, -1);
     menu_insert_item(menu, "Test WiFi connection", NULL, (void*) ACTION_WIFI_TEST, -1);
 
-    bool render = true;
+    bool                   render = true;
     menu_settings_action_t action = ACTION_NONE;
 
     render_settings_help(pax_buffer);
@@ -75,9 +68,9 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.input;
-            bool value = buttonMessage.state;
-            switch(pin) {
+            uint8_t pin   = buttonMessage.input;
+            bool    value = buttonMessage.state;
+            switch (pin) {
                 case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);

@@ -1,16 +1,17 @@
 #pragma once
 
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "appfs.h"
 
 esp_err_t appfs_init(void);
-void appfs_boot_app(int fd);
-void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version);
+void      appfs_boot_app(int fd);
+void      appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version);

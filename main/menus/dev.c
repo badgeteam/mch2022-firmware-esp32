@@ -1,29 +1,31 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
+#include "dev.h"
+
 #include <esp_err.h>
 #include <esp_log.h>
-#include "appfs.h"
-#include "ili9341.h"
-#include "pax_gfx.h"
-#include "pax_codecs.h"
-#include "menu.h"
-#include "rp2040.h"
-#include "launcher.h"
-#include "settings.h"
-#include "dev.h"
-#include "fpga_download.h"
-#include "hardware.h"
-#include "file_browser.h"
-#include "fpga_test.h"
-#include "button_test.h"
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "adc_test.h"
-#include "sao.h"
+#include "appfs.h"
+#include "button_test.h"
+#include "file_browser.h"
+#include "fpga_download.h"
+#include "fpga_test.h"
+#include "hardware.h"
+#include "ili9341.h"
 #include "ir.h"
+#include "launcher.h"
+#include "menu.h"
+#include "pax_codecs.h"
+#include "pax_gfx.h"
+#include "rp2040.h"
+#include "sao.h"
+#include "settings.h"
 
 extern const uint8_t dev_png_start[] asm("_binary_dev_png_start");
 extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
@@ -42,7 +44,7 @@ typedef enum action {
 } menu_dev_action_t;
 
 void render_dev_help(pax_buf_t* pax_buffer) {
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
@@ -50,7 +52,7 @@ void render_dev_help(pax_buf_t* pax_buffer) {
 
 void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     menu_t* menu = menu_alloc("Development tools", 34, 18);
-    
+
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFF000000;
@@ -60,12 +62,12 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu->titleBgColor      = 0xFFfa448c;
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
-     
+
     pax_buf_t icon_dev;
     pax_decode_png_buf(&icon_dev, (void*) dev_png_start, dev_png_end - dev_png_start, PAX_BUF_32_8888ARGB, 0);
-    
+
     menu_set_icon(menu, &icon_dev);
-    
+
     menu_insert_item(menu, "FPGA download mode", NULL, (void*) ACTION_FPGA_DL, -1);
     menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
@@ -75,17 +77,17 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "SAO", NULL, (void*) ACTION_SAO, -1);
     menu_insert_item(menu, "IR remote", NULL, (void*) ACTION_IR, -1);
 
-    bool render = true;
+    bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
-    
+
     render_dev_help(pax_buffer);
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin = buttonMessage.input;
-            bool value = buttonMessage.state;
-            switch(pin) {
+            uint8_t pin   = buttonMessage.input;
+            bool    value = buttonMessage.state;
+            switch (pin) {
                 case RP2040_INPUT_JOYSTICK_DOWN:
                     if (value) {
                         menu_navigate_next(menu);
@@ -150,6 +152,6 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     }
 
     menu_free(menu);
-    
+
     pax_buf_destroy(&icon_dev);
 }

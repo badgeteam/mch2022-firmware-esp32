@@ -1,30 +1,30 @@
-#include <stdio.h>
-#include <string.h>
-#include <sdkconfig.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
-#include <esp_system.h>
+#include "appfs_wrapper.h"
+
 #include <esp_err.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
+#include <stdio.h>
+#include <string.h>
+
 #include "appfs.h"
-#include "ili9341.h"
-#include "pax_gfx.h"
-#include "menu.h"
-#include "rp2040.h"
-#include "appfs_wrapper.h"
-#include "hardware.h"
-#include "system_wrapper.h"
 #include "bootscreen.h"
 #include "esp_sleep.h"
+#include "hardware.h"
+#include "ili9341.h"
+#include "menu.h"
+#include "pax_gfx.h"
+#include "rp2040.h"
 #include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
+#include "system_wrapper.h"
 
-static const char *TAG = "appfs wrapper";
+static const char* TAG = "appfs wrapper";
 
-esp_err_t appfs_init(void) {
-    return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE);
-}
+esp_err_t appfs_init(void) { return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE); }
 
 static uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
     fseek(fd, 0, SEEK_END);
@@ -37,12 +37,12 @@ static uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
 }
 
 void appfs_boot_app(int fd) {
-    if (fd<0 || fd>255) {
+    if (fd < 0 || fd > 255) {
         REG_WRITE(RTC_CNTL_STORE0_REG, 0);
     } else {
-        REG_WRITE(RTC_CNTL_STORE0_REG, 0xA5000000|fd);
+        REG_WRITE(RTC_CNTL_STORE0_REG, 0xA5000000 | fd);
     }
-    
+
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);
     esp_sleep_enable_timer_wakeup(10);
     esp_deep_sleep_start();
@@ -50,16 +50,16 @@ void appfs_boot_app(int fd) {
 
 void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
-    esp_err_t res;
+    esp_err_t      res;
     appfs_handle_t handle;
-    FILE* app_fd = fopen(path, "rb");
+    FILE*          app_fd = fopen(path, "rb");
     if (app_fd == NULL) {
         display_boot_screen(pax_buffer, ili9341, "Failed to open file");
         ESP_LOGE(TAG, "Failed to open file");
         vTaskDelay(100 / portTICK_PERIOD_MS);
         return;
     }
-    size_t app_size;
+    size_t   app_size;
     uint8_t* app = load_file_to_ram(app_fd, &app_size);
     fclose(app_fd);
     if (app == NULL) {
@@ -79,8 +79,8 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
         free(app);
         return;
     }
-    int roundedSize=(app_size+(SPI_FLASH_MMU_PAGE_SIZE-1))&(~(SPI_FLASH_MMU_PAGE_SIZE-1));
-    res = appfsErase(handle, 0, roundedSize);
+    int roundedSize = (app_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
+    res             = appfsErase(handle, 0, roundedSize);
     if (res != ESP_OK) {
         display_boot_screen(pax_buffer, ili9341, "Failed to erase file");
         ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
