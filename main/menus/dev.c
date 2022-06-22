@@ -23,6 +23,7 @@
 #include "button_test.h"
 #include "adc_test.h"
 #include "sao.h"
+#include "ir.h"
 
 extern const uint8_t dev_png_start[] asm("_binary_dev_png_start");
 extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
@@ -36,7 +37,8 @@ typedef enum action {
     ACTION_FILE_BROWSER_INT,
     ACTION_BUTTON_TEST,
     ACTION_ADC_TEST,
-    ACTION_SAO
+    ACTION_SAO,
+    ACTION_IR
 } menu_dev_action_t;
 
 void render_dev_help(pax_buf_t* pax_buffer) {
@@ -71,6 +73,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
     menu_insert_item(menu, "Analog inputs", NULL, (void*) ACTION_ADC_TEST, -1);
     menu_insert_item(menu, "SAO", NULL, (void*) ACTION_SAO, -1);
+    menu_insert_item(menu, "IR remote", NULL, (void*) ACTION_IR, -1);
 
     bool render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -135,6 +138,8 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
                 test_adc(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SAO) {
                 menu_sao(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_IR) {
+                menu_ir(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
                 break;
             }

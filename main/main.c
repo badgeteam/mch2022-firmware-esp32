@@ -74,6 +74,50 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
+static bool wait_for_button(xQueueHandle buttonQueue) {
+    while (1) {
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin = buttonMessage.input;
+            bool value = buttonMessage.state;
+            if (value) {
+                if (pin == RP2040_INPUT_BUTTON_BACK) {
+                    return false;
+                }
+                if (pin == RP2040_INPUT_BUTTON_ACCEPT) {
+                    return true;
+                }
+            }
+        }
+    }
+}
+
+void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const pax_font_t *font = pax_get_font("saira regular");
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0xf5ec42);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20*0, "Oops...");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*2, "The co-processor crashed, causing");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*3, "the badge to be restarted.");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*5, "Help us debug the problem by");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*6, "submitting a ticket on Github");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*7, "explaining what caused the crash.");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*9, "You can find the repository at:");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20*10, "https://github.com/badgeteam\n/mch2022-firmware-rp2040    Press A to continue.");
+    ili9341_write(ili9341, pax_buffer->buf);
+    wait_for_button(buttonQueue);
+}
+
+void display_rp2040_debug_message(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const pax_font_t *font = pax_get_font("saira regular");
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0xf5ec42);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20*0, "Debug mode");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20*2, "Co-processor is in debug mode");
+    ili9341_write(ili9341, pax_buffer->buf);
+    vTaskDelay(pdMS_TO_TICKS(500));
+}
+
 void stop() {
     ESP_LOGW(TAG, "*** HALTED ***");
     gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
@@ -142,8 +186,26 @@ void app_main(void) {
 
     RP2040* rp2040 = get_rp2040();
 
+    uint8_t crash_debug;
+    if (rp2040_get_crash_state(rp2040, &crash_debug) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read RP2040 crash & debug state");
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        stop();
+    }
+    
     rp2040_updater(rp2040, &pax_buffer, ili9341); // Handle RP2040 firmware update & bootloader mode
     
+    bool rp2040_crashed = crash_debug & 0x01;
+    bool rp2040_debug = crash_debug & 0x02;
+
+    if (rp2040_crashed) {
+        display_rp2040_crashed_message(rp2040->queue, &pax_buffer, ili9341);
+    }
+
+    if (rp2040_debug) {
+        display_rp2040_debug_message(&pax_buffer, ili9341);
+    }
+        
     factory_test(&pax_buffer, ili9341);
 
     if (bsp_ice40_init() != ESP_OK) {

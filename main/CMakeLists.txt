@@ -20,6 +20,7 @@ idf_component_register(
          "menus/dev.c"
          "menus/wifi.c"
          "menus/sao.c"
+         "menus/ir.c"
          "uninstall.c"
          "file_browser.c"
          "test_common.c"
