@@ -185,7 +185,7 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     test_end:
 
         if (result) {
-            esp_err_t res = nvs_set_u8_fixed("system", "factory_test", 1);
+            esp_err_t res = nvs_set_u8_fixed("system", "factory_test", 0x01);
             if (res != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to store test result %d\n", res);
                 result = false;
@@ -194,6 +194,7 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
                 pax_background(pax_buffer, 0xa85a32);
                 ili9341_write(ili9341, pax_buffer->buf);
             }
+            nvs_set_u8_fixed("system", "force_sponsors", 0x01); // Force showing sponsors on first boot
         }
 
         while (true) {

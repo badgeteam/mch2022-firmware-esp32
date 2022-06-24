@@ -22,6 +22,10 @@ Source code included as submodules is licensed separately, please check the foll
 | components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |
 | components/ws2812           | MIT                               | Unlicense / Public domain                              |
 
+Some of the icons in `resources/icons` are licensed under MIT license `Copyright (c) 2019-2021 The Bootstrap Authors`. The source files for these icons can be found at https://icons.getbootstrap.com/.
+
+The [BadgePython logo](resources/icons/python.png) may only be used as icon for the BadgePython project.
+
 ## How to build the firmware
 ```sh
 git clone --recursive https://github.com/badgeteam/mch2022-firmware-esp32

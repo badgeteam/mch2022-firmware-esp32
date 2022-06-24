@@ -264,6 +264,28 @@ void app_main(void) {
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
 
     if (webusb_mode == 0x00) {  // Normal boot
+        /* Sponsors check */
+        nvs_handle_t handle;
+        esp_err_t res = nvs_open("system", NVS_READWRITE, &handle);
+        if (res != ESP_OK) {
+            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
+            stop();
+        }
+
+        uint8_t force_sponsors;
+        res = nvs_get_u8(handle, "force_sponsors", &force_sponsors);
+        if ((res != ESP_OK) || (force_sponsors > 0)) {
+            appfs_handle_t appfs_fd = appfsOpen("sponsors");
+            if (appfs_fd != APPFS_INVALID_FD) {
+                appfs_boot_app(appfs_fd);
+                stop();
+            } else {
+                ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
+            }
+        }
+
+        nvs_close(handle);
+        
         /* Rick that roll */
         play_bootsound();
 

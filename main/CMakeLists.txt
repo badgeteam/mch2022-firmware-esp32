@@ -44,4 +44,7 @@ idf_component_register(
                 ${project_dir}/resources/icons/settings.png
                 ${project_dir}/resources/icons/apps.png
                 ${project_dir}/resources/icons/hatchery.png
+                ${project_dir}/resources/icons/tag.png
+                ${project_dir}/resources/icons/bitstream.png
+                ${project_dir}/resources/icons/python.png
 )

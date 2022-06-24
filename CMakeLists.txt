@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.5)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 set(PROJECT_NAME "MCH2022 launcher")
-set(PROJECT_VER "0.6")
+set(PROJECT_VER "0.7")
 
 project(main)
 

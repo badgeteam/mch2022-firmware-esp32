@@ -149,6 +149,11 @@ bool menu_remove_item(menu_t* aMenu, size_t aPosition) {
     free(item->label);
     free(item);
     aMenu->length--;
+    printf("%u / %u\n", aMenu->position, aMenu->length);
+    if (aMenu->position >= aMenu->length) {
+        aMenu->position = aMenu->length - 1;
+        printf("Corrected to %u / %u\n", aMenu->position, aMenu->length);
+    }
     return true;
 }
 

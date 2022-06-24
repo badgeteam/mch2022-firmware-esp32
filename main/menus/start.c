@@ -38,7 +38,16 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS } menu_start_action_t;
+extern const uint8_t tag_png_start[] asm("_binary_tag_png_start");
+extern const uint8_t tag_png_end[] asm("_binary_tag_png_end");
+
+extern const uint8_t python_png_start[] asm("_binary_python_png_start");
+extern const uint8_t python_png_end[] asm("_binary_python_png_end");
+
+extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
+extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
+
+typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS, ACTION_PYTHON, ACTION_FPGA } menu_start_action_t;
 
 void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t* font = pax_get_font("saira regular");
@@ -72,12 +81,19 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     pax_decode_png_buf(&icon_dev, (void*) dev_png_start, dev_png_end - dev_png_start, PAX_BUF_32_8888ARGB, 0);
     pax_buf_t icon_settings;
     pax_decode_png_buf(&icon_settings, (void*) settings_png_start, settings_png_end - settings_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_tag;
+    pax_decode_png_buf(&icon_tag, (void*) tag_png_start, tag_png_end - tag_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_python;
+    pax_decode_png_buf(&icon_python, (void*) python_png_start, python_png_end - python_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_bitstream;
+    pax_decode_png_buf(&icon_bitstream, (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start, PAX_BUF_32_8888ARGB, 0);
 
     menu_set_icon(menu, &icon_home);
-
-    menu_insert_item_icon(menu, "Apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
+    menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
+    menu_insert_item_icon(menu, "ESP32 apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
+    menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
+    menu_insert_item_icon(menu, "BadgePython apps", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
-    menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
 
@@ -138,7 +154,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             }
 
             if (battery_voltage >= 3.6) {
-                battery_percent = ((battery_voltage - 3.6) * 100) / (4.2 - 3.6);
+                battery_percent = ((battery_voltage - 3.6) * 100) / (4.15 - 3.6);
                 if (battery_percent > 100) battery_percent = 100;
             } else {
                 battery_percent = 0;

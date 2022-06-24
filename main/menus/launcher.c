@@ -19,16 +19,120 @@
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
-typedef enum { ACTION_NONE, ACTION_APPFS, ACTION_BACK } menu_launcher_action_t;
+static bool populate(menu_t* menu) {
+    for (size_t index = 0; index < menu_get_length(menu); index++) {
+        free(menu_get_callback_args(menu, index));
+    }
+    while (menu_remove_item(menu, 0)) { /* Empty. */ }
 
-typedef struct {
-    appfs_handle_t         fd;
-    menu_launcher_action_t action;
-} menu_launcher_args_t;
+    bool empty = true;
+    appfs_handle_t appfs_fd = appfsNextEntry(APPFS_INVALID_FD);
+    while (appfs_fd != APPFS_INVALID_FD) {
+        empty = false;
+        const char* name    = NULL;
+        const char* title   = NULL;
+        uint16_t    version = 0xFFFF;
+        appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
+        appfs_handle_t* args = malloc(sizeof(appfs_handle_t));
+        *args = appfs_fd;
+        menu_insert_item(menu, title, NULL, (void*) args, -1);
+        appfs_fd = appfsNextEntry(appfs_fd);
+    }
+    return empty;
+}
+
+static void render_message(pax_buf_t* pax_buffer, char* message) {
+    const pax_font_t* font = pax_get_font("saira regular");
+    pax_vec1_t size = pax_text_size(font, 18, message);
+    float width = size.x + 4;
+    float posX = (pax_buffer->width - width) / 2;
+    float height = size.y + 4;
+    float posY = (pax_buffer->height - height) / 2;
+    pax_col_t fgColor = 0xFFfa448c;
+    pax_col_t bgColor = 0xFFFFFFFF;
+    pax_simple_rect(pax_buffer, bgColor, posX, posY, width, height);
+    pax_outline_rect(pax_buffer, fgColor, posX, posY, width, height);
+    pax_clip(pax_buffer, posX + 1, posY + 1, width - 2, height - 2);
+    pax_center_text(pax_buffer, fgColor, font, 18, pax_buffer->width / 2, (pax_buffer->height / 2) - 9, message);
+    pax_noclip(pax_buffer);
+}
+
+typedef enum {
+    CONTEXT_ACTION_NONE,
+    CONTEXT_ACTION_UNINSTALL
+} context_menu_action_t;
+
+void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const char* name    = NULL;
+    const char* title   = NULL;
+    uint16_t    version = 0xFFFF;
+    appfsEntryInfoExt(fd, &name, &title, &version, NULL);
+    menu_t* menu = menu_alloc(title, 20, 18);
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFFFFFFFF;
+    menu->selectedItemColor = 0xFFfa448c;
+    menu->borderColor       = 0xFF491d88;
+    menu->titleColor        = 0xFFfa448c;
+    menu->titleBgColor      = 0xFF491d88;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+    
+    menu_insert_item(menu, "Uninstall", NULL, (void*) CONTEXT_ACTION_UNINSTALL, -1);
+    
+    bool render = true;
+    bool quit = false;
+    while (!quit) {
+        context_menu_action_t action = CONTEXT_ACTION_NONE;
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+            if (buttonMessage.state) {
+                switch (buttonMessage.input) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        menu_navigate_next(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        menu_navigate_previous(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                    case RP2040_INPUT_JOYSTICK_PRESS:
+                        action = (context_menu_action_t) menu_get_callback_args(menu, menu_get_position(menu));
+                        break;
+                    case RP2040_INPUT_BUTTON_HOME:
+                    case RP2040_INPUT_BUTTON_BACK:
+                        quit = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_MENU:
+                        break;
+                    case RP2040_INPUT_BUTTON_SELECT:
+                    case RP2040_INPUT_BUTTON_START:
+                    default:
+                        break;
+                }
+            }
+        }
+        if (render) {
+            menu_render(pax_buffer, menu, 20, 20, 280, 180, 0xFF491d88);
+            ili9341_write(ili9341, pax_buffer->buf);
+            render = false;
+        }
+        
+        if (action == CONTEXT_ACTION_UNINSTALL) {
+            render_message(pax_buffer, "Uninstalling app...");
+            ili9341_write(ili9341, pax_buffer->buf);
+            appfsDeleteFile(name);
+            quit = true;
+        }
+    }
+
+    menu_free(menu);
+}
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Apps", 34, 18);
-
+    pax_noclip(pax_buffer);
+    menu_t* menu = menu_alloc("ESP32 apps", 34, 18);
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
@@ -41,93 +145,66 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
     pax_buf_t icon_apps;
     pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
-
     menu_set_icon(menu, &icon_apps);
 
     const pax_font_t* font = pax_get_font("saira regular");
 
-    appfs_handle_t appfs_fd = APPFS_INVALID_FD;
-    while (1) {
-        appfs_fd = appfsNextEntry(appfs_fd);
-        if (appfs_fd == APPFS_INVALID_FD) break;
-        const char* name    = NULL;
-        const char* title   = NULL;
-        uint16_t    version = 0xFFFF;
-        appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
-        menu_launcher_args_t* args = malloc(sizeof(menu_launcher_args_t));
-        args->fd                   = appfs_fd;
-        args->action               = ACTION_APPFS;
+    bool empty = populate(menu);
 
-        char label[64];
-        if (version < 0xFFFF) {
-            snprintf(label, sizeof(label), "%s (r%u)", title, version);
-        } else {
-            snprintf(label, sizeof(label), "%s (dev)", title);
-        }
-
-        menu_insert_item(menu, label, NULL, (void*) args, -1);
-    }
-
-    bool                  render   = true;
-    menu_launcher_args_t* menuArgs = NULL;
-
-    pax_background(pax_buffer, 0xFFFFFF);
-    pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start app  [B] back");
-
+    bool render = true;
+    appfs_handle_t* appfs_fd_to_start = NULL;
     bool quit = false;
-
-    while (1) {
+    appfs_handle_t* appfs_fd_context_menu = NULL;
+    while (!quit) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            switch (pin) {
-                case RP2040_INPUT_JOYSTICK_DOWN:
-                    if (value) {
+        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+            if (buttonMessage.state) {
+                switch (buttonMessage.input) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
                         menu_navigate_next(menu);
                         render = true;
-                    }
-                    break;
-                case RP2040_INPUT_JOYSTICK_UP:
-                    if (value) {
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
                         menu_navigate_previous(menu);
                         render = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_HOME:
-                case RP2040_INPUT_BUTTON_BACK:
-                    if (value) {
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                    case RP2040_INPUT_JOYSTICK_PRESS:
+                        appfs_fd_to_start = (appfs_handle_t*) menu_get_callback_args(menu, menu_get_position(menu));
+                        break;
+                    case RP2040_INPUT_BUTTON_HOME:
+                    case RP2040_INPUT_BUTTON_BACK:
                         quit = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_ACCEPT:
-                case RP2040_INPUT_JOYSTICK_PRESS:
-                case RP2040_INPUT_BUTTON_SELECT:
-                case RP2040_INPUT_BUTTON_START:
-                    if (value) {
-                        menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
-                    }
-                    break;
-                default:
-                    break;
+                        break;
+                    case RP2040_INPUT_BUTTON_MENU:
+                        appfs_fd_context_menu = (appfs_handle_t*) menu_get_callback_args(menu, menu_get_position(menu));
+                        break;
+                    case RP2040_INPUT_BUTTON_SELECT:
+                    case RP2040_INPUT_BUTTON_START:
+                    default:
+                        break;
+                }
             }
+        }
+        
+        if (appfs_fd_context_menu != NULL) {
+            context_menu(*appfs_fd_context_menu, buttonQueue, pax_buffer, ili9341);
+            empty = populate(menu);
+            appfs_fd_context_menu = NULL;
+            render = true;
         }
 
         if (render) {
+            pax_background(pax_buffer, 0xFFFFFF);
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start [B] back [M] options");
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
 
-        if (menuArgs != NULL) {
-            if (menuArgs->action == ACTION_APPFS) {
-                appfs_boot_app(menuArgs->fd);
-            }
-            break;
-        }
-
-        if (quit) {
+        if (appfs_fd_to_start != NULL) {
+            appfs_boot_app(*appfs_fd_to_start);
             break;
         }
     }
