@@ -21,6 +21,7 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "settings.h"
+#include "nametag.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
@@ -37,7 +38,7 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_DEV, ACTION_SETTINGS } menu_start_action_t;
+typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS } menu_start_action_t;
 
 void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t* font = pax_get_font("saira regular");
@@ -76,6 +77,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
     menu_insert_item_icon(menu, "Apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
+    menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
 
@@ -161,6 +163,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
                 menu_launcher(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_HATCHERY) {
                 menu_hatchery(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_NAMETAG) {
+                show_nametag(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SETTINGS) {
                 menu_settings(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {
