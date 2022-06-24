@@ -19,7 +19,7 @@
 #include "rp2040.h"
 #include "wifi_connect.h"
 
-#define SLEEP_DELAY 3000
+#define SLEEP_DELAY 10000
 static const char *TAG = "nametag";
 
 static void place_in_sleep(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341);
@@ -57,9 +57,13 @@ void show_nametag(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
         show_name(buttonQueue, pax_buffer, ili9341, buffer);
         // Await buttons.
         if (xQueueReceive(buttonQueue, &msg, pdMS_TO_TICKS(SLEEP_DELAY+10))) {
+            // Check for go back buttons.
             if (msg.input == RP2040_INPUT_BUTTON_HOME && msg.state) {
                 goto exit;
+            } else if (msg.input == RP2040_INPUT_BUTTON_BACK && msg.state) {
+                goto exit;
             }
+            // Reschedule sleep time.
             sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
             ESP_LOGI(TAG, "Recheduled sleep in %d millis", SLEEP_DELAY);
         }
@@ -111,6 +115,8 @@ static void place_in_sleep(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9
         "Sleeping..."
     );
     ili9341_write(ili9341, pax_buffer->buf);
+    
+    // TODO: Power off peripherals to conserve power.
     
     #if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
     // Deep sleep if we can wake from it.
