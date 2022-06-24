@@ -63,6 +63,26 @@ typedef enum action {
     ACTION_PHASE2_CHAP,
 } menu_wifi_action_t;
 
+static const char *wifi_auth_names[] = {
+    "None",
+    "WEP",
+    "WPA1",
+    "WPA2",
+    "WPA1/2",
+    "WPA2 Ent",
+    "WPA3",
+    "WPA2/3",
+    "WAPI",
+};
+
+static const char *wifi_phase2_names[] = {
+    "EAP",
+    "MSCHAPv2",
+    "MSCHAP",
+    "PAP",
+    "CHAP",
+};
+
 void render_wifi_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
@@ -201,11 +221,9 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
     if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  WPA2 enterprise\nUsername:\n  %s\nPassword:\n  %s", ssid, username, password);
-    } else if (authmode != WIFI_AUTH_OPEN) {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, "", password);
+        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  WPA2 Ent + %s\nUsername:\n  %s\nPassword:\n  %s", ssid, wifi_phase2_names[phase2], username, password);
     } else {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  None", ssid);
+        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, wifi_auth_names[authmode], password);
     }
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] test [B] back");
