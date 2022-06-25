@@ -31,6 +31,7 @@ idf_component_register(
          "webusb.c"
          "wifi_test.c"
          "sao_eeprom.c"
+         "rtc_memory.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "appfs.h"
+#include "appfs_wrapper.h"
 #include "bootscreen.h"
 #include "dev.h"
 #include "hardware.h"
@@ -22,6 +23,7 @@
 #include "rp2040.h"
 #include "settings.h"
 #include "nametag.h"
+#include "rtc_memory.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
@@ -185,6 +187,15 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
                 menu_settings(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {
                 menu_dev(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_PYTHON) {
+                // Test
+                appfs_handle_t appfs_fd = appfsOpen("python");
+                if (appfs_fd != APPFS_INVALID_FD) {
+                    rtc_memory_string_write("dashboard.other.about");
+                    appfs_boot_app(appfs_fd);
+                } else {
+                    printf("Python not installed, can't start BadgePython app!\n");
+                }
             }
             action = ACTION_NONE;
             render = true;

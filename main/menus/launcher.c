@@ -10,6 +10,7 @@
 
 #include "appfs.h"
 #include "appfs_wrapper.h"
+#include "graphics_wrapper.h"
 #include "ili9341.h"
 #include "menu.h"
 #include "pax_codecs.h"
@@ -39,22 +40,6 @@ static bool populate(menu_t* menu) {
         appfs_fd = appfsNextEntry(appfs_fd);
     }
     return empty;
-}
-
-static void render_message(pax_buf_t* pax_buffer, char* message) {
-    const pax_font_t* font = pax_get_font("saira regular");
-    pax_vec1_t size = pax_text_size(font, 18, message);
-    float width = size.x + 4;
-    float posX = (pax_buffer->width - width) / 2;
-    float height = size.y + 4;
-    float posY = (pax_buffer->height - height) / 2;
-    pax_col_t fgColor = 0xFFfa448c;
-    pax_col_t bgColor = 0xFFFFFFFF;
-    pax_simple_rect(pax_buffer, bgColor, posX, posY, width, height);
-    pax_outline_rect(pax_buffer, fgColor, posX, posY, width, height);
-    pax_clip(pax_buffer, posX + 1, posY + 1, width - 2, height - 2);
-    pax_center_text(pax_buffer, fgColor, font, 18, pax_buffer->width / 2, (pax_buffer->height / 2) - 9, message);
-    pax_noclip(pax_buffer);
 }
 
 typedef enum {

@@ -41,6 +41,7 @@
 #include "wifi_connection.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
+#include "rtc_memory.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -250,6 +251,9 @@ void app_main(void) {
 
     /* Start WiFi */
     wifi_init();
+    
+    /* Clear RTC memory */
+    rtc_memory_clear();
 
     /* Check WebUSB mode */
 
