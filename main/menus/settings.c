@@ -16,6 +16,7 @@
 #include "hardware.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "nametag.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
@@ -25,31 +26,6 @@
 #include "wifi_connect.h"
 #include "wifi_ota.h"
 #include "wifi_test.h"
-
-static void edit_nickname(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    nvs_handle_t handle;
-    esp_err_t    res = nvs_open("owner", NVS_READWRITE, &handle);
-    if (res != ESP_OK) return;
-
-    char nickname[128] = {0};
-
-    size_t size = 0;
-    res         = nvs_get_str(handle, "nickname", NULL, &size);
-    if ((res == ESP_OK) && (size <= sizeof(nickname) - 1)) {
-        res = nvs_get_str(handle, "nickname", nickname, &size);
-        if (res != ESP_OK) {
-            nickname[0] = '\0';
-        }
-    }
-
-    bool accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel",
-                             nickname, sizeof(nickname) - 1);
-
-    if (accepted) {
-        nvs_set_str(handle, "nickname", nickname);
-    }
-    nvs_close(handle);
-}
 
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");

@@ -1,45 +1,114 @@
 #include "nametag.h"
 
-#include <driver/gpio.h>
-#include <esp_err.h>
-#include <esp_log.h>
-#include <esp_sleep.h>
-#include <esp_system.h>
-#include <esp_timer.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
-#include <freertos/task.h>
-#include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "driver/gpio.h"
+#include "driver/rtc_io.h"
+#include "esp32/ulp.h"
+#include "esp_err.h"
+#include "esp_log.h"
+#include "esp_sleep.h"
+#include "esp_system.h"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
 #include "nvs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "sdkconfig.h"
+#include "soc/rtc.h"
 #include "wifi_connect.h"
 
 #define SLEEP_DELAY 10000
 static const char *TAG = "nametag";
 
-static void place_in_sleep(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341);
-static void show_name(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *name);
+typedef enum { NICKNAME_THEME_HELLO = 0, NICKNAME_THEME_SIMPLE, NICKNAME_THEME_LAST } nickname_theme_t;
 
-// Shows the name tag.
-// Will fall into deep sleep if left alone for long enough.
-void show_nametag(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
-    // Open NVS.
+void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    nvs_handle_t handle;
+    esp_err_t    res = nvs_open("owner", NVS_READWRITE, &handle);
+    if (res != ESP_OK) return;
+
+    char nickname[128] = {0};
+
+    size_t size = 0;
+    res         = nvs_get_str(handle, "nickname", NULL, &size);
+    if ((res == ESP_OK) && (size <= sizeof(nickname) - 1)) {
+        res = nvs_get_str(handle, "nickname", nickname, &size);
+        if (res != ESP_OK) {
+            nickname[0] = '\0';
+        }
+    }
+
+    bool accepted = keyboard(button_queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel",
+                             nickname, sizeof(nickname) - 1);
+
+    if (accepted) {
+        nvs_set_str(handle, "nickname", nickname);
+    }
+    nvs_close(handle);
+}
+
+static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *name, nickname_theme_t theme, bool instructions) {
+    const pax_font_t *title_font        = pax_get_font("saira condensed");
+    const pax_font_t *instructions_font = pax_get_font("saira regular");
+    const pax_font_t *name_font         = pax_get_font((theme == NICKNAME_THEME_HELLO) ? "permanentmarker" : "saira condensed");
+
+    float      scale = (theme == NICKNAME_THEME_HELLO) ? 60 : name_font->default_size;
+    pax_vec1_t dims  = pax_text_size(name_font, scale, name);
+    if (dims.x > pax_buffer->width) {
+        scale *= pax_buffer->width / dims.x;
+        dims = pax_text_size(name_font, scale, name);
+    }
+
+    if (theme == NICKNAME_THEME_HELLO) {
+        pax_background(pax_buffer, 0xFFFFFF);
+        pax_simple_rect(pax_buffer, 0xFFFF0000, 0, 0, pax_buffer->width, 60);
+        pax_simple_rect(pax_buffer, 0xFFFF0000, 0, pax_buffer->height - 20, pax_buffer->width, 20);
+        pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 30, pax_buffer->width / 2, 2, "HELLO");
+        pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 24, pax_buffer->width / 2, 30, "My name is:");
+        pax_center_text(pax_buffer, 0xFF000000, name_font, scale, pax_buffer->width / 2, 60 + ((pax_buffer->height - 90) - dims.y) / 2, name);
+    } else {
+        pax_background(pax_buffer, 0x000000);
+        pax_center_text(pax_buffer, 0xFFFFFFFF, name_font, scale, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, name);
+    }
+
+    if (instructions) {
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, instructions_font, 14, 5, pax_buffer->height - 17, "[B] exit [M] name [SE] theme");
+    }
+
+    ili9341_write(ili9341, pax_buffer->buf);
+}
+
+static void place_in_sleep(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    esp_sleep_enable_ext0_wakeup(GPIO_INT_RP2040, false);
+    ESP_LOGW(TAG, "Entering deep sleep now!");
+    fflush(stdout);
+    fflush(stderr);
+    vTaskDelay(pdMS_TO_TICKS(100));
+    esp_deep_sleep_start();
+    while (1) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+char *read_nickname() {
+    char *buffer = NULL;
+
     nvs_handle_t handle;
     esp_err_t    res = nvs_open("owner", NVS_READWRITE, &handle);
 
     // Read nickname.
     size_t required = 0;
     res             = nvs_get_str(handle, "nickname", NULL, &required);
-    char *buffer;
     if (res) {
         ESP_LOGE(TAG, "Error reading nickname: %s", esp_err_to_name(res));
-        buffer = strdup("Fancy Name!");
+        buffer = strdup("BADGE.TEAM");
     } else {
         buffer           = malloc(required + 1);
         buffer[required] = 0;
@@ -48,98 +117,74 @@ void show_nametag(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9
             *buffer = 0;
         }
     }
+    nvs_close(handle);
 
-    // Schedule sleep time.
-    uint64_t sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
-    ESP_LOGI(TAG, "Scheduled sleep in %d millis", SLEEP_DELAY);
-    rp2040_input_message_t msg;
-    while (1) {
-        // Display the name.
-        show_name(buttonQueue, pax_buffer, ili9341, buffer);
-        // Await buttons.
-        if (xQueueReceive(buttonQueue, &msg, pdMS_TO_TICKS(SLEEP_DELAY + 10))) {
-            // Check for go back buttons.
-            if (msg.input == RP2040_INPUT_BUTTON_HOME && msg.state) {
-                goto exit;
-            } else if (msg.input == RP2040_INPUT_BUTTON_BACK && msg.state) {
-                goto exit;
-            }
-            // Reschedule sleep time.
-            sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
-            ESP_LOGI(TAG, "Recheduled sleep in %d millis", SLEEP_DELAY);
-        }
-        if (esp_timer_get_time() / 1000 > sleep_time) {
-            // Time to enter sleep mode.
-            place_in_sleep(buttonQueue, pax_buffer, ili9341);
-            goto exit;
-        }
+    return buffer;
+}
+
+static nickname_theme_t get_theme() {
+    nvs_handle_t handle;
+    if (nvs_open("owner", NVS_READWRITE, &handle) != ESP_OK) {
+        return 0;
     }
+    uint8_t result;
+    if (nvs_get_u8(handle, "theme", &result) != ESP_OK) {
+        result = 0;
+    }
+    nvs_close(handle);
 
-exit:
-    free(buffer);
+    result = result % NICKNAME_THEME_LAST;
+    return (nickname_theme_t) result;
+}
+
+static void set_theme(nickname_theme_t theme) {
+    theme = theme % NICKNAME_THEME_LAST;
+    nvs_handle_t handle;
+    if (nvs_open("owner", NVS_READWRITE, &handle) != ESP_OK) {
+        return;
+    }
+    nvs_set_u8(handle, "theme", (uint8_t) theme);
     nvs_close(handle);
 }
 
-// Show them names.
-static void show_name(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *name) {
-    const pax_font_t *font = pax_get_font("saira condensed");
-
-    // Set name scale.
-    float      scale = font->default_size;
-    pax_vec1_t dims  = pax_text_size(font, scale, name);
-    if (dims.x > pax_buffer->width) {
-        scale *= pax_buffer->width / dims.x;
-        dims = pax_text_size(font, scale, name);
+void show_nametag(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    nickname_theme_t theme      = get_theme();
+    char            *buffer     = read_nickname();
+    uint64_t         sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
+    ESP_LOGI(TAG, "Scheduled sleep in %d millis", SLEEP_DELAY);
+    rp2040_input_message_t msg;
+    bool                   quit = false;
+    while (!quit) {
+        if (esp_timer_get_time() / 1000 > sleep_time) {
+            show_name(button_queue, pax_buffer, ili9341, buffer, theme, false);
+            place_in_sleep(button_queue, pax_buffer, ili9341);
+            break;
+        }
+        show_name(button_queue, pax_buffer, ili9341, buffer, theme, true);
+        if (xQueueReceive(button_queue, &msg, pdMS_TO_TICKS(SLEEP_DELAY + 10))) {
+            if (msg.state) {
+                switch (msg.input) {
+                    case RP2040_INPUT_BUTTON_BACK:
+                    case RP2040_INPUT_BUTTON_HOME:
+                        quit = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_MENU:
+                        edit_nickname(button_queue, pax_buffer, ili9341);
+                        free(buffer);
+                        buffer = read_nickname();
+                        break;
+                    case RP2040_INPUT_BUTTON_SELECT:
+                        theme = (theme + 1) % NICKNAME_THEME_LAST;
+                        set_theme(theme);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
+            ESP_LOGI(TAG, "Recheduled sleep in %d millis", SLEEP_DELAY);
+        }
     }
 
-    // Center vertically.
-    pax_background(pax_buffer, 0);
-    pax_center_text(pax_buffer, -1, font, scale, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, name);
-    ili9341_write(ili9341, pax_buffer->buf);
-}
-
-// TODO: Place the ESP32 in sleep with button wakeup.
-static void place_in_sleep(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
-    ESP_LOGW(TAG, "About to enter sleep!");
-
-    // Notify the user of the slumber.
-    const pax_font_t *font = pax_get_font("saira regular");
-    pax_draw_text(pax_buffer, -1, font, font->default_size, 5, pax_buffer->height - 5 - font->default_size, "Sleeping...");
-    ili9341_write(ili9341, pax_buffer->buf);
-
-    // TODO: Power off peripherals to conserve power.
-
-#if SOC_GPIO_SUPPORT_DEEPSLEEP_WAKEUP
-    // Deep sleep if we can wake from it.
-    // Set wakeup pins.
-    uint64_t mask = 1 << GPIO_INT_RP2040;
-    esp_deep_sleep_enable_gpio_wakeup(mask, ESP_GPIO_WAKEUP_GPIO_LOW);
-    // Fall asleep.
-    ESP_LOGW(TAG, "Entering deep sleep now!");
-    fflush(stdout);
-    fflush(stderr);
-    vTaskDelay(pdMS_TO_TICKS(100));
-    esp_deep_sleep_start();
-
-#else
-    // Light sleep because we can't wake from deep sleep.
-    // Disable WiFi.
-    wifi_disconnect_and_disable();
-    // Set wakeup sources.
-    esp_sleep_disable_wifi_wakeup();
-    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
-    // Set wakeup pins.
-    gpio_wakeup_enable(GPIO_INT_RP2040, GPIO_INTR_LOW_LEVEL);
-    esp_sleep_enable_gpio_wakeup();
-    // Fall alseep.
-    ESP_LOGW(TAG, "Entering light sleep now!");
-    fflush(stdout);
-    fflush(stderr);
-    vTaskDelay(pdMS_TO_TICKS(100));
-    esp_light_sleep_start();
-    // Consume the button event, if any.
-    rp2040_input_message_t msg;
-    xQueueReceive(buttonQueue, &msg, pdMS_TO_TICKS(10));
-
-#endif
+    free(buffer);
 }
