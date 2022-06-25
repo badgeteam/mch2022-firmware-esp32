@@ -62,24 +62,6 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     ili9341_write(ili9341, pax_buffer->buf);
 }
 
-static bool wait_for_button(xQueueHandle buttonQueue) {
-    while (1) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            if (value) {
-                if (pin == RP2040_INPUT_BUTTON_BACK) {
-                    return false;
-                }
-                if (pin == RP2040_INPUT_BUTTON_ACCEPT) {
-                    return true;
-                }
-            }
-        }
-    }
-}
-
 void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_noclip(pax_buffer);

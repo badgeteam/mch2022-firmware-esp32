@@ -8,8 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "appfs.h"
-#include "appfs_wrapper.h"
 #include "bootscreen.h"
 #include "dev.h"
 #include "hardware.h"
@@ -23,7 +21,7 @@
 #include "rp2040.h"
 #include "settings.h"
 #include "nametag.h"
-#include "rtc_memory.h"
+#include "python.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
@@ -93,8 +91,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     menu_set_icon(menu, &icon_home);
     menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
     menu_insert_item_icon(menu, "ESP32 apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
-    menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
     menu_insert_item_icon(menu, "BadgePython apps", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
+    menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
@@ -188,14 +186,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             } else if (action == ACTION_DEV) {
                 menu_dev(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_PYTHON) {
-                // Test
-                appfs_handle_t appfs_fd = appfsOpen("python");
-                if (appfs_fd != APPFS_INVALID_FD) {
-                    rtc_memory_string_write("dashboard.other.about");
-                    appfs_boot_app(appfs_fd);
-                } else {
-                    printf("Python not installed, can't start BadgePython app!\n");
-                }
+                menu_python(buttonQueue, pax_buffer, ili9341);
             }
             action = ACTION_NONE;
             render = true;

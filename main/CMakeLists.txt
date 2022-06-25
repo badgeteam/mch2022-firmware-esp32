@@ -21,6 +21,7 @@ idf_component_register(
          "menus/wifi.c"
          "menus/sao.c"
          "menus/ir.c"
+         "menus/python.c"
          "nametag.c"
          "uninstall.c"
          "file_browser.c"

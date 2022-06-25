@@ -21,6 +21,7 @@
 #include "menu.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "system_wrapper.h"
 
 static const char* TAG = "file browser";
 
@@ -113,41 +114,6 @@ void find_parent_dir(char* path, char* parent) {
 
     strcpy(parent, path);
     parent[last_separator] = '\0';
-}
-
-static bool wait_for_button(xQueueHandle buttonQueue) {
-    while (1) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            if (value) {
-                if (pin == RP2040_INPUT_BUTTON_BACK) {
-                    return false;
-                }
-                if (pin == RP2040_INPUT_BUTTON_ACCEPT) {
-                    return true;
-                }
-            }
-        }
-    }
-}
-
-static uint8_t* load_file_to_ram(FILE* fd) {
-    fseek(fd, 0, SEEK_END);
-    size_t fsize = ftell(fd);
-    fseek(fd, 0, SEEK_SET);
-    uint8_t* file = malloc(fsize);
-    if (file == NULL) return NULL;
-    fread(file, fsize, 1, fd);
-    return file;
-}
-
-static size_t get_file_size(FILE* fd) {
-    fseek(fd, 0, SEEK_END);
-    size_t fsize = ftell(fd);
-    fseek(fd, 0, SEEK_SET);
-    return fsize;
 }
 
 static bool is_esp32_binary(FILE* fd) {

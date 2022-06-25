@@ -190,6 +190,12 @@ void* menu_get_callback_args(menu_t* aMenu, size_t aPosition) {
     return item->callbackArgs;
 }
 
+pax_buf_t* menu_get_icon(menu_t* aMenu, size_t aPosition) {
+    menu_item_t* item = _menu_find_item(aMenu, aPosition);
+    if (item == NULL) return NULL;
+    return item->icon;
+}
+
 void menu_debug(menu_t* aMenu) {
     if (aMenu == NULL) {
         printf("Menu pointer is NULL\n");
@@ -225,7 +231,7 @@ void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     if (maxItems > 1) {
         float offsetX = 0;
         if (aMenu->icon != NULL) {
-            offsetX = aMenu->icon->width;
+            offsetX = 32; // Fixed width by choice, could also use "aMenu->icon->width"
         }
 
         maxItems--;
@@ -233,10 +239,11 @@ void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
         // pax_simple_line(aBuffer, aMenu->titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
         pax_clip(aBuffer, aPosX + 1, posY + text_offset, aWidth - 2, text_height);
         pax_draw_text(aBuffer, aMenu->titleColor, font, text_height, aPosX + offsetX + 1, posY + text_offset, aMenu->title);
-        pax_noclip(aBuffer);
         if (aMenu->icon != NULL) {
+            pax_clip(aBuffer, aPosX, posY, 32, 32);
             pax_draw_image(aBuffer, aMenu->icon, aPosX, posY);
         }
+        pax_noclip(aBuffer);
         posY += entry_height;
     }
 
@@ -257,7 +264,7 @@ void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
 
         float iconWidth = 0;
         if (item->icon != NULL) {
-            iconWidth = item->icon->width + 1;
+            iconWidth = 33; // Fixed width by choice, could also use "item->icon->width + 1"
         }
 
         if (index == aMenu->position) {

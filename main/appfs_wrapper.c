@@ -26,16 +26,6 @@ static const char* TAG = "appfs wrapper";
 
 esp_err_t appfs_init(void) { return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE); }
 
-static uint8_t* load_file_to_ram(FILE* fd, size_t* fsize) {
-    fseek(fd, 0, SEEK_END);
-    *fsize = ftell(fd);
-    fseek(fd, 0, SEEK_SET);
-    uint8_t* file = malloc(*fsize);
-    if (file == NULL) return NULL;
-    fread(file, *fsize, 1, fd);
-    return file;
-}
-
 void appfs_boot_app(int fd) {
     if (fd < 0 || fd > 255) {
         REG_WRITE(RTC_CNTL_STORE0_REG, 0);
@@ -59,8 +49,8 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
         vTaskDelay(100 / portTICK_PERIOD_MS);
         return;
     }
-    size_t   app_size;
-    uint8_t* app = load_file_to_ram(app_fd, &app_size);
+    size_t   app_size = get_file_size(app_fd);
+    uint8_t* app = load_file_to_ram(app_fd);
     fclose(app_fd);
     if (app == NULL) {
         display_boot_screen(pax_buffer, ili9341, "Failed to load app to RAM");
