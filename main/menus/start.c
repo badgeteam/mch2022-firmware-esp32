@@ -89,12 +89,20 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     pax_decode_png_buf(&icon_bitstream, (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start, PAX_BUF_32_8888ARGB, 0);
 
     menu_set_icon(menu, &icon_home);
-    menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
+    /*menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
     menu_insert_item_icon(menu, "ESP32 apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
     menu_insert_item_icon(menu, "BadgePython apps", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
     //menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
+    menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);*/
+    
+    menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
+    menu_insert_item_icon(menu, "Apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
+    menu_insert_item_icon(menu, "Python", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
+    menu_insert_item_icon(menu, "FPGA", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
+    menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
+    menu_insert_item_icon(menu, "Tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
 
     bool                render = true;
@@ -114,31 +122,33 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 100 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            switch (pin) {
-                case RP2040_INPUT_JOYSTICK_DOWN:
-                    if (value) {
-                        menu_navigate_next(menu);
+            if (buttonMessage.state) {
+                switch (buttonMessage.input) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        menu_navigate_next_row(menu);
                         render = true;
-                    }
-                    break;
-                case RP2040_INPUT_JOYSTICK_UP:
-                    if (value) {
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        menu_navigate_previous_row(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_LEFT:
                         menu_navigate_previous(menu);
                         render = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_ACCEPT:
-                case RP2040_INPUT_JOYSTICK_PRESS:
-                case RP2040_INPUT_BUTTON_SELECT:
-                case RP2040_INPUT_BUTTON_START:
-                    if (value) {
+                        break;
+                    case RP2040_INPUT_JOYSTICK_RIGHT:
+                        menu_navigate_next(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                    case RP2040_INPUT_JOYSTICK_PRESS:
+                    case RP2040_INPUT_BUTTON_SELECT:
+                    case RP2040_INPUT_BUTTON_START:
                         action = (menu_start_action_t) menu_get_callback_args(menu, menu_get_position(menu));
-                    }
-                    break;
-                default:
-                    break;
+                        break;
+                    default:
+                        break;
+                }
             }
         }
 
@@ -169,7 +179,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             char textBuffer[64];
             snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
             render_start_help(pax_buffer, textBuffer);
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render_grid(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }

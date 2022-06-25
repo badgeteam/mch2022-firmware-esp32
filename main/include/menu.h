@@ -42,7 +42,11 @@ typedef struct menu {
     pax_col_t titleBgColor;
     pax_col_t scrollbarBgColor;
     pax_col_t scrollbarFgColor;
-
+    
+    float grid_margin_x;
+    float grid_margin_y;
+    float grid_entry_count_x;
+    float grid_entry_count_y;
 } menu_t;
 
 menu_t*    menu_alloc(const char* title, float entry_height, float text_height);
@@ -54,12 +58,15 @@ bool       menu_remove_item(menu_t* menu, size_t position);
 bool       menu_navigate_to(menu_t* menu, size_t position);
 void       menu_navigate_previous(menu_t* menu);
 void       menu_navigate_next(menu_t* menu);
+void menu_navigate_previous_row(menu_t* menu);
+void menu_navigate_next_row(menu_t* menu);
 size_t     menu_get_position(menu_t* menu);
 size_t     menu_get_length(menu_t* menu);
 void*      menu_get_callback_args(menu_t* menu, size_t position);
 pax_buf_t* menu_get_icon(menu_t* menu, size_t position);
 void       menu_debug(menu_t* menu);
 void       menu_render(pax_buf_t* aBuffer, menu_t* menu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor);
+void       menu_render_grid(pax_buf_t* buffer, menu_t* menu, float position_x, float position_y, float width, float height, pax_col_t color);
 
 #ifdef __cplusplus
 }
