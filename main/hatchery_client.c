@@ -208,6 +208,7 @@ struct json_cb_parser_t
     int int_value;
     json_cb_parser_callback_t callback;
     void *data;
+    int error;
 };
 
 static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callback_t callback, void *data)
@@ -216,6 +217,7 @@ static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callbac
     string_appender_init(&parser->string_appender);
     parser->callback = callback;
     parser->data = data;
+    parser->error = 0;
 }
 
 static void json_cb_parser_close(json_cb_parser_t *parser)
@@ -225,11 +227,13 @@ static void json_cb_parser_close(json_cb_parser_t *parser)
 
 static void json_cb_process(void *callback_data, const char *data, int data_len)
 {
+    ESP_LOGI(TAG, "%d bytes of data", data_len);
+
 #define JSON_NEXT_CH parser->lc = __LINE__; goto next; case __LINE__:;
 
     json_cb_parser_t *parser = (json_cb_parser_t*)callback_data;
 
-    for (int i = 0; i < data_len; i++) {
+    for (int i = 0; i < data_len && parser->error == 0; i++) {
         char ch = data[i];
 
         switch(parser->lc) { case 0:
@@ -286,7 +290,11 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
         next:;
     }       
  #undef JSON_NEXT_CH
+
+    ESP_LOGI(TAG, "parser->error = %d", parser->error);
 }
+
+#define JSON_SYNTAX_ERROR parser->error = __LINE__; return;
 
 // Query app types
 
@@ -315,7 +323,16 @@ static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_pa
 {
     process_app_types_t *process_app_types = (process_app_types_t*)(parser->data);
 #define NEXT process_app_types->cl = __LINE__; return; case __LINE__:;
-    
+/*
+    switch (state) {
+        case json_cb_open_array: ESP_LOGI(TAG, "open_arrat"); break;
+        case json_cb_open_object: ESP_LOGI(TAG, "open_object"); break;
+        case json_cb_close_array: ESP_LOGI(TAG, "close_array"); break;
+        case json_cb_close_object: ESP_LOGI(TAG, "close_object"); break;
+        case json_cb_string: ESP_LOGI(TAG, "string '%s'", string_appender_copy(&parser->string_appender)); break;
+        case json_cb_int: ESP_LOGI(TAG, "int %d", parser->int_value); break;
+    }
+ */   
     switch(process_app_types->cl) { case 0:
     
         if (state == json_cb_open_array) {
@@ -332,6 +349,9 @@ static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_pa
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "name") == 0) {
                         NEXT
@@ -341,6 +361,12 @@ static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_pa
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 if (state == json_cb_close_object) {
@@ -349,10 +375,19 @@ static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_pa
                     }
                     NEXT
                 }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
             }
             if (state == json_cb_close_array) {
                 NEXT
             }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
         }
     }
 
@@ -444,6 +479,9 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "name") == 0) {
                         NEXT
@@ -453,6 +491,9 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "apps") == 0) {
                         NEXT
@@ -461,6 +502,12 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                                 (*process_categories->cur)->nr_apps = parser->int_value;
                             }
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 if (state == json_cb_close_object) {
@@ -469,10 +516,19 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                     }
                     NEXT
                 }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
             }
             if (state == json_cb_close_array) {
                 NEXT
             }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
         }
     }
 
@@ -566,6 +622,9 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "name") == 0) {
                         NEXT
@@ -574,6 +633,9 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                                 (*process_apps->cur)->name = string_appender_copy(&parser->string_appender);
                             }
                             NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
                         }
                     }
                     else if (string_appender_compare(&parser->string_appender, "author") == 0) {
@@ -584,6 +646,9 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "license") == 0) {
                         NEXT
@@ -592,6 +657,9 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                                 (*process_apps->cur)->license = string_appender_copy(&parser->string_appender);
                             }
                             NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
                         }
                     }
                     else if (string_appender_compare(&parser->string_appender, "description") == 0) {
@@ -602,6 +670,9 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
                     else if (string_appender_compare(&parser->string_appender, "version") == 0) {
                         NEXT
@@ -611,6 +682,12 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                             }
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 if (state == json_cb_close_object) {
@@ -619,10 +696,19 @@ static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_
                     }
                     NEXT
                 }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
             }
             if (state == json_cb_close_array) {
                 NEXT
             }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
         }
     }
 
@@ -724,12 +810,18 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                         replace_string(&process_app->app->slug, &parser->string_appender);
                         NEXT
                     }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
                 }
                 else if (string_appender_compare(&parser->string_appender, "name") == 0) {
                     NEXT
                     if (state == json_cb_string) {
                         replace_string(&process_app->app->name, &parser->string_appender);
                         NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 else if (string_appender_compare(&parser->string_appender, "author") == 0) {
@@ -738,12 +830,18 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                         replace_string(&process_app->app->author, &parser->string_appender);
                         NEXT
                     }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
                 }
                 else if (string_appender_compare(&parser->string_appender, "license") == 0) {
                     NEXT
                     if (state == json_cb_string) {
                         replace_string(&process_app->app->license, &parser->string_appender);
                         NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 else if (string_appender_compare(&parser->string_appender, "description") == 0) {
@@ -752,12 +850,18 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                         replace_string(&process_app->app->description, &parser->string_appender);
                         NEXT
                     }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
                 }
                 else if (string_appender_compare(&parser->string_appender, "version") == 0) {
                     NEXT
                     if (state == json_cb_int) {
                         process_app->app->version = parser->int_value;
                         NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 else if (string_appender_compare(&parser->string_appender, "files") == 0) {
@@ -776,6 +880,9 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                                         }
                                         NEXT
                                     }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
                                 }
                                 else if (string_appender_compare(&parser->string_appender, "url") == 0) {
                                     NEXT
@@ -785,6 +892,9 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                                         }
                                         NEXT
                                     }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
                                 }
                                 else if (string_appender_compare(&parser->string_appender, "size") == 0) {
                                     NEXT
@@ -793,6 +903,12 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                                             (*process_app->cur)->size = parser->int_value;
                                         }
                                     }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
+                                }
+                                else {
+                                    JSON_SYNTAX_ERROR
                                 }
                             }
                             if (state == json_cb_close_object) {
@@ -801,16 +917,34 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                                 }
                                 NEXT
                             }
+                            else {
+                                JSON_SYNTAX_ERROR
+                            }
                         }
                         if (state == json_cb_close_array) {
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else {
+                    JSON_SYNTAX_ERROR
                 }
             }
             if (state == json_cb_open_object) {
                 NEXT
             }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
         }
     }
 

@@ -163,8 +163,7 @@ static void action_types(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
 
 void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     hatchery_server_t server;
-    //server.url = "https://hatchery.badge.team/api/mch2022";
-    server.url = "http://www.iwriteiam.nl/mch2022";
+    server.url = "https://mch2022.badge.team/v2/mch2022";
     server.app_types = NULL;
     menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, &server);
     hatchery_app_type_free(server.app_types);
