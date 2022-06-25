@@ -49,6 +49,26 @@ extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
 
 typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS, ACTION_PYTHON, ACTION_FPGA } menu_start_action_t;
 
+void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
+    float width     = 30;
+    float height    = 34 - 15;
+    float x         = pax_buffer->width - width - 10;
+    float y         = (34 - height) / 2;
+    float margin    = 3;
+    float bar_width = width - (margin * 2);
+    pax_simple_rect(pax_buffer, (percentage > 10) ? 0xff40eb34 : 0xffeb4034, x, y, width, height);
+    pax_simple_rect(pax_buffer, (percentage > 10) ? 0xff40eb34 : 0xffeb4034, x + width, y + 5, 3, height - 10);
+    pax_simple_rect(pax_buffer, 0xFF491d88, x + margin + ((percentage * bar_width) / 100), y + margin, bar_width - ((percentage * bar_width) / 100),
+                    height - (margin * 2));
+    /*char buffer[6];
+    snprintf(buffer, sizeof(buffer), "%u%%", percentage);
+    const pax_font_t* font = pax_get_font("saira regular");
+    pax_draw_text(pax_buffer, 0xffffffff, font, 12, x, y + 3, buffer);*/
+    if (charging) {
+        pax_draw_text(pax_buffer, 0xffffffff, font, 18, x + width - 6, y + 2, "+");
+    }
+}
+
 void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
@@ -164,7 +184,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             }
 
             if (battery_voltage >= 3.6) {
-                battery_percent = ((battery_voltage - 3.6) * 100) / (4.15 - 3.6);
+                battery_percent = ((battery_voltage - 3.6) * 100) / (4.1 - 3.6);
                 if (battery_percent > 100) battery_percent = 100;
             } else {
                 battery_percent = 0;
@@ -177,9 +197,11 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
         if (render) {
             char textBuffer[64];
-            snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
+            // snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
+            snprintf(textBuffer, sizeof(textBuffer), "v%s", version);
             render_start_help(pax_buffer, textBuffer);
             menu_render_grid(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            render_battery(pax_buffer, battery_percent, battery_charging);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
