@@ -16,12 +16,12 @@
 #include "launcher.h"
 #include "math.h"
 #include "menu.h"
+#include "nametag.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
+#include "python.h"
 #include "rp2040.h"
 #include "settings.h"
-#include "nametag.h"
-#include "python.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");

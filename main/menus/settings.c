@@ -4,14 +4,15 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <freertos/task.h>
+#include <nvs.h>
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
-#include <nvs.h>
 
 #include "appfs.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
 #include "menu.h"
@@ -24,17 +25,16 @@
 #include "wifi_connect.h"
 #include "wifi_ota.h"
 #include "wifi_test.h"
-#include "graphics_wrapper.h"
 
 static void edit_nickname(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     nvs_handle_t handle;
-    esp_err_t res = nvs_open("owner", NVS_READWRITE, &handle);
+    esp_err_t    res = nvs_open("owner", NVS_READWRITE, &handle);
     if (res != ESP_OK) return;
 
     char nickname[128] = {0};
 
     size_t size = 0;
-    res = nvs_get_str(handle, "nickname", NULL, &size);
+    res         = nvs_get_str(handle, "nickname", NULL, &size);
     if ((res == ESP_OK) && (size <= sizeof(nickname) - 1)) {
         res = nvs_get_str(handle, "nickname", nickname, &size);
         if (res != ESP_OK) {
@@ -42,8 +42,9 @@ static void edit_nickname(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI93
         }
     }
 
-    bool accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel", nickname, sizeof(nickname) - 1);
-    
+    bool accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel",
+                             nickname, sizeof(nickname) - 1);
+
     if (accepted) {
         nvs_set_str(handle, "nickname", nickname);
     }
@@ -53,7 +54,16 @@ static void edit_nickname(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI93
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_RP2040_BL, ACTION_UNINSTALL, ACTION_WIFI_TEST, ACTION_NICKNAME } menu_settings_action_t;
+typedef enum action {
+    ACTION_NONE,
+    ACTION_BACK,
+    ACTION_WIFI,
+    ACTION_OTA,
+    ACTION_RP2040_BL,
+    ACTION_UNINSTALL,
+    ACTION_WIFI_TEST,
+    ACTION_NICKNAME
+} menu_settings_action_t;
 
 void render_settings_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
@@ -85,7 +95,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_insert_item(menu, "Test WiFi connection", NULL, (void*) ACTION_WIFI_TEST, -1);
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
-    //menu_insert_item(menu, "Uninstall app", NULL, (void*) ACTION_UNINSTALL, -1);
+    // menu_insert_item(menu, "Uninstall app", NULL, (void*) ACTION_UNINSTALL, -1);
 
     bool                   render = true;
     menu_settings_action_t action = ACTION_NONE;

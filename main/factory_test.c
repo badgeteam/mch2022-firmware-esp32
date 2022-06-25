@@ -194,7 +194,7 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
                 pax_background(pax_buffer, 0xa85a32);
                 ili9341_write(ili9341, pax_buffer->buf);
             }
-            nvs_set_u8_fixed("system", "force_sponsors", 0x01); // Force showing sponsors on first boot
+            nvs_set_u8_fixed("system", "force_sponsors", 0x01);  // Force showing sponsors on first boot
         }
 
         while (true) {

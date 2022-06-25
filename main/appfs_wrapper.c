@@ -50,7 +50,7 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
         return;
     }
     size_t   app_size = get_file_size(app_fd);
-    uint8_t* app = load_file_to_ram(app_fd);
+    uint8_t* app      = load_file_to_ram(app_fd);
     fclose(app_fd);
     if (app == NULL) {
         display_boot_screen(pax_buffer, ili9341, "Failed to load app to RAM");

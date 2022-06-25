@@ -231,7 +231,7 @@ void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
     if (maxItems > 1) {
         float offsetX = 0;
         if (aMenu->icon != NULL) {
-            offsetX = 32; // Fixed width by choice, could also use "aMenu->icon->width"
+            offsetX = 32;  // Fixed width by choice, could also use "aMenu->icon->width"
         }
 
         maxItems--;
@@ -264,7 +264,7 @@ void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
 
         float iconWidth = 0;
         if (item->icon != NULL) {
-            iconWidth = 33; // Fixed width by choice, could also use "item->icon->width + 1"
+            iconWidth = 33;  // Fixed width by choice, could also use "item->icon->width + 1"
         }
 
         if (index == aMenu->position) {
