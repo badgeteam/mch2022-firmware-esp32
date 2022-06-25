@@ -69,7 +69,7 @@ static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callba
 
     //esp_wifi_set_ps(WIFI_PS_NONE); // Disable any WiFi power save mode
 
-    ESP_LOGI(TAG, "http get");
+    //ESP_LOGI(TAG, "http get");
 
     esp_http_client_config_t config = {
         .url = url,
@@ -84,7 +84,7 @@ static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callba
     esp_err_t err = esp_http_client_perform(client);
     esp_http_client_cleanup(client);
 
-    ESP_LOGI(TAG, "http get done %d", err);
+    //ESP_LOGI(TAG, "http get done %d", err);
 
     return err;
 }
@@ -201,13 +201,14 @@ enum json_cb_parser_state_t {
 
 typedef struct json_cb_parser_t json_cb_parser_t;
 typedef void (*json_cb_parser_callback_t)(json_cb_parser_t *parser, json_parser_state_t state);
-static struct json_cb_parser_t
+struct json_cb_parser_t
 {
     int lc;
     string_appender_t string_appender;
     int int_value;
     json_cb_parser_callback_t callback;
     void *data;
+    int error;
 };
 
 static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callback_t callback, void *data)
@@ -216,6 +217,7 @@ static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callbac
     string_appender_init(&parser->string_appender);
     parser->callback = callback;
     parser->data = data;
+    parser->error = 0;
 }
 
 static void json_cb_parser_close(json_cb_parser_t *parser)
@@ -225,15 +227,15 @@ static void json_cb_parser_close(json_cb_parser_t *parser)
 
 static void json_cb_process(void *callback_data, const char *data, int data_len)
 {
-    ESP_LOGI(TAG, "received data %d", data_len);
+    ESP_LOGI(TAG, "%d bytes of data", data_len);
+
 #define JSON_NEXT_CH parser->lc = __LINE__; goto next; case __LINE__:;
 
     json_cb_parser_t *parser = (json_cb_parser_t*)callback_data;
 
-    for (int i = 0; i < data_len; i++) {
+    for (int i = 0; i < data_len && parser->error == 0; i++) {
         char ch = data[i];
 
-        ESP_LOGI(TAG, "'%c' %d", ch, parser->lc);
         switch(parser->lc) { case 0:
 
             for (;;) {
@@ -288,15 +290,28 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
         next:;
     }       
  #undef JSON_NEXT_CH
+
+    ESP_LOGI(TAG, "parser->error = %d", parser->error);
 }
+
+#define JSON_SYNTAX_ERROR parser->error = __LINE__; return;
 
 // Query app types
 
-hatchery_app_type_t *new_app_type(hatchery_server_t *server) {
-    hatchery_app_type_t *app_type = (hatchery_app_type_t*)malloc(sizeof(hatchery_app_type_t));
+#define MAX_URL_LEN 300
+
+typedef struct process_app_types_t process_app_types_t;
+struct process_app_types_t {
+    int cl;
+    hatchery_server_t *server;
+    hatchery_app_type_t **cur;
+};
+
+static hatchery_app_type_t *new_app_type(hatchery_server_t *server) {
+    hatchery_app_type_t *app_type = (hatchery_app_type_t*)malloc(sizeof(hatchery_app_type_t ));
     if (app_type != NULL) {
-        app_type->slug = NULL;
         app_type->name = NULL;
+        app_type->slug = NULL;
         app_type->server = server;
         app_type->categories = NULL;
         app_type->next = NULL;
@@ -304,19 +319,108 @@ hatchery_app_type_t *new_app_type(hatchery_server_t *server) {
     return app_type;
 }
 
+static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
+{
+    process_app_types_t *process_app_types = (process_app_types_t*)(parser->data);
+#define NEXT process_app_types->cl = __LINE__; return; case __LINE__:;
+/*
+    switch (state) {
+        case json_cb_open_array: ESP_LOGI(TAG, "open_arrat"); break;
+        case json_cb_open_object: ESP_LOGI(TAG, "open_object"); break;
+        case json_cb_close_array: ESP_LOGI(TAG, "close_array"); break;
+        case json_cb_close_object: ESP_LOGI(TAG, "close_object"); break;
+        case json_cb_string: ESP_LOGI(TAG, "string '%s'", string_appender_copy(&parser->string_appender)); break;
+        case json_cb_int: ESP_LOGI(TAG, "int %d", parser->int_value); break;
+    }
+ */   
+    switch(process_app_types->cl) { case 0:
+    
+        if (state == json_cb_open_array) {
+            NEXT
+            while (state == json_cb_open_object) {
+                *process_app_types->cur = new_app_type(process_app_types->server);
+                NEXT
+                while (state == json_cb_string) {
+                    if (string_appender_compare(&parser->string_appender, "slug") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_app_types->cur) != NULL && (*process_app_types->cur)->slug == NULL) {
+                                (*process_app_types->cur)->slug = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "name") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_app_types->cur) != NULL && (*process_app_types->cur)->name == NULL) {
+                                (*process_app_types->cur)->name = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                if (state == json_cb_close_object) {
+                    if ((*process_app_types->cur) != NULL) {
+                        process_app_types->cur = &(*process_app_types->cur)->next;
+                    }
+                    NEXT
+                }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
+            }
+            if (state == json_cb_close_array) {
+                NEXT
+            }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
+        }
+    }
+
+#undef NEXT
+}
+
 esp_err_t hatchery_query_app_types(hatchery_server_t *server) {
+
     if (server->app_types != NULL) {
         return ESP_OK;
     }
 
-    hatchery_app_type_t *app_type = new_app_type(server);
-    if (app_type != NULL) {
-        app_type->name = (char*)malloc(sizeof(char)*4);
-        strcpy(app_type->name, "App");
-        server->app_types = app_type;
-    }
+    process_app_types_t process_app_types_data;
+    process_app_types_data.cl = 0;
+    process_app_types_data.server = server;
+    process_app_types_data.cur = &server->app_types;
+    
+    json_cb_parser_t parser;
+    json_cb_parser_init(&parser, hatchery_process_app_types, &process_app_types_data);
 
-    return ESP_OK;
+    data_callback_t data_callback;
+    data_callback.data = &parser;
+    data_callback.fn = json_cb_process;
+
+    char url[MAX_URL_LEN+1];
+    snprintf(url, MAX_URL_LEN, "%s/types", server->url);
+    url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_app_types %s", url);
+    esp_err_t result = hatchery_http_get(url, &data_callback);
+
+    json_cb_parser_close(&parser);
+
+    return result;
 }
 
 void hatchery_app_type_free(hatchery_app_type_t *app_types) {
@@ -325,7 +429,7 @@ void hatchery_app_type_free(hatchery_app_type_t *app_types) {
         free(app_types->name);
         free(app_types->slug);
         hatchery_category_free(app_types->categories);
-        hatchery_app_type_t *next = app_types;
+        hatchery_app_type_t *next = app_types->next;
         free(app_types);
         app_types = next;
     }
@@ -357,7 +461,6 @@ static hatchery_category_t *new_category(hatchery_app_type_t *app_type) {
 static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
 {
     process_categories_t *process_categories = (process_categories_t*)(parser->data);
-    ESP_LOGI(TAG, "category %d at line %d", state, process_categories->cl);
 #define NEXT process_categories->cl = __LINE__; return; case __LINE__:;
     
     switch(process_categories->cl) { case 0:
@@ -374,8 +477,10 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                             if ((*process_categories->cur) != NULL && (*process_categories->cur)->slug == NULL) {
                                 (*process_categories->cur)->slug = string_appender_copy(&parser->string_appender);
                             }
-                            //printf("slug '%s'\n", slug);
                             NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
                         }
                     }
                     else if (string_appender_compare(&parser->string_appender, "name") == 0) {
@@ -384,17 +489,25 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                             if ((*process_categories->cur) != NULL && (*process_categories->cur)->name == NULL) {
                                 (*process_categories->cur)->name = string_appender_copy(&parser->string_appender);
                             }
-                            //printf("name '%s'\n", name);
                             NEXT
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
                     }
-                    else if (string_appender_compare(&parser->string_appender, "eggs") == 0) {
+                    else if (string_appender_compare(&parser->string_appender, "apps") == 0) {
                         NEXT
                         if (state == json_cb_int) {
                             if ((*process_categories->cur) != NULL && (*process_categories->cur)->nr_apps == -1) {
                                 (*process_categories->cur)->nr_apps = parser->int_value;
                             }
                         }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
                     }
                 }
                 if (state == json_cb_close_object) {
@@ -403,10 +516,19 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                     }
                     NEXT
                 }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
             }
             if (state == json_cb_close_array) {
                 NEXT
             }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
         }
     }
 
@@ -431,7 +553,10 @@ esp_err_t hatchery_query_categories(hatchery_app_type_t *app_type) {
     data_callback.data = &parser;
     data_callback.fn = json_cb_process;
 
-    const char *url = app_type->server->url;
+    char url[MAX_URL_LEN+1];
+    snprintf(url, MAX_URL_LEN, "%s/%s/categories", app_type->server->url, app_type->slug);
+    url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_categories %s", url);
     esp_err_t result = hatchery_http_get(url, &data_callback);
 
     json_cb_parser_close(&parser);
@@ -451,6 +576,175 @@ void hatchery_category_free(hatchery_category_t *catagories) {
     }
 }
 
+// Query apps
+
+typedef struct process_apps_t process_apps_t;
+struct process_apps_t {
+    int cl;
+    hatchery_category_t *category;
+    hatchery_app_t **cur;
+};
+
+static hatchery_app_t *new_app(hatchery_category_t *category) {
+    hatchery_app_t *app = (hatchery_app_t*)malloc(sizeof(hatchery_app_t ));
+    if (app != NULL) {
+        app->name = NULL;
+        app->slug = NULL; 
+        app->author = NULL;
+        app->license = NULL;
+        app->description = NULL;
+        app->version = 0;
+        app->files = NULL;
+        app->category = category;
+        app->next = NULL;
+    }
+    return app;
+}
+
+static void hatchery_process_apps(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
+{
+    process_apps_t *process_apps = (process_apps_t*)(parser->data);
+#define NEXT process_apps->cl = __LINE__; return; case __LINE__:;
+    
+    switch(process_apps->cl) { case 0:
+    
+        if (state == json_cb_open_array) {
+            NEXT
+            while (state == json_cb_open_object) {
+                *process_apps->cur = new_app(process_apps->category);
+                NEXT
+                while (state == json_cb_string) {
+                    if (string_appender_compare(&parser->string_appender, "slug") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_apps->cur) != NULL && (*process_apps->cur)->slug == NULL) {
+                                (*process_apps->cur)->slug = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "name") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_apps->cur) != NULL && (*process_apps->cur)->name == NULL) {
+                                (*process_apps->cur)->name = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "author") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_apps->cur) != NULL && (*process_apps->cur)->author == NULL) {
+                                (*process_apps->cur)->author = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "license") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_apps->cur) != NULL && (*process_apps->cur)->license == NULL) {
+                                (*process_apps->cur)->license = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "description") == 0) {
+                        NEXT
+                        if (state == json_cb_string) {
+                            if ((*process_apps->cur) != NULL && (*process_apps->cur)->description == NULL) {
+                                (*process_apps->cur)->description = string_appender_copy(&parser->string_appender);
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else if (string_appender_compare(&parser->string_appender, "version") == 0) {
+                        NEXT
+                        if (state == json_cb_int) {
+                            if ((*process_apps->cur) != NULL) {
+                                (*process_apps->cur)->version = parser->int_value;
+                            }
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                if (state == json_cb_close_object) {
+                    if ((*process_apps->cur) != NULL) {
+                        process_apps->cur = &(*process_apps->cur)->next;
+                    }
+                    NEXT
+                }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
+            }
+            if (state == json_cb_close_array) {
+                NEXT
+            }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
+        }
+    }
+
+#undef NEXT
+}
+
+esp_err_t hatchery_query_apps(hatchery_category_t *category) {
+
+    if (category->apps != NULL) {
+        return ESP_OK;
+    }
+
+    process_apps_t process_apps_data;
+    process_apps_data.cl = 0;
+    process_apps_data.category = category;
+    process_apps_data.cur = &category->apps;
+    
+    json_cb_parser_t parser;
+    json_cb_parser_init(&parser, hatchery_process_apps, &process_apps_data);
+
+    data_callback_t data_callback;
+    data_callback.data = &parser;
+    data_callback.fn = json_cb_process;
+
+    hatchery_app_type_t *app_type = category->app_type;
+    char url[MAX_URL_LEN+1];
+    snprintf(url, MAX_URL_LEN, "%s/%s/%s/apps", app_type->server->url, app_type->slug, category->slug);
+    url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_apps %s", url);
+    esp_err_t result = hatchery_http_get(url, &data_callback);
+
+    json_cb_parser_close(&parser);
+
+    return result;
+}
+
 void hatchery_app_free(hatchery_app_t *apps) {
 
     while (apps != NULL) {
@@ -459,8 +753,285 @@ void hatchery_app_free(hatchery_app_t *apps) {
         free(apps->author);
         free(apps->license);
         free(apps->description);
+        for (hatchery_file_t *files = apps->files; files != NULL;) {
+            free(files->name);
+            free(files->url);
+            hatchery_file_t *next_file = files->next;
+            free(files);
+            files = next_file;
+        }
         hatchery_app_t *next = apps->next;
         free(apps);
         apps = next;
     }
+}
+
+// Query app
+
+static hatchery_file_t *new_file() {
+    hatchery_file_t *file = (hatchery_file_t*)malloc(sizeof(hatchery_file_t));
+    if (file != NULL) {
+        file->name = NULL;
+        file->url = NULL;
+        file->size = -1;
+        file->contents = NULL;
+        file->next = NULL;
+    }
+    return file;
+}
+
+typedef struct process_app_t process_app_t;
+struct process_app_t {
+    int cl;
+    hatchery_app_t *app;
+    hatchery_file_t **cur;
+};
+
+static void replace_string(char **ref_trg, string_appender_t *string_appender) {
+    if (*ref_trg == NULL || string_appender_compare(string_appender, *ref_trg) != 0) {
+        free(*ref_trg);
+        *ref_trg = string_appender_copy(string_appender);
+    }
+}
+
+static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_state_t state)
+{
+    process_app_t *process_app = (process_app_t*)(parser->data);
+#define NEXT process_app->cl = __LINE__; return; case __LINE__:;
+    
+    switch(process_app->cl) { case 0:
+    
+        if (state == json_cb_open_object) {
+            NEXT
+            while (state == json_cb_string) {
+                if (string_appender_compare(&parser->string_appender, "slug") == 0) {
+                    NEXT
+                    if (state == json_cb_string) {
+                        replace_string(&process_app->app->slug, &parser->string_appender);
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "name") == 0) {
+                    NEXT
+                    if (state == json_cb_string) {
+                        replace_string(&process_app->app->name, &parser->string_appender);
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "author") == 0) {
+                    NEXT
+                    if (state == json_cb_string) {
+                        replace_string(&process_app->app->author, &parser->string_appender);
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "license") == 0) {
+                    NEXT
+                    if (state == json_cb_string) {
+                        replace_string(&process_app->app->license, &parser->string_appender);
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "description") == 0) {
+                    NEXT
+                    if (state == json_cb_string) {
+                        replace_string(&process_app->app->description, &parser->string_appender);
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "version") == 0) {
+                    NEXT
+                    if (state == json_cb_int) {
+                        process_app->app->version = parser->int_value;
+                        NEXT
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else if (string_appender_compare(&parser->string_appender, "files") == 0) {
+                    NEXT
+                    if (state == json_cb_open_array) {
+                        NEXT
+                        while (state == json_cb_open_object) {
+                            (*process_app->cur) = new_file();
+                            NEXT
+                            while (state == json_cb_string) {
+                                if (string_appender_compare(&parser->string_appender, "name") == 0) {
+                                    NEXT
+                                    if (state == json_cb_string) {
+                                        if ((*process_app->cur) != NULL && (*process_app->cur)->name == NULL) {
+                                            (*process_app->cur)->name = string_appender_copy(&parser->string_appender);
+                                        }
+                                        NEXT
+                                    }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
+                                }
+                                else if (string_appender_compare(&parser->string_appender, "url") == 0) {
+                                    NEXT
+                                    if (state == json_cb_string) {
+                                        if ((*process_app->cur) != NULL && (*process_app->cur)->url == NULL) {
+                                            (*process_app->cur)->url = string_appender_copy(&parser->string_appender);
+                                        }
+                                        NEXT
+                                    }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
+                                }
+                                else if (string_appender_compare(&parser->string_appender, "size") == 0) {
+                                    NEXT
+                                    if (state == json_cb_int) {
+                                        if ((*process_app->cur) != NULL && (*process_app->cur)->size == -1) {
+                                            (*process_app->cur)->size = parser->int_value;
+                                        }
+                                    }
+                                    else {
+                                        JSON_SYNTAX_ERROR
+                                    }
+                                }
+                                else {
+                                    JSON_SYNTAX_ERROR
+                                }
+                            }
+                            if (state == json_cb_close_object) {
+                                if ((*process_app->cur) != NULL) {
+                                    process_app->cur = &(*process_app->cur)->next;
+                                }
+                                NEXT
+                            }
+                            else {
+                                JSON_SYNTAX_ERROR
+                            }
+                        }
+                        if (state == json_cb_close_array) {
+                            NEXT
+                        }
+                        else {
+                            JSON_SYNTAX_ERROR
+                        }
+                    }
+                    else {
+                        JSON_SYNTAX_ERROR
+                    }
+                }
+                else {
+                    JSON_SYNTAX_ERROR
+                }
+            }
+            if (state == json_cb_open_object) {
+                NEXT
+            }
+            else {
+                JSON_SYNTAX_ERROR
+            }
+        }
+        else {
+            JSON_SYNTAX_ERROR
+        }
+    }
+
+#undef NEXT
+}
+
+esp_err_t hatchery_query_app(hatchery_app_t *app) {
+
+    if (app->files != NULL) {
+        return ESP_OK;
+    }
+
+    process_app_t process_app_data;
+    process_app_data.cl = 0;
+    process_app_data.app = app;
+    process_app_data.cur = &app->files;
+    
+    json_cb_parser_t parser;
+    json_cb_parser_init(&parser, hatchery_process_app, &process_app_data);
+
+    data_callback_t data_callback;
+    data_callback.data = &parser;
+    data_callback.fn = json_cb_process;
+
+    hatchery_category_t *category = app->category;
+    hatchery_app_type_t *app_type = category->app_type;
+    char url[MAX_URL_LEN+1];
+    snprintf(url, MAX_URL_LEN, "%s/%s/%s/%s", app_type->server->url, app_type->slug, category->slug, app->slug);
+    url[MAX_URL_LEN] = '\0';
+    ESP_LOGI(TAG, "query_app %s", url);
+    esp_err_t result = hatchery_http_get(url, &data_callback);
+
+    json_cb_parser_close(&parser);
+
+    return result;
+}
+
+// Query file
+
+typedef struct process_file_t process_file_t;
+struct process_file_t {
+    hatchery_file_t *file;
+    int loaded;
+};
+
+static void file_data_cb_process(void *callback_data, const char *data, int data_len) {
+    process_file_t *process_file_data = (process_file_t*)callback_data;
+    hatchery_file_t *file = process_file_data->file;
+
+    if (file->contents == NULL) {
+        return;
+    }
+    if (process_file_data->loaded + data_len > file->size) {
+        // Received more data than expected
+        free(file->contents);
+        file->contents = NULL;
+        return;        
+    }
+
+    memcpy(file->contents + process_file_data->loaded, data, data_len);
+    process_file_data->loaded += data_len;
+}
+
+esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file) {
+
+    if (file->contents != NULL || file->size <= 0) {
+        return ESP_OK;
+    }
+    file->contents = (uint8_t*)malloc(file->size);
+    if (file->contents == NULL) {
+        return ESP_OK;
+    }
+    process_file_t process_file_data;
+    process_file_data.file = file;
+    process_file_data.loaded = 0;
+
+    data_callback_t data_callback;
+    data_callback.data = &process_file_data;
+    data_callback.fn = file_data_cb_process;
+
+    ESP_LOGI(TAG, "query_file %s %d", file->url, file->size);
+    esp_err_t result = hatchery_http_get(file->url, &data_callback);
+
+    if (file->contents != NULL || process_file_data.loaded != file->size) {
+        free(file->contents);
+        file->contents = NULL;
+    }
+
+    return result;
 }

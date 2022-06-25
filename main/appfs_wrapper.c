@@ -40,9 +40,8 @@ void appfs_boot_app(int fd) {
 
 void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
-    esp_err_t      res;
-    appfs_handle_t handle;
-    FILE*          app_fd = fopen(path, "rb");
+    esp_err_t res;
+    FILE*     app_fd = fopen(path, "rb");
     if (app_fd == NULL) {
         display_boot_screen(pax_buffer, ili9341, "Failed to open file");
         ESP_LOGE(TAG, "Failed to open file");
@@ -61,7 +60,14 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
 
     ESP_LOGI(TAG, "Application size %d", app_size);
 
-    res = appfsCreateFileExt(name, title, version, app_size, &handle);
+    appfs_store_in_memory_app(pax_buffer, ili9341, name, title, version, app_size, app);
+
+    free(app);
+}
+
+void appfs_store_in_memory_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
+    appfs_handle_t handle;
+    esp_err_t res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
         display_boot_screen(pax_buffer, ili9341, "Failed to create file");
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
@@ -86,7 +92,6 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
         free(app);
         return;
     }
-    free(app);
     ESP_LOGI(TAG, "Application is now stored in AppFS");
     display_boot_screen(pax_buffer, ili9341, "App installed!");
     vTaskDelay(100 / portTICK_PERIOD_MS);

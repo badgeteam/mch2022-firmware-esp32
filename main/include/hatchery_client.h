@@ -45,8 +45,8 @@ typedef struct hatchery_file_t hatchery_file_t;
 struct hatchery_file_t {
     char *name;
     char *url;
-    int size;
-    hatchery_category_t *category;
+    size_t size; // -1: Unknown
+    uint8_t *contents;
     hatchery_file_t *next;
 };
 
@@ -56,7 +56,9 @@ struct hatchery_app_t {
     char *author;
     char *license;
     char *description;
+    uint16_t version; // default 0
     hatchery_file_t *files;
+    hatchery_category_t *category;
     hatchery_app_t *next;
 };
 
@@ -65,3 +67,5 @@ esp_err_t hatchery_query_apps(hatchery_category_t *category);
 esp_err_t hatchery_query_app(hatchery_app_t *app);
 
 void hatchery_app_free(hatchery_app_t *apps);
+
+esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file);
