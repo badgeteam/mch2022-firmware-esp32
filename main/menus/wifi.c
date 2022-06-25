@@ -25,8 +25,6 @@
 #include "wifi_connection.h"
 #include "wifi_ota.h"
 
-static const char* TAG = "wifi menu";
-
 typedef enum action {
     /* ==== GENERIC ACTIONS ==== */
     // Nothing happens.

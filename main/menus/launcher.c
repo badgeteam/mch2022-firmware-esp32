@@ -21,10 +21,12 @@ extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
 static bool populate(menu_t* menu) {
+    size_t previous_position = menu_get_position(menu);
     for (size_t index = 0; index < menu_get_length(menu); index++) {
         free(menu_get_callback_args(menu, index));
     }
-    while (menu_remove_item(menu, 0)) { /* Empty. */
+    while (menu_remove_item(menu, 0)) {
+        ;
     }
 
     bool           empty    = true;
@@ -40,6 +42,8 @@ static bool populate(menu_t* menu) {
         menu_insert_item(menu, title, NULL, (void*) args, -1);
         appfs_fd = appfsNextEntry(appfs_fd);
     }
+
+    menu_set_position(menu, previous_position);
     return empty;
 }
 

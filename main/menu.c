@@ -154,10 +154,11 @@ bool menu_remove_item(menu_t* menu, size_t position) {
     free(item->label);
     free(item);
     menu->length--;
-    printf("%u / %u\n", menu->position, menu->length);
+    if (menu->length < 1) {
+        menu->position = 0;
+    }
     if (menu->position >= menu->length) {
         menu->position = menu->length - 1;
-        printf("Corrected to %u / %u\n", menu->position, menu->length);
     }
     return true;
 }
@@ -198,6 +199,15 @@ void menu_navigate_next_row(menu_t* menu) {
 }
 
 size_t menu_get_position(menu_t* menu) { return menu->position; }
+
+void menu_set_position(menu_t* menu, size_t position) {
+    menu->position = position;
+    if (menu->length < 1) {
+        menu->position = 0;
+    } else if (menu->position >= menu->length) {
+        menu->position = menu->length - 1;
+    }
+}
 
 size_t menu_get_length(menu_t* menu) { return menu->length; }
 

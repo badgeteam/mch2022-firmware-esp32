@@ -61,6 +61,7 @@ void       menu_navigate_next(menu_t* menu);
 void       menu_navigate_previous_row(menu_t* menu);
 void       menu_navigate_next_row(menu_t* menu);
 size_t     menu_get_position(menu_t* menu);
+void       menu_set_position(menu_t* menu, size_t position);
 size_t     menu_get_length(menu_t* menu);
 void*      menu_get_callback_args(menu_t* menu, size_t position);
 pax_buf_t* menu_get_icon(menu_t* menu, size_t position);
