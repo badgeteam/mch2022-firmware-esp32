@@ -33,6 +33,7 @@
 #include "rp2040.h"
 #include "rp2040_updater.h"
 #include "rp2040bl.h"
+#include "rtc_memory.h"
 #include "sao_eeprom.h"
 #include "sdcard.h"
 #include "settings.h"
@@ -41,7 +42,6 @@
 #include "wifi_connection.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
-#include "rtc_memory.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -60,24 +60,6 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
     if (line2 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20 * 2, line2);
     if (line3 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20 * 3, line3);
     ili9341_write(ili9341, pax_buffer->buf);
-}
-
-static bool wait_for_button(xQueueHandle buttonQueue) {
-    while (1) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            if (value) {
-                if (pin == RP2040_INPUT_BUTTON_BACK) {
-                    return false;
-                }
-                if (pin == RP2040_INPUT_BUTTON_ACCEPT) {
-                    return true;
-                }
-            }
-        }
-    }
 }
 
 void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
@@ -251,7 +233,7 @@ void app_main(void) {
 
     /* Start WiFi */
     wifi_init();
-    
+
     /* Clear RTC memory */
     rtc_memory_clear();
 
@@ -270,7 +252,7 @@ void app_main(void) {
     if (webusb_mode == 0x00) {  // Normal boot
         /* Sponsors check */
         nvs_handle_t handle;
-        esp_err_t res = nvs_open("system", NVS_READWRITE, &handle);
+        esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
         if (res != ESP_OK) {
             display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
             stop();
@@ -289,7 +271,7 @@ void app_main(void) {
         }
 
         nvs_close(handle);
-        
+
         /* Rick that roll */
         play_bootsound();
 

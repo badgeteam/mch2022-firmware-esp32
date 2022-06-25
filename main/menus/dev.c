@@ -43,7 +43,7 @@ typedef enum action {
     ACTION_IR
 } menu_dev_action_t;
 
-void render_dev_help(pax_buf_t* pax_buffer) {
+static void render_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
@@ -80,7 +80,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
 
-    render_dev_help(pax_buffer);
+    render_help(pax_buffer);
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
@@ -147,7 +147,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
             }
             action = ACTION_NONE;
             render = true;
-            render_dev_help(pax_buffer);
+            render_help(pax_buffer);
         }
     }
 

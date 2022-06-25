@@ -45,20 +45,21 @@ typedef struct menu {
 
 } menu_t;
 
-menu_t* menu_alloc(const char* aTitle, float arg_entry_height, float arg_text_height);
-void    menu_free(menu_t* aMenu);
-void    menu_set_icon(menu_t* aMenu, pax_buf_t* icon);
-bool    menu_insert_item(menu_t* aMenu, const char* aLabel, menu_callback_t aCallback, void* aCallbackArgs, size_t aPosition);
-bool    menu_insert_item_icon(menu_t* aMenu, const char* aLabel, menu_callback_t aCallback, void* aCallbackArgs, size_t aPosition, pax_buf_t* icon);
-bool    menu_remove_item(menu_t* aMenu, size_t aPosition);
-bool    menu_navigate_to(menu_t* aMenu, size_t aPosition);
-void    menu_navigate_previous(menu_t* aMenu);
-void    menu_navigate_next(menu_t* aMenu);
-size_t  menu_get_position(menu_t* aMenu);
-size_t  menu_get_length(menu_t* aMenu);
-void*   menu_get_callback_args(menu_t* aMenu, size_t aPosition);
-void    menu_debug(menu_t* aMenu);
-void    menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor);
+menu_t*    menu_alloc(const char* aTitle, float arg_entry_height, float arg_text_height);
+void       menu_free(menu_t* aMenu);
+void       menu_set_icon(menu_t* aMenu, pax_buf_t* icon);
+bool       menu_insert_item(menu_t* aMenu, const char* aLabel, menu_callback_t aCallback, void* aCallbackArgs, size_t aPosition);
+bool       menu_insert_item_icon(menu_t* aMenu, const char* aLabel, menu_callback_t aCallback, void* aCallbackArgs, size_t aPosition, pax_buf_t* icon);
+bool       menu_remove_item(menu_t* aMenu, size_t aPosition);
+bool       menu_navigate_to(menu_t* aMenu, size_t aPosition);
+void       menu_navigate_previous(menu_t* aMenu);
+void       menu_navigate_next(menu_t* aMenu);
+size_t     menu_get_position(menu_t* aMenu);
+size_t     menu_get_length(menu_t* aMenu);
+void*      menu_get_callback_args(menu_t* aMenu, size_t aPosition);
+pax_buf_t* menu_get_icon(menu_t* aMenu, size_t aPosition);
+void       menu_debug(menu_t* aMenu);
+void       menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor);
 
 #ifdef __cplusplus
 }

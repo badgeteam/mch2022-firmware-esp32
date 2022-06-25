@@ -24,35 +24,33 @@ static bool populate(menu_t* menu) {
     for (size_t index = 0; index < menu_get_length(menu); index++) {
         free(menu_get_callback_args(menu, index));
     }
-    while (menu_remove_item(menu, 0)) { /* Empty. */ }
+    while (menu_remove_item(menu, 0)) { /* Empty. */
+    }
 
-    bool empty = true;
+    bool           empty    = true;
     appfs_handle_t appfs_fd = appfsNextEntry(APPFS_INVALID_FD);
     while (appfs_fd != APPFS_INVALID_FD) {
-        empty = false;
+        empty               = false;
         const char* name    = NULL;
         const char* title   = NULL;
         uint16_t    version = 0xFFFF;
         appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
         appfs_handle_t* args = malloc(sizeof(appfs_handle_t));
-        *args = appfs_fd;
+        *args                = appfs_fd;
         menu_insert_item(menu, title, NULL, (void*) args, -1);
         appfs_fd = appfsNextEntry(appfs_fd);
     }
     return empty;
 }
 
-typedef enum {
-    CONTEXT_ACTION_NONE,
-    CONTEXT_ACTION_UNINSTALL
-} context_menu_action_t;
+typedef enum { CONTEXT_ACTION_NONE, CONTEXT_ACTION_UNINSTALL } context_menu_action_t;
 
 void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     const char* name    = NULL;
     const char* title   = NULL;
     uint16_t    version = 0xFFFF;
     appfsEntryInfoExt(fd, &name, &title, &version, NULL);
-    menu_t* menu = menu_alloc(title, 20, 18);
+    menu_t* menu            = menu_alloc(title, 20, 18);
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
@@ -62,13 +60,13 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
     menu->titleBgColor      = 0xFF491d88;
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
-    
+
     menu_insert_item(menu, "Uninstall", NULL, (void*) CONTEXT_ACTION_UNINSTALL, -1);
-    
+
     bool render = true;
-    bool quit = false;
+    bool quit   = false;
     while (!quit) {
-        context_menu_action_t action = CONTEXT_ACTION_NONE;
+        context_menu_action_t  action        = CONTEXT_ACTION_NONE;
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
             if (buttonMessage.state) {
@@ -103,7 +101,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
-        
+
         if (action == CONTEXT_ACTION_UNINSTALL) {
             render_message(pax_buffer, "Uninstalling app...");
             ili9341_write(ili9341, pax_buffer->buf);
@@ -117,7 +115,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
 
 void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_noclip(pax_buffer);
-    menu_t* menu = menu_alloc("ESP32 apps", 34, 18);
+    menu_t* menu            = menu_alloc("ESP32 apps", 34, 18);
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
@@ -136,9 +134,9 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
     bool empty = populate(menu);
 
-    bool render = true;
-    appfs_handle_t* appfs_fd_to_start = NULL;
-    bool quit = false;
+    bool            render                = true;
+    appfs_handle_t* appfs_fd_to_start     = NULL;
+    bool            quit                  = false;
     appfs_handle_t* appfs_fd_context_menu = NULL;
     while (!quit) {
         rp2040_input_message_t buttonMessage = {0};
@@ -171,12 +169,12 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 }
             }
         }
-        
+
         if (appfs_fd_context_menu != NULL) {
             context_menu(*appfs_fd_context_menu, buttonQueue, pax_buffer, ili9341);
-            empty = populate(menu);
+            empty                 = populate(menu);
             appfs_fd_context_menu = NULL;
-            render = true;
+            render                = true;
         }
 
         if (render) {

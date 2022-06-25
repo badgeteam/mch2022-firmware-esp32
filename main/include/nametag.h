@@ -4,8 +4,8 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-#include "pax_gfx.h"
 #include "ili9341.h"
+#include "pax_gfx.h"
 #include "rp2040.h"
 
 // Shows the name tag.
