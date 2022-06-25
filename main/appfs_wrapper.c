@@ -67,7 +67,7 @@ void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, 
 
 void appfs_store_in_memory_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
-    esp_err_t res = appfsCreateFileExt(name, title, version, app_size, &handle);
+    esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
         display_boot_screen(pax_buffer, ili9341, "Failed to create file");
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
