@@ -57,7 +57,7 @@ class WebUSBPacket():
         return struct.pack("<HIHI", self.command.value, len(self.payload), 0xADDE, self.message_id)
 
 class WebUSB():
-    def __init__(self):
+    def __init__(self, boot = True):
         self.device = usb.core.find(idVendor=0x16d0, idProduct=0x0f9a)
 
         if self.device is None:
@@ -74,10 +74,11 @@ class WebUSB():
         self.REQUEST_BAUDRATE = 0x24
         self.REQUEST_MODE     = 0x25
 
-        self.TIMEOUT = 15
+        self.TIMEOUT = 60
         self.PAYLOADHEADERLEN = 12
 
-        self.bootWebUSB()
+        if boot:
+            self.bootWebUSB()
         self.message_id = 1
 
     def getMessageId(self):
@@ -278,3 +279,6 @@ class WebUSB():
         self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_MODE, 0x0000, self.webusb_esp32.bInterfaceNumber)
         self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_STATE, 0x0000, self.webusb_esp32.bInterfaceNumber)
 
+
+    def reset(self):
+        self.device.ctrl_transfer(self.REQUEST_TYPE_CLASS_TO_INTERFACE, self.REQUEST_RESET, 0x0000, self.webusb_esp32.bInterfaceNumber)

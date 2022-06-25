@@ -1,37 +1,39 @@
+#include "menu.h"
+
 #include <stdio.h>
 #include <string.h>
-#include "pax_gfx.h"
+
 #include "pax_codecs.h"
-#include "menu.h"
+#include "pax_gfx.h"
 
 menu_t* menu_alloc(const char* aTitle, float arg_entry_height, float arg_text_height) {
     if (aTitle == NULL) return NULL;
     menu_t* menu = malloc(sizeof(menu_t));
     if (menu == NULL) return NULL;
     size_t titleSize = strlen(aTitle) + 1;
-    menu->title = malloc(titleSize);
+    menu->title      = malloc(titleSize);
     if (menu->title == NULL) {
         free(menu);
         return NULL;
     }
     memcpy(menu->title, aTitle, titleSize);
-    menu->firstItem = NULL;
-    menu->length = 0;
-    menu->position = 0;
+    menu->firstItem    = NULL;
+    menu->length       = 0;
+    menu->position     = 0;
     menu->entry_height = (arg_entry_height > 0) ? arg_entry_height : 20;
-    menu->text_height = (arg_text_height > 0) ? arg_text_height : (arg_entry_height - 2);
-    menu->icon = NULL;
-    
-    menu->fgColor = 0xFF000000;
-    menu->bgColor = 0xFFFFFFFF;
-    menu->bgTextColor = 0xFFFFFFFF;
+    menu->text_height  = (arg_text_height > 0) ? arg_text_height : (arg_entry_height - 2);
+    menu->icon         = NULL;
+
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFFFFFFFF;
     menu->selectedItemColor = 0xFF000000;
-    menu->borderColor = 0x88000000;
-    menu->titleColor = 0xFFFFFFFF;
-    menu->titleBgColor = 0xFF000000;
-    menu->scrollbarBgColor = 0xFFCCCCCC;
-    menu->scrollbarFgColor = 0xFF555555;
-    
+    menu->borderColor       = 0x88000000;
+    menu->titleColor        = 0xFFFFFFFF;
+    menu->titleBgColor      = 0xFF000000;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+
     return menu;
 }
 
@@ -52,9 +54,7 @@ void menu_free(menu_t* aMenu) {
     free(aMenu);
 }
 
-void menu_set_icon(menu_t* aMenu, pax_buf_t* icon) {
-    aMenu->icon = icon;
-}
+void menu_set_icon(menu_t* aMenu, pax_buf_t* icon) { aMenu->icon = icon; }
 
 menu_item_t* _menu_find_item(menu_t* aMenu, size_t aPosition) {
     menu_item_t* currentItem = aMenu->firstItem;
@@ -82,29 +82,29 @@ bool menu_insert_item(menu_t* aMenu, const char* aLabel, menu_callback_t aCallba
     menu_item_t* newItem = malloc(sizeof(menu_item_t));
     if (newItem == NULL) return false;
     size_t labelSize = strlen(aLabel) + 1;
-    newItem->label = malloc(labelSize);
+    newItem->label   = malloc(labelSize);
     if (newItem->label == NULL) {
         free(newItem);
         return false;
     }
     memcpy(newItem->label, aLabel, labelSize);
-    newItem->callback = aCallback;
+    newItem->callback     = aCallback;
     newItem->callbackArgs = aCallbackArgs;
-    newItem->icon = NULL;
+    newItem->icon         = NULL;
     if (aMenu->firstItem == NULL) {
-        newItem->nextItem = NULL;
+        newItem->nextItem     = NULL;
         newItem->previousItem = NULL;
-        aMenu->firstItem = newItem;
+        aMenu->firstItem      = newItem;
     } else {
         if (aPosition >= aMenu->length) {
-            newItem->previousItem = _menu_find_last_item(aMenu);
-            newItem->nextItem = NULL;
+            newItem->previousItem           = _menu_find_last_item(aMenu);
+            newItem->nextItem               = NULL;
             newItem->previousItem->nextItem = newItem;
         } else {
-            newItem->nextItem = _menu_find_item(aMenu, aPosition);
-            newItem->previousItem = newItem->nextItem->previousItem; // Copy pointer to previous item to new item
-            if (newItem->nextItem != NULL) newItem->nextItem->previousItem = newItem; // Replace pointer to previous item with new item
-            if (newItem->previousItem != NULL) newItem->previousItem->nextItem = newItem; // Replace pointer to next item in previous item
+            newItem->nextItem     = _menu_find_item(aMenu, aPosition);
+            newItem->previousItem = newItem->nextItem->previousItem;                       // Copy pointer to previous item to new item
+            if (newItem->nextItem != NULL) newItem->nextItem->previousItem = newItem;      // Replace pointer to previous item with new item
+            if (newItem->previousItem != NULL) newItem->previousItem->nextItem = newItem;  // Replace pointer to next item in previous item
         }
     }
     aMenu->length++;
@@ -121,21 +121,21 @@ bool menu_insert_item_icon(menu_t* aMenu, const char* aLabel, menu_callback_t aC
     } else {
         item = _menu_find_item(aMenu, aPosition);
     }
-    
+
     item->icon = icon;
     return true;
 }
 
 bool menu_remove_item(menu_t* aMenu, size_t aPosition) {
-    if (aMenu == NULL) return false; // Can't delete an item from a menu that doesn't exist
-    if (aMenu->length <= aPosition) return false; // Can't delete an item that doesn't exist
+    if (aMenu == NULL) return false;               // Can't delete an item from a menu that doesn't exist
+    if (aMenu->length <= aPosition) return false;  // Can't delete an item that doesn't exist
     menu_item_t* item;
-    
+
     if (aPosition == 0) {
         item = aMenu->firstItem;
-        if (item == NULL) return false; // Can't delete if no linked list is allocated
+        if (item == NULL) return false;  // Can't delete if no linked list is allocated
         if (item->nextItem != NULL) {
-            aMenu->firstItem = item->nextItem;
+            aMenu->firstItem               = item->nextItem;
             aMenu->firstItem->previousItem = NULL;
         } else {
             aMenu->firstItem = NULL;
@@ -149,6 +149,11 @@ bool menu_remove_item(menu_t* aMenu, size_t aPosition) {
     free(item->label);
     free(item);
     aMenu->length--;
+    printf("%u / %u\n", aMenu->position, aMenu->length);
+    if (aMenu->position >= aMenu->length) {
+        aMenu->position = aMenu->length - 1;
+        printf("Corrected to %u / %u\n", aMenu->position, aMenu->length);
+    }
     return true;
 }
 
@@ -165,7 +170,7 @@ void menu_navigate_previous(menu_t* aMenu) {
     if (aMenu->length < 1) return;
     aMenu->position--;
     if (aMenu->position > aMenu->length) {
-       aMenu->position = aMenu->length - 1;
+        aMenu->position = aMenu->length - 1;
     }
 }
 
@@ -175,18 +180,20 @@ void menu_navigate_next(menu_t* aMenu) {
     aMenu->position = (aMenu->position + 1) % aMenu->length;
 }
 
-size_t menu_get_position(menu_t* aMenu) {
-    return aMenu->position;
-}
+size_t menu_get_position(menu_t* aMenu) { return aMenu->position; }
 
-size_t menu_get_length(menu_t* aMenu) {
-    return aMenu->length;
-}
+size_t menu_get_length(menu_t* aMenu) { return aMenu->length; }
 
 void* menu_get_callback_args(menu_t* aMenu, size_t aPosition) {
     menu_item_t* item = _menu_find_item(aMenu, aPosition);
     if (item == NULL) return NULL;
     return item->callbackArgs;
+}
+
+pax_buf_t* menu_get_icon(menu_t* aMenu, size_t aPosition) {
+    menu_item_t* item = _menu_find_item(aMenu, aPosition);
+    if (item == NULL) return NULL;
+    return item->icon;
 }
 
 void menu_debug(menu_t* aMenu) {
@@ -209,41 +216,42 @@ void menu_debug(menu_t* aMenu) {
     printf("------\n");
 }
 
-void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor) {
-    const pax_font_t *font = pax_get_font("saira regular");
-    
-    float entry_height = aMenu->entry_height;//18 + 2;
-    float text_height = aMenu->text_height;
-    float text_offset = ((entry_height - text_height) / 2) + 1;
-    size_t maxItems = aHeight / entry_height;
-    
+void menu_render(pax_buf_t* aBuffer, menu_t* aMenu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor) {
+    const pax_font_t* font = pax_get_font("saira regular");
+
+    float  entry_height = aMenu->entry_height;  // 18 + 2;
+    float  text_height  = aMenu->text_height;
+    float  text_offset  = ((entry_height - text_height) / 2) + 1;
+    size_t maxItems     = aHeight / entry_height;
+
     float posY = aPosY;
 
     pax_noclip(aBuffer);
-    
+
     if (maxItems > 1) {
         float offsetX = 0;
         if (aMenu->icon != NULL) {
-            offsetX = aMenu->icon->width;
+            offsetX = 32;  // Fixed width by choice, could also use "aMenu->icon->width"
         }
-        
+
         maxItems--;
         pax_simple_rect(aBuffer, aMenu->titleBgColor, aPosX, posY, aWidth, entry_height);
-        //pax_simple_line(aBuffer, aMenu->titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
+        // pax_simple_line(aBuffer, aMenu->titleColor, aPosX + 1, aPosY + entry_height, aPosX + aWidth - 2, aPosY + entry_height - 1);
         pax_clip(aBuffer, aPosX + 1, posY + text_offset, aWidth - 2, text_height);
         pax_draw_text(aBuffer, aMenu->titleColor, font, text_height, aPosX + offsetX + 1, posY + text_offset, aMenu->title);
-        pax_noclip(aBuffer);
         if (aMenu->icon != NULL) {
+            pax_clip(aBuffer, aPosX, posY, 32, 32);
             pax_draw_image(aBuffer, aMenu->icon, aPosX, posY);
         }
+        pax_noclip(aBuffer);
         posY += entry_height;
     }
-    
+
     size_t itemOffset = 0;
     if (aMenu->position >= maxItems) {
         itemOffset = aMenu->position - maxItems + 1;
     }
-    
+
     pax_outline_rect(aBuffer, aMenu->borderColor, aPosX, aPosY, aWidth, aHeight);
     pax_simple_rect(aBuffer, aMenu->bgColor, aPosX, posY, aWidth, aHeight - posY + aPosY);
 
@@ -253,10 +261,10 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
             printf("Render error: item is NULL at %u\n", index);
             break;
         }
-        
+
         float iconWidth = 0;
         if (item->icon != NULL) {
-            iconWidth = item->icon->width + 1;
+            iconWidth = 33;  // Fixed width by choice, could also use "item->icon->width + 1"
         }
 
         if (index == aMenu->position) {
@@ -270,25 +278,25 @@ void menu_render(pax_buf_t *aBuffer, menu_t* aMenu, float aPosX, float aPosY, fl
             pax_draw_text(aBuffer, aMenu->fgColor, font, text_height, aPosX + iconWidth + 1, posY + text_offset, item->label);
             pax_noclip(aBuffer);
         }
-        
+
         if (item->icon != NULL) {
             pax_draw_image(aBuffer, item->icon, aPosX + 1, posY);
         }
-        
+
         posY += entry_height;
     }
-    
+
     pax_clip(aBuffer, aPosX + aWidth - 5, aPosY + entry_height, 4, aHeight - 1 - entry_height);
-    
-    float fractionStart = itemOffset / (aMenu->length * 1.0);
+
+    float fractionStart    = itemOffset / (aMenu->length * 1.0);
     float fractionSelected = aMenu->position / (aMenu->length * 1.0);
-    float fractionEnd = (itemOffset + maxItems) / (aMenu->length * 1.0);
+    float fractionEnd      = (itemOffset + maxItems) / (aMenu->length * 1.0);
     if (fractionEnd > 1.0) fractionEnd = 1.0;
-    
+
     float scrollbarHeight = aHeight - entry_height;
-    float scrollbarStart = scrollbarHeight * fractionStart;
-    float scrollbarEnd = scrollbarHeight * fractionEnd;
-    
+    float scrollbarStart  = scrollbarHeight * fractionStart;
+    float scrollbarEnd    = scrollbarHeight * fractionEnd;
+
     pax_simple_rect(aBuffer, aMenu->scrollbarBgColor, aPosX + aWidth - 5, aPosY + entry_height - 1, 4, scrollbarHeight);
     pax_simple_rect(aBuffer, aMenu->scrollbarFgColor, aPosX + aWidth - 5, aPosY + entry_height - 1 + scrollbarStart, 4, scrollbarEnd - scrollbarStart);
 
