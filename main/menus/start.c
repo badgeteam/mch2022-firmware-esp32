@@ -60,11 +60,8 @@ void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     pax_simple_rect(pax_buffer, (percentage > 10) ? 0xff40eb34 : 0xffeb4034, x + width, y + 5, 3, height - 10);
     pax_simple_rect(pax_buffer, 0xFF491d88, x + margin + ((percentage * bar_width) / 100), y + margin, bar_width - ((percentage * bar_width) / 100),
                     height - (margin * 2));
-    /*char buffer[6];
-    snprintf(buffer, sizeof(buffer), "%u%%", percentage);
-    const pax_font_t* font = pax_get_font("saira regular");
-    pax_draw_text(pax_buffer, 0xffffffff, font, 12, x, y + 3, buffer);*/
     if (charging) {
+        const pax_font_t* font = pax_get_font("saira regular");
         pax_draw_text(pax_buffer, 0xffffffff, font, 18, x + width - 6, y + 2, "+");
     }
 }

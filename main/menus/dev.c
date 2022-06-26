@@ -40,7 +40,8 @@ typedef enum action {
     ACTION_BUTTON_TEST,
     ACTION_ADC_TEST,
     ACTION_SAO,
-    ACTION_IR
+    ACTION_IR,
+    ACTION_IR_RENZE
 } menu_dev_action_t;
 
 static void render_help(pax_buf_t* pax_buffer) {
@@ -75,7 +76,8 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
     menu_insert_item(menu, "Analog inputs", NULL, (void*) ACTION_ADC_TEST, -1);
     menu_insert_item(menu, "SAO", NULL, (void*) ACTION_SAO, -1);
-    menu_insert_item(menu, "IR remote", NULL, (void*) ACTION_IR, -1);
+    menu_insert_item(menu, "Infrared remote (deco lights)", NULL, (void*) ACTION_IR, -1);
+    menu_insert_item(menu, "Infrared remote (badge tent)", NULL, (void*) ACTION_IR_RENZE, -1);
 
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -141,7 +143,9 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
             } else if (action == ACTION_SAO) {
                 menu_sao(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_IR) {
-                menu_ir(buttonQueue, pax_buffer, ili9341);
+                menu_ir(buttonQueue, pax_buffer, ili9341, false);
+            } else if (action == ACTION_IR_RENZE) {
+                menu_ir(buttonQueue, pax_buffer, ili9341, true);
             } else if (action == ACTION_BACK) {
                 break;
             }
