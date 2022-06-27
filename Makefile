@@ -15,6 +15,9 @@ prepare:
 clean:
 	rm -rf "$(BUILDDIR)"
 
+fullclean:
+	source "$(IDF_PATH)/export.sh" && idf.py fullclean
+
 build:
 	source "$(IDF_PATH)/export.sh" && idf.py build
 
