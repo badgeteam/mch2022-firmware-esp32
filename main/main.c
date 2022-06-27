@@ -258,9 +258,9 @@ void app_main(void) {
             stop();
         }
 
-        uint8_t force_sponsors;
-        res = nvs_get_u8(handle, "force_sponsors", &force_sponsors);
-        if ((res != ESP_OK) || (force_sponsors > 0)) {
+        uint8_t sponsors;
+        res = nvs_get_u8(handle, "sponsors", &sponsors);
+        if ((res != ESP_OK) || (sponsors < 1)) {
             appfs_handle_t appfs_fd = appfsOpen("sponsors");
             if (appfs_fd != APPFS_INVALID_FD) {
                 appfs_boot_app(appfs_fd);
