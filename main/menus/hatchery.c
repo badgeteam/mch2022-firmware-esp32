@@ -16,6 +16,8 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 
+static const char *TAG = "HatchMenu";
+
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
