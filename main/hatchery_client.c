@@ -177,7 +177,7 @@ static int string_appender_compare(string_appender_t *str_app, const char *s) {
 
 // JSON callback parser
 
-typedef enum json_cb_parser_state_t json_parser_state_t;
+typedef enum json_cb_parser_state_t json_cb_parser_state_t;
 enum json_cb_parser_state_t {
     json_cb_int,
     json_cb_string,
@@ -188,7 +188,7 @@ enum json_cb_parser_state_t {
 };
 
 typedef struct json_cb_parser_t json_cb_parser_t;
-typedef void (*json_cb_parser_callback_t)(json_cb_parser_t *parser, json_parser_state_t state);
+typedef void (*json_cb_parser_callback_t)(json_cb_parser_t *parser, json_cb_parser_state_t state);
 struct json_cb_parser_t {
     int                       lc;
     string_appender_t         string_appender;
@@ -196,6 +196,7 @@ struct json_cb_parser_t {
     json_cb_parser_callback_t callback;
     void                     *data;
     int                       error;
+    json_cb_parser_state_t    state;
 };
 
 static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callback_t callback, void *data) {
@@ -204,6 +205,7 @@ static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callbac
     parser->callback = callback;
     parser->data     = data;
     parser->error    = 0;
+    parser->state    = 0;
 }
 
 static void json_cb_parser_close(json_cb_parser_t *parser) { string_appender_close(&parser->string_appender); }
@@ -271,11 +273,12 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
     }
 #undef JSON_NEXT_CH
 
-    ESP_LOGI(TAG, "parser->error = %d", parser->error);
+    ESP_LOGI(TAG, "parser->error = %d with state = %d", parser->error, parser->state);
 }
 
 #define JSON_SYNTAX_ERROR     \
     parser->error = __LINE__; \
+    parser->state = state;    \
     return;
 
 // Query app types
@@ -307,16 +310,6 @@ static void hatchery_process_app_types(json_cb_parser_t *parser, enum json_cb_pa
     process_app_types->cl = __LINE__; \
     return;                           \
     case __LINE__:;
-    /*
-        switch (state) {
-            case json_cb_open_array: ESP_LOGI(TAG, "open_arrat"); break;
-            case json_cb_open_object: ESP_LOGI(TAG, "open_object"); break;
-            case json_cb_close_array: ESP_LOGI(TAG, "close_array"); break;
-            case json_cb_close_object: ESP_LOGI(TAG, "close_object"); break;
-            case json_cb_string: ESP_LOGI(TAG, "string '%s'", string_appender_copy(&parser->string_appender)); break;
-            case json_cb_int: ESP_LOGI(TAG, "int %d", parser->int_value); break;
-        }
-     */
     switch (process_app_types->cl) {
         case 0:
 
@@ -470,6 +463,7 @@ static void hatchery_process_categories(json_cb_parser_t *parser, enum json_cb_p
                                 if ((*process_categories->cur) != NULL && (*process_categories->cur)->nr_apps == -1) {
                                     (*process_categories->cur)->nr_apps = parser->int_value;
                                 }
+                                NEXT
                             }
                             else {
                                 JSON_SYNTAX_ERROR
@@ -683,7 +677,7 @@ esp_err_t hatchery_query_apps(hatchery_category_t *category) {
 
     hatchery_app_type_t *app_type = category->app_type;
     char                 url[MAX_URL_LEN + 1];
-    snprintf(url, MAX_URL_LEN, "%s/%s/%s/apps", app_type->server->url, app_type->slug, category->slug);
+    snprintf(url, MAX_URL_LEN, "%s/%s/%s", app_type->server->url, app_type->slug, category->slug);
     url[MAX_URL_LEN] = '\0';
     ESP_LOGI(TAG, "query_apps %s", url);
     esp_err_t result = hatchery_http_get(url, &data_callback);
@@ -831,6 +825,7 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                                             if ((*process_app->cur) != NULL && (*process_app->cur)->size == -1) {
                                                 (*process_app->cur)->size = parser->int_value;
                                             }
+                                            NEXT
                                         }
                                         else {
                                             JSON_SYNTAX_ERROR
@@ -861,7 +856,7 @@ static void hatchery_process_app(json_cb_parser_t *parser, enum json_cb_parser_s
                         JSON_SYNTAX_ERROR
                     }
                 }
-                if (state == json_cb_open_object) {
+                if (state == json_cb_close_object) {
                     NEXT
                 } else {
                     JSON_SYNTAX_ERROR
@@ -931,12 +926,15 @@ static void file_data_cb_process(void *callback_data, const char *data, int data
 }
 
 esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file) {
-    if (file->contents != NULL || file->size <= 0) {
+    ESP_LOGI(TAG, "size : %d", file->size);
+    if (file->contents != NULL) {
         return ESP_OK;
     }
-    file->contents = (uint8_t *) malloc(file->size);
+    int malloc_size = file->size == 0 ? 1 : file->size;
+    file->contents  = (uint8_t *) malloc(malloc_size);
     if (file->contents == NULL) {
-        return ESP_OK;
+        ESP_LOGI(TAG, "Malloc failed");
+        return ESP_ERR_NO_MEM;
     }
     process_file_t process_file_data;
     process_file_data.file   = file;
@@ -949,9 +947,10 @@ esp_err_t hatchery_query_file(hatchery_app_t *app, hatchery_file_t *file) {
     ESP_LOGI(TAG, "query_file %s %d", file->url, file->size);
     esp_err_t result = hatchery_http_get(file->url, &data_callback);
 
-    if (file->contents != NULL || process_file_data.loaded != file->size) {
+    if (file->contents != NULL && process_file_data.loaded != file->size) {
         free(file->contents);
         file->contents = NULL;
+        return ESP_FAIL;
     }
 
     return result;
