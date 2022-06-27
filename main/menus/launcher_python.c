@@ -1,4 +1,4 @@
-#include "python.h"
+#include "launcher_python.h"
 
 #include <cJSON.h>
 #include <esp_err.h>
@@ -24,6 +24,7 @@
 #include "rp2040.h"
 #include "rtc_memory.h"
 #include "system_wrapper.h"
+#include "metadata.h"
 
 extern const uint8_t python_png_start[] asm("_binary_python_png_start");
 extern const uint8_t python_png_end[] asm("_binary_python_png_end");
@@ -35,132 +36,18 @@ static appfs_handle_t python_appfs_fd = APPFS_INVALID_FD;
 
 typedef enum action { ACTION_NONE, ACTION_TEST } menu_python_action_t;
 
-void start_python_app(const char* application) {
-    rtc_memory_string_write(application);
+static void start_python_app(const char* path) {
+    rtc_memory_string_write(path);
     appfs_boot_app(python_appfs_fd);
 }
 
-void parse_metadata(const char* path, char** name, char** description, char** category, char** author, int* revision) {
-    FILE* fd = fopen(path, "r");
-    if (fd == NULL) return;
-    char* json_data = (char*) load_file_to_ram(fd);
-    fclose(fd);
-    if (json_data == NULL) return;
-    cJSON* root = cJSON_Parse(json_data);
-    if (root == NULL) {
-        free(json_data);
-        return;
-    }
-    if (name) {
-        cJSON* name_obj = cJSON_GetObjectItem(root, "name");
-        if (name_obj) {
-            *name = strdup(name_obj->valuestring);
-        }
-    }
-    if (description) {
-        cJSON* description_obj = cJSON_GetObjectItem(root, "description");
-        if (description_obj) {
-            *description = strdup(description_obj->valuestring);
-        }
-    }
-    if (category) {
-        cJSON* category_obj = cJSON_GetObjectItem(root, "category");
-        if (category_obj) {
-            *category = strdup(category_obj->valuestring);
-        }
-    }
-    if (author) {
-        cJSON* author_obj = cJSON_GetObjectItem(root, "author");
-        if (author_obj) {
-            *author = strdup(author_obj->valuestring);
-        }
-    }
-    if (revision) {
-        cJSON* revision_obj = cJSON_GetObjectItem(root, "revision");
-        if (revision_obj) {
-            *revision = revision_obj->valueint;
-        }
-    }
-    cJSON_Delete(root);
-}
-
-void populate_menu_entry_from_path(menu_t* menu, const char* path,
-                                   const char* name) {  // Path is here the folder of a specific app, for example /internal/apps/event_schedule
-    char metadata_file_path[128];
-    snprintf(metadata_file_path, sizeof(metadata_file_path), "%s/%s/metadata.json", path, name);
-    char init_file_path[128];
-    snprintf(init_file_path, sizeof(init_file_path), "%s/%s/__init__.py", path, name);
-    char icon_file_path[128];
-    snprintf(icon_file_path, sizeof(icon_file_path), "%s/%s/icon.png", path, name);
-
-    char* title = NULL;
-    /*char* description = NULL;
-    char* category    = NULL;
-    char* author      = NULL;
-    int   revision    = -1;*/
-
-    // parse_metadata(metadata_file_path, &title, &description, &category, &author, &revision);
-    parse_metadata(metadata_file_path, &title, NULL, NULL, NULL, NULL);
-
-    /*if (title != NULL) printf("Name: %s\n", title);
-    if (description != NULL) printf("Description: %s\n", description);
-    if (category != NULL) printf("Category: %s\n", category);
-    if (author != NULL) printf("Author: %s\n", author);
-    if (revision >= 0) printf("Revision: %u\n", revision);*/
-
-    pax_buf_t* icon = NULL;
-
-    FILE* icon_fd = fopen(icon_file_path, "rb");
-    if (icon_fd != NULL) {
-        size_t   icon_size = get_file_size(icon_fd);
-        uint8_t* icon_data = load_file_to_ram(icon_fd);
-        if (icon_data != NULL) {
-            icon = malloc(sizeof(pax_buf_t));
-            if (icon != NULL) {
-                pax_decode_png_buf(icon, (void*) icon_data, icon_size, PAX_BUF_32_8888ARGB, 0);
-            }
-            free(icon_data);
-        }
-        fclose(icon_fd);
-    }
-
-    if (icon == NULL) {
-        icon = malloc(sizeof(pax_buf_t));
-        if (icon != NULL) {
-            pax_decode_png_buf(icon, (void*) python_png_start, python_png_end - python_png_start, PAX_BUF_32_8888ARGB, 0);
-        }
-    }
-
-    menu_insert_item_icon(menu, (title != NULL) ? title : name, NULL, (void*) strdup(name), -1, icon);
-
-    if (title) free(title);
-    /*if (description) free(description);
-    if (category) free(category);
-    if (author) free(author);*/
-}
-
-bool populate_menu_from_path(menu_t* menu, const char* path) {  // Path is here the folder containing the Python apps, for example /internal/apps
-    DIR* dir = opendir(path);
-    if (dir == NULL) {
-        printf("Failed to populate menu, directory not found: %s\n", path);
-        return false;
-    }
-    struct dirent* ent;
-    while ((ent = readdir(dir)) != NULL) {
-        if (ent->d_type == DT_REG) continue;  // Skip files, only parse directories
-        populate_menu_entry_from_path(menu, path, ent->d_name);
-    }
-    closedir(dir);
-    return true;
-}
-
-bool populate_menu(menu_t* menu) {
-    bool internal_result = populate_menu_from_path(menu, "/internal/apps");
-    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps");
+static bool populate_menu(menu_t* menu) {
+    bool internal_result = populate_menu_from_path(menu, "/internal/apps", (void*) python_png_start, python_png_end - python_png_start);
+    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps", (void*) python_png_start, python_png_end - python_png_start);
     return internal_result | sdcard_result;
 }
 
-void menu_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     python_appfs_fd = appfsOpen("python");
 
     if (python_appfs_fd == APPFS_INVALID_FD) {
@@ -236,7 +123,7 @@ void menu_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
             const pax_font_t* font = pax_get_font("saira regular");
             pax_background(pax_buffer, 0xFFFFFF);
             pax_noclip(pax_buffer);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
+            pax_draw_text(pax_buffer, 0xFFfa448c, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
             render_help = false;
         }
 

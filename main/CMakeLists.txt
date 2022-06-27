@@ -13,7 +13,6 @@ idf_component_register(
          "fpga_util.c"
          "audio.c"
          "bootscreen.c"
-         "menus/launcher.c"
          "menus/hatchery.c"
          "menus/settings.c"
          "menus/start.c"
@@ -21,7 +20,9 @@ idf_component_register(
          "menus/wifi.c"
          "menus/sao.c"
          "menus/ir.c"
-         "menus/python.c"
+         "menus/launcher_esp32.c"
+         "menus/launcher_python.c"
+         "menus/launcher_fpga.c"
          "nametag.c"
          "uninstall.c"
          "file_browser.c"
@@ -33,6 +34,7 @@ idf_component_register(
          "wifi_test.c"
          "sao_eeprom.c"
          "rtc_memory.c"
+         "metadata.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
@@ -49,4 +51,5 @@ idf_component_register(
                 ${project_dir}/resources/icons/tag.png
                 ${project_dir}/resources/icons/bitstream.png
                 ${project_dir}/resources/icons/python.png
+                ${project_dir}/resources/icons/hourglass.png
 )

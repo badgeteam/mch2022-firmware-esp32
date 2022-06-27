@@ -12,7 +12,6 @@
 
 #include "appfs.h"
 #include "ili9341.h"
-#include "launcher.h"
 #include "menu.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"

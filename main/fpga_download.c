@@ -242,7 +242,7 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
     return true;
 }
 
-bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341, bool enable_uart) {
+bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341, bool enable_uart, const char* prefix) {
     while (true) {
         bool work_done = false;
 
@@ -263,7 +263,7 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, IL
             return false;
         }
 
-        fpga_req_process(ice40, work_done ? 0 : (50 / portTICK_PERIOD_MS), &res);
+        fpga_req_process(prefix, ice40, work_done ? 0 : (50 / portTICK_PERIOD_MS), &res);
         if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
@@ -304,7 +304,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         if (!fpga_uart_download(ice40, pax_buffer, ili9341)) goto error;
 
         // Waiting for next download and sending key strokes to FPGA
-        bool uart_triggered = fpga_host(buttonQueue, ice40, pax_buffer, ili9341, true);
+        bool uart_triggered = fpga_host(buttonQueue, ice40, pax_buffer, ili9341, true, "/sd");
         if (!uart_triggered) goto error;
         ice40_disable(ice40);
         ili9341_init(ili9341);

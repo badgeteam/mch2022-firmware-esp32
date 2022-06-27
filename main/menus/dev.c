@@ -19,7 +19,6 @@
 #include "hardware.h"
 #include "ili9341.h"
 #include "ir.h"
-#include "launcher.h"
 #include "menu.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
@@ -48,11 +47,11 @@ static void render_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
+    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
 void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Development tools", 34, 18);
+    menu_t* menu = menu_alloc("Tools", 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -69,15 +68,16 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
 
     menu_set_icon(menu, &icon_dev);
 
+    menu_insert_item(menu, "Infrared remote (deco lights)", NULL, (void*) ACTION_IR, -1);
+    menu_insert_item(menu, "Infrared remote (badge tent)", NULL, (void*) ACTION_IR_RENZE, -1);
     menu_insert_item(menu, "FPGA download mode", NULL, (void*) ACTION_FPGA_DL, -1);
     menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
     menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
     menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
     menu_insert_item(menu, "Analog inputs", NULL, (void*) ACTION_ADC_TEST, -1);
-    menu_insert_item(menu, "SAO", NULL, (void*) ACTION_SAO, -1);
-    menu_insert_item(menu, "Infrared remote (deco lights)", NULL, (void*) ACTION_IR, -1);
-    menu_insert_item(menu, "Infrared remote (badge tent)", NULL, (void*) ACTION_IR_RENZE, -1);
+    menu_insert_item(menu, "SAO EEPROM tool", NULL, (void*) ACTION_SAO, -1);
+
 
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;

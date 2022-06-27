@@ -13,13 +13,14 @@
 #include "hardware.h"
 #include "hatchery.h"
 #include "ili9341.h"
-#include "launcher.h"
+#include "launcher_esp32.h"
+#include "launcher_python.h"
+#include "launcher_fpga.h"
 #include "math.h"
 #include "menu.h"
 #include "nametag.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
-#include "python.h"
 #include "rp2040.h"
 #include "settings.h"
 
@@ -109,7 +110,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     /*menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
     menu_insert_item_icon(menu, "ESP32 apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
     menu_insert_item_icon(menu, "BadgePython apps", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
-    //menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
+    menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);*/
@@ -205,8 +206,10 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
         if (action != ACTION_NONE) {
             if (action == ACTION_APPS) {
-                menu_launcher(buttonQueue, pax_buffer, ili9341);
+                display_busy(pax_buffer, ili9341);
+                menu_launcher_esp32(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_HATCHERY) {
+                display_busy(pax_buffer, ili9341);
                 menu_hatchery(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_NAMETAG) {
                 show_nametag(buttonQueue, pax_buffer, ili9341);
@@ -215,7 +218,11 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             } else if (action == ACTION_DEV) {
                 menu_dev(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_PYTHON) {
-                menu_python(buttonQueue, pax_buffer, ili9341);
+                display_busy(pax_buffer, ili9341);
+                menu_launcher_python(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_FPGA) {
+                display_busy(pax_buffer, ili9341);
+                menu_launcher_fpga(buttonQueue, pax_buffer, ili9341);
             }
             action = ACTION_NONE;
             render = true;

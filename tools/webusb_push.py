@@ -26,3 +26,6 @@ else:
 if run:
     dev.appfsExecute(name)
     dev.disconnect()
+else:
+    dev.reset()
+    dev.disconnect()

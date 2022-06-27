@@ -402,24 +402,25 @@ static struct req_entry *_fpga_req_open_file(uint32_t fid, const char *path) {
     return re;
 }
 
-static struct req_entry *_fpga_req_get_file(uint32_t fid) {
+static struct req_entry *_fpga_req_get_file(const char* prefix, uint32_t fid) {
     struct req_entry *re;
-    char              path[32];
+    char              path[128];
 
     // Scan entries for a matching one
     for (re = g_req_entries; re; re = re->next)
         if (re->fid == fid) return re;
 
     // Nothing found, try to open file
-    snprintf(path, sizeof(path), "/sd/fpga_%08x.dat", fid);
+    snprintf(path, sizeof(path), "%s/fpga_%08x.dat", prefix, fid);
+    printf("FPGA read file '%s'\n", path);
     return _fpga_req_open_file(fid, path);
 }
 
-static ssize_t _fpga_req_fread(uint32_t fid, void *buf, size_t nbyte, size_t ofs) {
+static ssize_t _fpga_req_fread(const char* prefix, uint32_t fid, void *buf, size_t nbyte, size_t ofs) {
     struct req_entry *re;
 
     // Get or create entry
-    re = _fpga_req_get_file(fid);
+    re = _fpga_req_get_file(prefix, fid);
 
 #if 0
     printf("rd: %08x %p %6d %6d\n", fid, re, nbyte, ofs);
@@ -519,7 +520,7 @@ int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
 
 void fpga_req_del_file(uint32_t fid) { _fpga_req_delete_entry(fid); }
 
-bool fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err) {
+bool fpga_req_process(const char* prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err) {
     esp_err_t res;
     uint8_t   buf[12];
     uint8_t   req;
@@ -562,7 +563,7 @@ bool fpga_req_process(ICE40 *ice40, TickType_t wait, esp_err_t *err) {
         buf_req = malloc(req_length + 1);
 
         // Load data from file
-        _fpga_req_fread(req_file_id, &buf_req[1], req_length, req_offset);
+        _fpga_req_fread(prefix, req_file_id, &buf_req[1], req_length, req_offset);
 
         // Send data
         buf_req[0] = SPI_CMD_FREAD_PUT;

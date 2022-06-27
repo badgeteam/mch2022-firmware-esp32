@@ -16,6 +16,7 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "metadata.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -55,13 +56,14 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
     uint16_t    version = 0xFFFF;
     appfsEntryInfoExt(fd, &name, &title, &version, NULL);
     menu_t* menu            = menu_alloc(title, 20, 18);
+
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
-    menu->selectedItemColor = 0xFFfa448c;
-    menu->borderColor       = 0xFF491d88;
-    menu->titleColor        = 0xFFfa448c;
-    menu->titleBgColor      = 0xFF491d88;
+    menu->selectedItemColor = 0xFF491d88;
+    menu->borderColor       = 0xFF43b5a0;
+    menu->titleColor        = 0xFF491d88;
+    menu->titleBgColor      = 0xFF43b5a0;
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
 
@@ -117,7 +119,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
     menu_free(menu);
 }
 
-void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_noclip(pax_buffer);
     menu_t* menu            = menu_alloc("ESP32 apps", 34, 18);
     menu->fgColor           = 0xFF000000;
@@ -183,7 +185,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
+            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);
