@@ -183,7 +183,7 @@ void menu_launcher(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start [B] back [M] options");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
             menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
             if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);

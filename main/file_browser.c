@@ -297,7 +297,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                 pax_background(pax_buffer, 0xFFFFFF);
                 pax_noclip(pax_buffer);
                 const pax_font_t* font = pax_get_font("saira regular");
-                pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "[A] install  [B] back");
+                pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "🅰 install  🅱 back");
                 renderbg = false;
             }
 

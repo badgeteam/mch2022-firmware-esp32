@@ -73,7 +73,7 @@ void render_wifi_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
 void              wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
@@ -213,7 +213,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
         snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, wifi_auth_names[authmode], password);
     }
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] test [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 test 🅱 back");
     ili9341_write(ili9341, pax_buffer->buf);
 
     bool quit = false;
