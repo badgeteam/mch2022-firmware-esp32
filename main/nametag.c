@@ -45,7 +45,7 @@ void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *il
         }
     }
 
-    bool accepted = keyboard(button_queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel",
+    bool accepted = keyboard(button_queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press 🅷 to cancel",
                              nickname, sizeof(nickname) - 1);
 
     if (accepted) {

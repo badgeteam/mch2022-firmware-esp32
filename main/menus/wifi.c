@@ -571,7 +571,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         // Select SSID.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to cancel",
+        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel",
                             ssid, sizeof(ssid));
 
         // Select auth mode.
@@ -595,12 +595,12 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         if (accepted) {
             // Username.
             accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username",
-                                "Press HOME to cancel", username, sizeof(username));
+                                "Press 🅷 to cancel", username, sizeof(username));
         }
     }
     if (accepted) {
         // Password.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to cancel",
+        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press 🅷 to cancel",
                             password, sizeof(password));
     }
     if (accepted) {
