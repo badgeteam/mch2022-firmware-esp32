@@ -73,7 +73,7 @@ void render_wifi_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
 void              wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
@@ -213,7 +213,7 @@ void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
         snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, wifi_auth_names[authmode], password);
     }
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] test [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 test 🅱 back");
     ili9341_write(ili9341, pax_buffer->buf);
 
     bool quit = false;
@@ -571,7 +571,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         // Select SSID.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press HOME to cancel",
+        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel",
                             ssid, sizeof(ssid));
 
         // Select auth mode.
@@ -595,12 +595,12 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         if (accepted) {
             // Username.
             accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username",
-                                "Press HOME to cancel", username, sizeof(username));
+                                "Press 🅷 to cancel", username, sizeof(username));
         }
     }
     if (accepted) {
         // Password.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press HOME to cancel",
+        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press 🅷 to cancel",
                             password, sizeof(password));
     }
     if (accepted) {

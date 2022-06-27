@@ -236,7 +236,7 @@ void menu_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
             const pax_font_t* font = pax_get_font("saira regular");
             pax_background(pax_buffer, 0xFFFFFF);
             pax_noclip(pax_buffer);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] start app [B] back");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
             render_help = false;
         }
 

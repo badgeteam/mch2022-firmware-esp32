@@ -206,7 +206,7 @@ void menu_ir(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, 
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
             menu_render_grid(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
-            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "[A] send [B] back");
+            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 send 🅱 back");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }

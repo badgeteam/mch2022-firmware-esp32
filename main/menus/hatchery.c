@@ -57,7 +57,7 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341
     pax_background(pax_buffer, 0xFFFFFF);
 
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 5, 240 - 18, "[A] Install [B] Back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 5, 240 - 18, "🅰 Install 🅱 Back");
 
     pax_simple_rect(pax_buffer, 0xFF491d88, 0, 0, 320, entry_height);
     pax_clip(pax_buffer, 1, text_offset, 320 - 2, text_height);
@@ -142,7 +142,7 @@ static void fill_menu_items_categories(menu_t *menu, void *context) {
 }
 
 static void action_categories(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select app  [B] back", fill_menu_items_apps, action_apps, args);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select app  🅱 back", fill_menu_items_apps, action_apps, args);
 }
 
 // App types menu
@@ -157,7 +157,7 @@ static void fill_menu_items_types(menu_t *menu, void *context) {
 }
 
 static void action_types(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select category  [B] back", fill_menu_items_categories, action_categories, args);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select category  🅱 back", fill_menu_items_categories, action_categories, args);
 }
 
 // Main entry function
@@ -166,7 +166,7 @@ void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili
     hatchery_server_t server;
     server.url       = "https://mch2022.badge.team/v2/mch2022";
     server.app_types = NULL;
-    menu_generic(buttonQueue, pax_buffer, ili9341, "[A] select type  [B] back", fill_menu_items_types, action_types, &server);
+    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select type  🅱 back", fill_menu_items_types, action_types, &server);
     hatchery_app_type_free(server.app_types);
 }
 

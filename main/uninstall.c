@@ -52,7 +52,7 @@ void uninstall_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341*
 
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] uninstall app  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 uninstall app  🅱 back");
 
     bool quit = false;
 

@@ -70,7 +70,7 @@ void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "[A] accept");
+    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept");
     pax_vec1_t version_size = pax_text_size(font, 18, text);
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }

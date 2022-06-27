@@ -45,7 +45,7 @@ void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *il
         }
     }
 
-    bool accepted = keyboard(button_queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press HOME to cancel",
+    bool accepted = keyboard(button_queue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "Nickname", "Press 🅷 to cancel",
                              nickname, sizeof(nickname) - 1);
 
     if (accepted) {
@@ -79,7 +79,7 @@ static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 
     }
 
     if (instructions) {
-        pax_draw_text(pax_buffer, 0xFFFFFFFF, instructions_font, 14, 5, pax_buffer->height - 17, "[B] exit [M] name [SE] theme");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, instructions_font, 14, 5, pax_buffer->height - 17, "🅱 exit 🅼 name 🅴 theme");
     }
 
     ili9341_write(ili9341, pax_buffer->buf);

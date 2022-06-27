@@ -48,7 +48,7 @@ static void render_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[A] accept  [B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
 void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {

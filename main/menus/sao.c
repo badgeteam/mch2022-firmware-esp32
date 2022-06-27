@@ -72,7 +72,7 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
         strncpy(buffer, tmp, sizeof(buffer));
     }
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 80, buffer);*/
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[B] back [Joystick] Program");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back ⤓ Program");
 }
 
 static void render_sao_not_detected(pax_buf_t* pax_buffer) {
@@ -80,7 +80,7 @@ static void render_sao_not_detected(pax_buf_t* pax_buffer) {
     pax_background(pax_buffer, 0xFFAAAA);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 0, "No SAO detected");
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "[B] back");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back");
 }
 
 void menu_sao(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
