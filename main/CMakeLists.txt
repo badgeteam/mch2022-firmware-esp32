@@ -34,6 +34,7 @@ idf_component_register(
          "sao_eeprom.c"
          "rtc_memory.c"
          "metadata.c"
+         "wifi_defaults.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

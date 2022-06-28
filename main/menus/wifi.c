@@ -24,6 +24,7 @@
 #include "wifi_connect.h"
 #include "wifi_connection.h"
 #include "wifi_ota.h"
+#include "wifi_defaults.h"
 
 typedef enum action {
     /* ==== GENERIC ACTIONS ==== */
