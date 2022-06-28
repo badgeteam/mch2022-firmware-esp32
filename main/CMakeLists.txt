@@ -24,7 +24,6 @@ idf_component_register(
          "menus/launcher_python.c"
          "menus/launcher_fpga.c"
          "nametag.c"
-         "uninstall.c"
          "file_browser.c"
          "test_common.c"
          "factory_test.c"

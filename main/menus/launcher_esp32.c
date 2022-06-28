@@ -103,7 +103,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
             }
         }
         if (render) {
-            menu_render(pax_buffer, menu, 20, 20, 280, 180, 0xFF491d88);
+            menu_render(pax_buffer, menu, 20, 20, 280, 180);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -186,7 +186,7 @@ void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
             pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;

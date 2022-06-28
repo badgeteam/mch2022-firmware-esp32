@@ -53,3 +53,13 @@ Then run the following commands to apply the new rule:
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
+
+### Ubuntu snap
+
+While we have no idea why Canonical thinks breaking things by forcing Ubuntu users to use a bad software distribution system, we do have a solution!
+
+Install the Chromium snap package, then run the following command (in addition to adding the udev rule above). If you already have the badge connected turn it off and back on after running the command.
+
+```
+sudo snap connect chromium:raw-usb
+```

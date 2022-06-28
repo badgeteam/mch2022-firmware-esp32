@@ -72,8 +72,8 @@ static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI
 }
 
 static bool populate_menu(menu_t* menu) {
-    bool internal_result = populate_menu_from_path(menu, "/internal/fpga", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
-    bool sdcard_result   = populate_menu_from_path(menu, "/sd/fpga", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool internal_result = populate_menu_from_path(menu, "/internal/apps/ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps/ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
     return internal_result | sdcard_result;
 }
 
@@ -138,7 +138,7 @@ void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             if (empty) render_message(pax_buffer, "No FPGA bitstreams installed");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;

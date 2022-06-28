@@ -21,7 +21,6 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "system_wrapper.h"
-#include "uninstall.h"
 #include "wifi.h"
 #include "wifi_connect.h"
 #include "wifi_ota.h"
@@ -36,7 +35,6 @@ typedef enum action {
     ACTION_WIFI,
     ACTION_OTA,
     ACTION_RP2040_BL,
-    ACTION_UNINSTALL,
     ACTION_WIFI_TEST,
     ACTION_NICKNAME
 } menu_settings_action_t;
@@ -71,7 +69,6 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_insert_item(menu, "Test WiFi connection", NULL, (void*) ACTION_WIFI_TEST, -1);
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
-    // menu_insert_item(menu, "Uninstall app", NULL, (void*) ACTION_UNINSTALL, -1);
 
     bool                   render = true;
     menu_settings_action_t action = ACTION_NONE;
@@ -116,7 +113,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -132,8 +129,6 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 wifi_connection_test(pax_buffer, ili9341);
             } else if (action == ACTION_WIFI) {
                 menu_wifi(buttonQueue, pax_buffer, ili9341);
-            } else if (action == ACTION_UNINSTALL) {
-                uninstall_browser(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
                 break;
             } else if (action == ACTION_NICKNAME) {

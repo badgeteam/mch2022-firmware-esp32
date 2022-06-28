@@ -313,7 +313,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             }
 
             if (render) {
-                menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
+                menu_render(pax_buffer, menu, 0, 0, 320, 220);
                 ili9341_write(ili9341, pax_buffer->buf);
                 render = false;
             }

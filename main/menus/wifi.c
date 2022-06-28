@@ -132,7 +132,7 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -298,7 +298,7 @@ wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buf
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF2f55a8);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -384,7 +384,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF2f55a8);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -466,7 +466,7 @@ int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF2f55a8);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }

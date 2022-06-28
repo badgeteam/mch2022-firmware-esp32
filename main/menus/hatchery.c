@@ -262,7 +262,7 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI934
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
