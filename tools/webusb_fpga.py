@@ -7,12 +7,15 @@ import time
 import sys
 import argparse
 
-REQUEST_TYPE_CLASS_TO_INTERFACE = 0x21 # This is a bitfield, see USB spec (has nothing to do with the other REQUEST_ defines)
+# Defined in webusb_task.c of the RP2040 firmware
+REQUEST_STATE          = 0x22
+REQUEST_RESET          = 0x23
+REQUEST_BAUDRATE       = 0x24
+REQUEST_MODE           = 0x25
+REQUEST_MODE_GET       = 0x26
+REQUEST_FW_VERSION_GET = 0x27
 
-REQUEST_STATE    = 0x22 # Defined in webusb_task.c of the RP2040 firmware
-REQUEST_RESET    = 0x23 # Defined in webusb_task.c of the RP2040 firmware
-REQUEST_BAUDRATE = 0x24 # Defined in webusb_task.c of the RP2040 firmware
-REQUEST_MODE     = 0x25 # Defined in webusb_task.c of the RP2040 firmware
+WEBUSB_MODE_FPGA_DOWNLOAD = 0x02
 
 parser = argparse.ArgumentParser(description='MCH2022 badge FPGA tool')
 parser.add_argument("bitstream", help="Bitstream binary")
@@ -49,12 +52,22 @@ webusb_esp32 = configuration[(4,0)]
 esp32_ep_out = usb.util.find_descriptor(webusb_esp32, custom_match = lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_OUT)
 esp32_ep_in  = usb.util.find_descriptor(webusb_esp32, custom_match = lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == usb.util.ENDPOINT_IN)
 
-device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_STATE, 0x0001, webusb_esp32.bInterfaceNumber)
-device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_MODE, 0x0002, webusb_esp32.bInterfaceNumber)
-device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_RESET, 0x0000, webusb_esp32.bInterfaceNumber)
-device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_BAUDRATE, 9216, webusb_esp32.bInterfaceNumber)
+request_type_in = usb.util.build_request_type(usb.util.CTRL_IN, usb.util.CTRL_TYPE_CLASS, usb.util.CTRL_RECIPIENT_INTERFACE)
+request_type_out = usb.util.build_request_type(usb.util.CTRL_OUT, usb.util.CTRL_TYPE_CLASS, usb.util.CTRL_RECIPIENT_INTERFACE)
 
-print("Waiting for ESP32 to boot into FPGA download mode...")
+# Connect
+device.ctrl_transfer(request_type_out, REQUEST_STATE, 0x0001, webusb_esp32.bInterfaceNumber)
+
+# Read WebUSB mode
+current_mode = int(device.ctrl_transfer(request_type_in, REQUEST_MODE_GET, 0, webusb_esp32.bInterfaceNumber, 1)[0])
+
+if current_mode != WEBUSB_MODE_FPGA_DOWNLOAD:
+    device.ctrl_transfer(request_type_out, REQUEST_MODE, 0x0002, webusb_esp32.bInterfaceNumber)
+    device.ctrl_transfer(request_type_out, REQUEST_RESET, 0x0000, webusb_esp32.bInterfaceNumber)
+    device.ctrl_transfer(request_type_out, REQUEST_BAUDRATE, 9216, webusb_esp32.bInterfaceNumber)
+    print("Waiting for ESP32 to boot into FPGA download mode...")
+else:
+    print("ESP32 already in FPGA download mode, connecting...")
 
 while True:
     data = None
@@ -124,4 +137,4 @@ bitstream_packet = [
 usb_tx("Sending bitstream", b''.join(bitstream_packet))
 
 # Disconnect
-device.ctrl_transfer(REQUEST_TYPE_CLASS_TO_INTERFACE, REQUEST_STATE, 0x0000, webusb_esp32.bInterfaceNumber)
+device.ctrl_transfer(request_type_out, REQUEST_STATE, 0x0000, webusb_esp32.bInterfaceNumber)

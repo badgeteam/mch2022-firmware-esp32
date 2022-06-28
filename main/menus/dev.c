@@ -32,7 +32,6 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 typedef enum action {
     ACTION_NONE,
     ACTION_BACK,
-    ACTION_FPGA_DL,
     ACTION_FPGA_TEST,
     ACTION_FILE_BROWSER,
     ACTION_FILE_BROWSER_INT,
@@ -70,13 +69,12 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
 
     menu_insert_item(menu, "Infrared remote (deco lights)", NULL, (void*) ACTION_IR, -1);
     menu_insert_item(menu, "Infrared remote (badge tent)", NULL, (void*) ACTION_IR_RENZE, -1);
-    menu_insert_item(menu, "FPGA download mode", NULL, (void*) ACTION_FPGA_DL, -1);
-    menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
     menu_insert_item(menu, "File browser (SD card)", NULL, (void*) ACTION_FILE_BROWSER, -1);
     menu_insert_item(menu, "File browser (internal)", NULL, (void*) ACTION_FILE_BROWSER_INT, -1);
     menu_insert_item(menu, "Button test", NULL, (void*) ACTION_BUTTON_TEST, -1);
     menu_insert_item(menu, "Analog inputs", NULL, (void*) ACTION_ADC_TEST, -1);
     menu_insert_item(menu, "SAO EEPROM tool", NULL, (void*) ACTION_SAO, -1);
+    menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
 
 
     bool              render = true;
@@ -128,9 +126,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
         }
 
         if (action != ACTION_NONE) {
-            if (action == ACTION_FPGA_DL) {
-                fpga_download(buttonQueue, get_ice40(), pax_buffer, ili9341);
-            } else if (action == ACTION_FPGA_TEST) {
+            if (action == ACTION_FPGA_TEST) {
                 fpga_test(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_FILE_BROWSER) {
                 file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
