@@ -11,11 +11,6 @@
 #include "rp2040.h"
 
 void restart() {
-    /*for (int i = 3; i >= 0; i--) {
-        printf("Restarting in %d seconds...\n", i);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-    printf("Restarting now.\n");*/
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     fflush(stdout);
     esp_restart();
@@ -24,15 +19,16 @@ void restart() {
 bool wait_for_button(xQueueHandle buttonQueue) {
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 1000 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            if (value) {
-                if (pin == RP2040_INPUT_BUTTON_BACK) {
-                    return false;
-                }
-                if (pin == RP2040_INPUT_BUTTON_ACCEPT) {
-                    return true;
+        if (xQueueReceive(buttonQueue, &buttonMessage, portMAX_DELAY) == pdTRUE) {
+            if (buttonMessage.state) {
+                switch(buttonMessage.input) {
+                    case RP2040_INPUT_BUTTON_BACK:
+                    case RP2040_INPUT_BUTTON_HOME:
+                        return false;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                        return true;
+                    default:
+                        break;
                 }
             }
         }
