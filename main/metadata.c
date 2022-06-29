@@ -12,6 +12,7 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
+
 #include "ili9341.h"
 #include "menu.h"
 #include "pax_codecs.h"
@@ -62,8 +63,8 @@ void parse_metadata(const char* path, char** name, char** description, char** ca
     cJSON_Delete(root);
 }
 
-void populate_menu_entry_from_path(menu_t* menu, const char* path,
-                                   const char* name, void* default_icon_data, size_t default_icon_size) {  // Path is here the folder of a specific app, for example /internal/apps/event_schedule
+void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* name, void* default_icon_data,
+                                   size_t default_icon_size) {  // Path is here the folder of a specific app, for example /internal/apps/event_schedule
     char metadata_file_path[128];
     snprintf(metadata_file_path, sizeof(metadata_file_path), "%s/%s/metadata.json", path, name);
     char icon_file_path[128];
@@ -108,7 +109,7 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path,
             pax_decode_png_buf(icon, default_icon_data, default_icon_size, PAX_BUF_32_8888ARGB, 0);
         }
     }
-    
+
     menu_insert_item_icon(menu, (title != NULL) ? title : name, NULL, (void*) strdup(app_path), -1, icon);
 
     if (title) free(title);
@@ -117,7 +118,8 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path,
     if (author) free(author);*/
 }
 
-bool populate_menu_from_path(menu_t* menu, const char* path, void* default_icon_data, size_t default_icon_size) {  // Path is here the folder containing the Python apps, for example /internal/apps
+bool populate_menu_from_path(menu_t* menu, const char* path, void* default_icon_data,
+                             size_t default_icon_size) {  // Path is here the folder containing the Python apps, for example /internal/apps
     DIR* dir = opendir(path);
     if (dir == NULL) {
         printf("Failed to populate menu, directory not found: %s\n", path);

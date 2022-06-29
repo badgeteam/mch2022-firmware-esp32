@@ -13,10 +13,10 @@
 #include "graphics_wrapper.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
-#include "metadata.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -55,7 +55,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
     const char* title   = NULL;
     uint16_t    version = 0xFFFF;
     appfsEntryInfoExt(fd, &name, &title, &version, NULL);
-    menu_t* menu            = menu_alloc(title, 20, 18);
+    menu_t* menu = menu_alloc(title, 20, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;

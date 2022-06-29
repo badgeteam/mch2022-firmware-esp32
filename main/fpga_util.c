@@ -402,7 +402,7 @@ static struct req_entry *_fpga_req_open_file(uint32_t fid, const char *path) {
     return re;
 }
 
-static struct req_entry *_fpga_req_get_file(const char* prefix, uint32_t fid) {
+static struct req_entry *_fpga_req_get_file(const char *prefix, uint32_t fid) {
     struct req_entry *re;
     char              path[128];
 
@@ -416,7 +416,7 @@ static struct req_entry *_fpga_req_get_file(const char* prefix, uint32_t fid) {
     return _fpga_req_open_file(fid, path);
 }
 
-static ssize_t _fpga_req_fread(const char* prefix, uint32_t fid, void *buf, size_t nbyte, size_t ofs) {
+static ssize_t _fpga_req_fread(const char *prefix, uint32_t fid, void *buf, size_t nbyte, size_t ofs) {
     struct req_entry *re;
 
     // Get or create entry
@@ -520,7 +520,7 @@ int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
 
 void fpga_req_del_file(uint32_t fid) { _fpga_req_delete_entry(fid); }
 
-bool fpga_req_process(const char* prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err) {
+bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err) {
     esp_err_t res;
     uint8_t   buf[12];
     uint8_t   req;

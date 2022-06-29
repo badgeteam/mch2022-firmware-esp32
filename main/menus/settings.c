@@ -28,14 +28,7 @@
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action {
-    ACTION_NONE,
-    ACTION_BACK,
-    ACTION_WIFI,
-    ACTION_OTA,
-    ACTION_RP2040_BL,
-    ACTION_NICKNAME
-} menu_settings_action_t;
+typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_RP2040_BL, ACTION_NICKNAME } menu_settings_action_t;
 
 void render_settings_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_get_font("saira regular");

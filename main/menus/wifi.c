@@ -23,8 +23,8 @@
 #include "system_wrapper.h"
 #include "wifi_connect.h"
 #include "wifi_connection.h"
-#include "wifi_ota.h"
 #include "wifi_defaults.h"
+#include "wifi_ota.h"
 #include "wifi_test.h"
 
 typedef enum action {
@@ -490,8 +490,8 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         // Select SSID.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel",
-                            ssid, sizeof(ssid));
+        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel", ssid,
+                            sizeof(ssid));
 
         // Select auth mode.
         if (accepted) {
@@ -513,8 +513,8 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
         if (accepted) {
             // Username.
-            accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username",
-                                "Press 🅷 to cancel", username, sizeof(username));
+            accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username", "Press 🅷 to cancel",
+                                username, sizeof(username));
         }
     }
     if (accepted) {

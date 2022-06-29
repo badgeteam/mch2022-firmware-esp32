@@ -18,24 +18,24 @@
 #include "bootscreen.h"
 #include "fpga_download.h"
 #include "fpga_util.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ice40.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rtc_memory.h"
 #include "system_wrapper.h"
-#include "metadata.h"
-#include "graphics_wrapper.h"
 
 extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
 extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
 
 static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path) {
     const pax_font_t* font = pax_get_font("saira regular");
-    char filename[128];
+    char              filename[128];
     snprintf(filename, sizeof(filename), "%s/bitstream.bin", path);
     FILE* fd = fopen(filename, "rb");
     if (fd == NULL) {

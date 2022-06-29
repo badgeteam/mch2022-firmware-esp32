@@ -17,8 +17,8 @@
 #include "nvs_flash.h"
 #include "string.h"
 #include "wifi.h"
-#include "wifi_connect.h"
 #include "wifi_cert.h"
+#include "wifi_connect.h"
 
 #define HASH_LEN 32
 
@@ -135,10 +135,8 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341) {
 
     ESP_LOGI(TAG, "Starting OTA update");
 
-    esp_http_client_config_t config = {.url               = "https://mch2022.ota.bodge.team/mch2022.bin",
-                                       .use_global_ca_store = true,
-                                       .event_handler     = _http_event_handler,
-                                       .keep_alive_enable = true};
+    esp_http_client_config_t config = {
+        .url = "https://mch2022.ota.bodge.team/mch2022.bin", .use_global_ca_store = true, .event_handler = _http_event_handler, .keep_alive_enable = true};
 
     esp_https_ota_config_t ota_config = {
         .http_config         = &config,

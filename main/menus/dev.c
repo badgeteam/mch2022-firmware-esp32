@@ -76,7 +76,6 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     menu_insert_item(menu, "SAO EEPROM tool", NULL, (void*) ACTION_SAO, -1);
     menu_insert_item(menu, "FPGA selftest", NULL, (void*) ACTION_FPGA_TEST, -1);
 
-
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
 

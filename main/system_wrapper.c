@@ -21,7 +21,7 @@ bool wait_for_button(xQueueHandle buttonQueue) {
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(buttonQueue, &buttonMessage, portMAX_DELAY) == pdTRUE) {
             if (buttonMessage.state) {
-                switch(buttonMessage.input) {
+                switch (buttonMessage.input) {
                     case RP2040_INPUT_BUTTON_BACK:
                     case RP2040_INPUT_BUTTON_HOME:
                         return false;

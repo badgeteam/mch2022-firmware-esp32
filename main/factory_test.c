@@ -15,8 +15,8 @@
 #include "rp2040.h"
 #include "settings.h"
 #include "test_common.h"
-#include "ws2812.h"
 #include "wifi_defaults.h"
+#include "ws2812.h"
 
 static const char* TAG = "factory";
 

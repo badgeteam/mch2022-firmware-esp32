@@ -139,7 +139,7 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
     const pax_font_t* font = pax_get_font("saira regular");
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
-    
+
     char* path = strdup(filename);
     if (path == NULL) return;
     for (size_t position = strlen(path) - 1; position >= 0; position--) {

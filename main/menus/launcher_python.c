@@ -16,16 +16,16 @@
 #include "appfs.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rtc_memory.h"
 #include "system_wrapper.h"
-#include "metadata.h"
-#include "graphics_wrapper.h"
 
 extern const uint8_t python_png_start[] asm("_binary_python_png_start");
 extern const uint8_t python_png_end[] asm("_binary_python_png_end");
@@ -49,11 +49,11 @@ static bool populate_menu(menu_t* menu) {
 }
 
 void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    python_appfs_fd = appfsOpen("python");
+    python_appfs_fd           = appfsOpen("python");
     bool python_not_installed = (python_appfs_fd == APPFS_INVALID_FD);
 
     const char* title = "BadgePython apps";
-    menu_t* menu = menu_alloc(title, 34, 18);
+    menu_t*     menu  = menu_alloc(title, 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
