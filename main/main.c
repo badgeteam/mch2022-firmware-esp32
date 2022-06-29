@@ -93,7 +93,8 @@ bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 6, "webusb_push.py tool.");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 7, "Check out https://docs.badge.team");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 8, "for more information.");
-    pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10, "You can disable this protection by pressing A\nTo continue starting without disabling the protection\npress B.");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10,
+                  "You can disable this protection by pressing A\nTo continue starting without disabling the protection\npress B.");
     ili9341_write(ili9341, pax_buffer->buf);
     return wait_for_button(buttonQueue);
 }
@@ -164,7 +165,7 @@ void app_main(void) {
         display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
-    
+
     nvs_handle_t handle;
     res = nvs_open("system", NVS_READWRITE, &handle);
     if (res != ESP_OK) {
@@ -207,13 +208,13 @@ void app_main(void) {
     factory_test(&pax_buffer, ili9341);
 
     /* Apply flashing lock */
-    
+
     uint8_t prevent_flashing;
     res = nvs_get_u8(handle, "flash_lock", &prevent_flashing);
     if (res != ESP_OK) {
         prevent_flashing = true;
     }
-    
+
     if (rp2040_set_reset_lock(rp2040, prevent_flashing) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write RP2040 flashing lock state");
         display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
@@ -332,7 +333,7 @@ void app_main(void) {
         } else {
             ESP_LOGW(TAG, "Flashing using esptool.py is allowed");
         }
-        
+
         /* Sponsors check */
         uint8_t sponsors;
         res = nvs_get_u8(handle, "sponsors", &sponsors);
@@ -368,6 +369,6 @@ void app_main(void) {
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
         display_boot_screen(&pax_buffer, ili9341, buffer);
     }
-    
+
     nvs_close(handle);
 }

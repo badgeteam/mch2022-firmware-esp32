@@ -32,7 +32,7 @@ typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_
 
 void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     nvs_handle_t handle;
-    esp_err_t res = nvs_open("system", NVS_READWRITE, &handle);
+    esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
     if (res != ESP_OK) {
         ESP_LOGE("settings", "NVS open failed: %d", res);
         return;
