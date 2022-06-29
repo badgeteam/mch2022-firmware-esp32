@@ -196,16 +196,21 @@ struct json_cb_parser_t {
     json_cb_parser_callback_t callback;
     void                     *data;
     int                       error;
+    int                       i;
+    u_int16_t                 unicode_ch;
+    u_int16_t                 first_pair;
     json_cb_parser_state_t    state;
 };
 
 static void json_cb_parser_init(json_cb_parser_t *parser, json_cb_parser_callback_t callback, void *data) {
     parser->lc = 0;
     string_appender_init(&parser->string_appender);
-    parser->callback = callback;
-    parser->data     = data;
-    parser->error    = 0;
-    parser->state    = 0;
+    parser->callback   = callback;
+    parser->data       = data;
+    parser->error      = 0;
+    parser->unicode_ch = 0;
+    parser->first_pair = 0;
+    parser->state      = 0;
 }
 
 static void json_cb_parser_close(json_cb_parser_t *parser) { string_appender_close(&parser->string_appender); }
@@ -217,6 +222,10 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
     parser->lc = __LINE__; \
     goto next;             \
     case __LINE__:;
+#define JSON_ERROR            \
+    parser->error = __LINE__; \
+    parser->state = -1;       \
+    goto next;
 
     json_cb_parser_t *parser = (json_cb_parser_t *) callback_data;
 
@@ -241,13 +250,69 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
                         while (ch != '"') {
                             if (ch == '\\') {
                                 JSON_NEXT_CH
-                                if (ch == 't')
-                                    ch = '\t';
-                                else if (ch == 'n')
-                                    ch = '\n';
-                                else if (ch == 'r')
-                                    ch = '\r';
-                                string_appender_append(&parser->string_appender, ch);
+                                if (ch == 'u') {
+                                    parser->unicode_ch = 0;
+                                    for (parser->i = 0; parser->i < 4; parser->i++) {
+                                        JSON_NEXT_CH
+                                        if ('0' <= ch && ch <= '9')
+                                            parser->unicode_ch = 16 * parser->unicode_ch + ch - '0';
+                                        else if ('a' <= ch && ch <= 'f')
+                                            parser->unicode_ch = 16 * parser->unicode_ch + ch + (10 - 'a');
+                                        else if ('A' <= ch && ch <= 'F')
+                                            parser->unicode_ch = 16 * parser->unicode_ch + ch + (10 - 'A');
+                                        else {
+                                            JSON_ERROR
+                                        }
+                                    }
+                                    if (parser->unicode_ch == 0) {
+                                        JSON_ERROR
+                                    }
+                                    if (0xd800 <= parser->unicode_ch && parser->unicode_ch <= 0xdbff) {
+                                        // first surrogate pair
+                                        if (parser->first_pair != 0) {
+                                            JSON_ERROR
+                                        }
+                                        parser->first_pair = parser->unicode_ch;
+                                    } else if (0xdc00 <= parser->unicode_ch && parser->unicode_ch <= 0xdfff) {
+                                        // second surrogate pair
+                                        if (parser->first_pair == 0) {
+                                            JSON_ERROR
+                                        }
+                                        // generate UTF-8 for surrogate pair
+                                        ESP_LOGI(TAG, "surrogage %x %x", parser->first_pair, parser->unicode_ch);
+                                        u_int16_t fp = parser->first_pair & 0x3ff;
+                                        u_int16_t sp = parser->unicode_ch & 0x3ff;
+                                        string_appender_append(&parser->string_appender, 0xf0 | ((fp >> 8) & 0x03));
+                                        string_appender_append(&parser->string_appender, 0x80 | ((fp >> 2) & 0x3f));
+                                        string_appender_append(&parser->string_appender, 0x80 | ((fp << 4) & 0x30) | ((sp >> 6) & 0x0f));
+                                        string_appender_append(&parser->string_appender, 0x80 | (sp & 0x3f));
+                                        parser->first_pair = 0;
+                                    } else {
+                                        // generate UTF-8
+                                        ESP_LOGI(TAG, "unicode %x", parser->unicode_ch);
+                                        u_int16_t unicode = parser->unicode_ch;
+                                        if (unicode <= 0x007F) {
+                                            string_appender_append(&parser->string_appender, unicode & 0x7f);
+                                        }
+                                        else if (unicode <= 0x07FF) {
+                                            string_appender_append(&parser->string_appender, 0xc0 | ((unicode >> 6) & 0x1f));
+                                            string_appender_append(&parser->string_appender, 0x80 | (unicode & 0x3f));
+                                        } else {
+                                            string_appender_append(&parser->string_appender, 0xe0 | ((unicode >> 12) & 0x0f));
+                                            string_appender_append(&parser->string_appender, 0x80 | ((unicode >> 6) & 0x3f));
+                                            string_appender_append(&parser->string_appender, 0x80 | (unicode & 0x3f));
+                                        }
+                                        parser->first_pair = 0;
+                                    }
+                                } else {
+                                    if (ch == 't')
+                                        ch = '\t';
+                                    else if (ch == 'n')
+                                        ch = '\n';
+                                    else if (ch == 'r')
+                                        ch = '\r';
+                                    string_appender_append(&parser->string_appender, ch);
+                                }
                             } else {
                                 string_appender_append(&parser->string_appender, ch);
                             }
@@ -272,6 +337,7 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
     next:;
     }
 #undef JSON_NEXT_CH
+#undef JSON_ERROR
 
     ESP_LOGI(TAG, "parser->error = %d with state = %d", parser->error, parser->state);
 }
