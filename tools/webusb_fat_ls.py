@@ -2,7 +2,7 @@
 from webusb import *
 import argparse
 
-parser = argparse.ArgumentParser(description='MCH2022 fs list tool')
+parser = argparse.ArgumentParser(description='MCH2022 badge FAT FS list tool')
 parser.add_argument("name", help="directory name")
 args = parser.parse_args()
 

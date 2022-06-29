@@ -2,7 +2,7 @@
 from webusb import *
 import argparse
 
-parser = argparse.ArgumentParser(description='MCH2022 badge app sideloading tool')
+parser = argparse.ArgumentParser(description='MCH2022 badge AppFS sideloading tool')
 parser.add_argument("name", help="AppFS filename")
 parser.add_argument("application", help="Application binary")
 parser.add_argument('--run', default=False, action='store_true')

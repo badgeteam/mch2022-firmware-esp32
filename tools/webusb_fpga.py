@@ -17,7 +17,7 @@ REQUEST_FW_VERSION_GET = 0x27
 
 WEBUSB_MODE_FPGA_DOWNLOAD = 0x02
 
-parser = argparse.ArgumentParser(description='MCH2022 badge FPGA tool')
+parser = argparse.ArgumentParser(description='MCH2022 badge FPGA bit stream loading tool')
 parser.add_argument("bitstream", help="Bitstream binary")
 parser.add_argument("bindings", nargs="*", help="Data files/bindings")
 args = parser.parse_args()

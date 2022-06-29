@@ -40,6 +40,9 @@ make flash
 make monitor
 ```
 
+## WebUSB tools
+In [`./tools`](./tools/) you will find command line tools to push files and apps to the badge etc., and a short manual on how to use them.
+
 ## Linux permissions
 Create `/etc/udev/rules.d/99-mch2022.rules` with the following contents:
 
@@ -55,7 +58,6 @@ sudo udevadm trigger
 ```
 
 ### Ubuntu snap
-
 While we have no idea why Canonical thinks breaking things by forcing Ubuntu users to use a bad software distribution system, we do have a solution!
 
 Install the Chromium snap package, then run the following command (in addition to adding the udev rule above). If you already have the badge connected turn it off and back on after running the command.

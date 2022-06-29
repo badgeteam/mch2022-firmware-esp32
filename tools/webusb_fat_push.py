@@ -2,7 +2,7 @@
 from webusb import *
 import argparse
 
-parser = argparse.ArgumentParser(description='MCH2022 fs push tool')
+parser = argparse.ArgumentParser(description='MCH2022 badge FAT FS upload tool')
 parser.add_argument("name", help="filename local")
 parser.add_argument("target", help="filename local")
 args = parser.parse_args()

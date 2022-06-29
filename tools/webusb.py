@@ -23,7 +23,7 @@ def printProgressBar (iteration, total, prefix = '', suffix = '', decimals = 1, 
     bar = fill * filledLength + '-' * (length - filledLength)
     print(f'\r{prefix} |{bar}| {percent}% {suffix}', end = printEnd)
     # Print New Line on Complete
-    if iteration == total: 
+    if iteration == total:
         print()
 
 class Commands(Enum):
@@ -41,7 +41,7 @@ class Commands(Enum):
     APPFSDEL = 4104
     APPFSWRITE = 4105
 
-class WebUSBPacket():    
+class WebUSBPacket():
     def __init__(self, command, message_id, payload=None):
         self.command = command
         self.message_id = message_id
@@ -196,7 +196,7 @@ class WebUSB():
             file (bytes) : file contents as byte array
 
         returns:
-            bool : true if file was uploaded        
+            bool : true if file was uploaded
         """
 
         payload = filename.encode(encoding='ascii') + b"\x00" + file
@@ -259,7 +259,7 @@ class WebUSB():
             None
         
         returns:
-            list : list of dicts containing 'name' and 'size'        
+            list : list of dicts containing 'name' and 'size'
         """
 
         data = self.sendPacket(WebUSBPacket(Commands.APPFSFDIR, self.getMessageId()))
