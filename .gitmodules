@@ -48,4 +48,4 @@
 	url = https://github.com/badgeteam/esp32-component-bme680.git
 [submodule "tools"]
 	path = tools
-	url = https://github.com/badgeteam/mch2022-esp32-tools
+	url = https://github.com/badgeteam/mch2022-tools
