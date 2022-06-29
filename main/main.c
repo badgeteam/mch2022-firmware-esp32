@@ -80,6 +80,24 @@ void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buf
     wait_for_button(buttonQueue);
 }
 
+bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    const pax_font_t* font = pax_get_font("saira regular");
+    pax_noclip(pax_buffer);
+    pax_background(pax_buffer, 0xf5ec42);
+    pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Flashing attempt detected");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, "Hi there developer!");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 2, "You tried to overwrite the launcher");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 3, "firmware, are you sure you want to");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 4, "do that? We recommend you to");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 5, "install your app using the");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 6, "webusb_push.py tool.");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 7, "Check out https://docs.badge.team");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 8, "for more information.");
+    pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10, "You can disable this protection by pressing A\nTo continue starting without disabling the protection\npress B.");
+    ili9341_write(ili9341, pax_buffer->buf);
+    return wait_for_button(buttonQueue);
+}
+
 void display_rp2040_debug_message(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     const pax_font_t* font = pax_get_font("saira regular");
     pax_noclip(pax_buffer);
@@ -146,6 +164,14 @@ void app_main(void) {
         display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
+    
+    nvs_handle_t handle;
+    res = nvs_open("system", NVS_READWRITE, &handle);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "NVS open failed: %d", res);
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
+        stop();
+    }
 
     display_boot_screen(&pax_buffer, ili9341, "Starting...");
 
@@ -158,14 +184,14 @@ void app_main(void) {
 
     RP2040* rp2040 = get_rp2040();
 
+    rp2040_updater(rp2040, &pax_buffer, ili9341);  // Handle RP2040 firmware update & bootloader mode
+
     uint8_t crash_debug;
     if (rp2040_get_crash_state(rp2040, &crash_debug) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read RP2040 crash & debug state");
         display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
         stop();
     }
-
-    rp2040_updater(rp2040, &pax_buffer, ili9341);  // Handle RP2040 firmware update & bootloader mode
 
     bool rp2040_crashed = crash_debug & 0x01;
     bool rp2040_debug   = crash_debug & 0x02;
@@ -179,6 +205,22 @@ void app_main(void) {
     }
 
     factory_test(&pax_buffer, ili9341);
+
+    /* Apply flashing lock */
+    
+    uint8_t prevent_flashing;
+    res = nvs_get_u8(handle, "flash_lock", &prevent_flashing);
+    if (res != ESP_OK) {
+        prevent_flashing = true;
+    }
+    
+    if (rp2040_set_reset_lock(rp2040, prevent_flashing) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to write RP2040 flashing lock state");
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        stop();
+    }
+
+    /* Start FPGA driver */
 
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
@@ -272,14 +314,26 @@ void app_main(void) {
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
 
     if (webusb_mode == 0x00) {  // Normal boot
-        /* Sponsors check */
-        nvs_handle_t handle;
-        esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
-        if (res != ESP_OK) {
-            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
-            stop();
+        if (prevent_flashing) {
+            uint8_t attempted;
+            if (rp2040_get_reset_attempted(rp2040, &attempted) == ESP_OK) {
+                if (attempted) {
+                    rp2040_set_reset_attempted(rp2040, false);
+                    ESP_LOGE(TAG, "Detected esptool.py style reset while flash lock is active");
+                    bool disable_lock = display_rp2040_flash_lock_warning(rp2040->queue, &pax_buffer, ili9341);
+                    if (disable_lock) {
+                        nvs_set_u8(handle, "flash_lock", 0);
+                        nvs_commit(handle);
+                        rp2040_set_reset_lock(rp2040, 0);
+                    }
+                    esp_restart();
+                }
+            }
+        } else {
+            ESP_LOGW(TAG, "Flashing using esptool.py is allowed");
         }
-
+        
+        /* Sponsors check */
         uint8_t sponsors;
         res = nvs_get_u8(handle, "sponsors", &sponsors);
         if ((res != ESP_OK) || (sponsors < 1)) {
@@ -291,8 +345,6 @@ void app_main(void) {
                 ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
             }
         }
-
-        nvs_close(handle);
 
         /* Rick that roll */
         play_bootsound();
@@ -316,4 +368,6 @@ void app_main(void) {
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
         display_boot_screen(&pax_buffer, ili9341, buffer);
     }
+    
+    nvs_close(handle);
 }
