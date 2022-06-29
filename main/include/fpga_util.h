@@ -64,4 +64,4 @@ int  fpga_req_add_file_alias(uint32_t fid, const char *path);
 int  fpga_req_add_file_data(uint32_t fid, void *data, size_t len);
 void fpga_req_del_file(uint32_t fid);
 
-bool fpga_req_process(const char* prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err);
+bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err);

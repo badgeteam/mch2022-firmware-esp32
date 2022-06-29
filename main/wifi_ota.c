@@ -17,14 +17,12 @@
 #include "nvs_flash.h"
 #include "string.h"
 #include "wifi.h"
+#include "wifi_cert.h"
 #include "wifi_connect.h"
 
 #define HASH_LEN 32
 
 static const char *TAG = "OTA update";
-
-extern const uint8_t server_cert_pem_start[] asm("_binary_isrgrootx1_pem_start");
-extern const uint8_t server_cert_pem_end[] asm("_binary_isrgrootx1_pem_end");
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt) {
     switch (evt->event_id) {
@@ -137,11 +135,8 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341) {
 
     ESP_LOGI(TAG, "Starting OTA update");
 
-    esp_http_client_config_t config = {.url               = "https://ota.bodge.team/mch2022.bin",
-                                       .crt_bundle_attach = esp_crt_bundle_attach,
-                                       .cert_pem          = (char *) server_cert_pem_start,
-                                       .event_handler     = _http_event_handler,
-                                       .keep_alive_enable = true};
+    esp_http_client_config_t config = {
+        .url = "https://mch2022.ota.bodge.team/mch2022.bin", .use_global_ca_store = true, .event_handler = _http_event_handler, .keep_alive_enable = true};
 
     esp_https_ota_config_t ota_config = {
         .http_config         = &config,

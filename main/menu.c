@@ -243,7 +243,7 @@ void menu_debug(menu_t* menu) {
     printf("------\n");
 }
 
-void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height, pax_col_t color) {
+void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height) {
     const pax_font_t* font = pax_get_font("saira regular");
 
     float  entry_height = menu->entry_height;  // 18 + 2;
@@ -330,7 +330,7 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
     pax_noclip(pax_buffer);
 }
 
-void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height, pax_col_t color) {
+void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height) {
     const pax_font_t* font = pax_get_font("saira regular");
 
     float header_height = menu->entry_height;

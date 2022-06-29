@@ -14,8 +14,8 @@
 #include "hatchery.h"
 #include "ili9341.h"
 #include "launcher_esp32.h"
-#include "launcher_python.h"
 #include "launcher_fpga.h"
+#include "launcher_python.h"
 #include "math.h"
 #include "menu.h"
 #include "nametag.h"
@@ -198,7 +198,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             // snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
             snprintf(textBuffer, sizeof(textBuffer), "v%s", version);
             render_start_help(pax_buffer, textBuffer);
-            menu_render_grid(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render_grid(pax_buffer, menu, 0, 0, 320, 220);
             render_battery(pax_buffer, battery_percent, battery_charging);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;

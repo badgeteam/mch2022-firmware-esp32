@@ -18,24 +18,24 @@
 #include "bootscreen.h"
 #include "fpga_download.h"
 #include "fpga_util.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ice40.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rtc_memory.h"
 #include "system_wrapper.h"
-#include "metadata.h"
-#include "graphics_wrapper.h"
 
 extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
 extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
 
 static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path) {
     const pax_font_t* font = pax_get_font("saira regular");
-    char filename[128];
+    char              filename[128];
     snprintf(filename, sizeof(filename), "%s/bitstream.bin", path);
     FILE* fd = fopen(filename, "rb");
     if (fd == NULL) {
@@ -72,8 +72,8 @@ static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI
 }
 
 static bool populate_menu(menu_t* menu) {
-    bool internal_result = populate_menu_from_path(menu, "/internal/fpga", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
-    bool sdcard_result   = populate_menu_from_path(menu, "/sd/fpga", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool internal_result = populate_menu_from_path(menu, "/internal/apps/ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps/ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
     return internal_result | sdcard_result;
 }
 
@@ -138,7 +138,7 @@ void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             if (empty) render_message(pax_buffer, "No FPGA bitstreams installed");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;

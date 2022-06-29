@@ -15,6 +15,7 @@
 #include "rp2040.h"
 #include "settings.h"
 #include "test_common.h"
+#include "wifi_defaults.h"
 #include "ws2812.h"
 
 static const char* TAG = "factory";
@@ -179,8 +180,6 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
             goto test_end;
         }
 
-        ws2812_send_data(led_green, sizeof(led_green));
-
     // Wait for the operator to unplug the badge
     test_end:
 
@@ -195,6 +194,11 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
                 ili9341_write(ili9341, pax_buffer->buf);
             }
             nvs_set_u8_fixed("system", "force_sponsors", 0x01);  // Force showing sponsors on first boot
+            wifi_set_defaults();
+            pax_noclip(pax_buffer);
+            pax_background(pax_buffer, 0x00FF00);
+            ili9341_write(ili9341, pax_buffer->buf);
+            ws2812_send_data(led_green, sizeof(led_green));
         }
 
         while (true) {

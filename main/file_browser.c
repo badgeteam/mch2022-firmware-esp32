@@ -139,7 +139,7 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
     const pax_font_t* font = pax_get_font("saira regular");
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
-    
+
     char* path = strdup(filename);
     if (path == NULL) return;
     for (size_t position = strlen(path) - 1; position >= 0; position--) {
@@ -313,7 +313,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             }
 
             if (render) {
-                menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF000000);
+                menu_render(pax_buffer, menu, 0, 0, 320, 220);
                 ili9341_write(ili9341, pax_buffer->buf);
                 render = false;
             }

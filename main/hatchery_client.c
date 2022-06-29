@@ -22,9 +22,6 @@
 
 static const char *TAG = "Hatchery";
 
-extern const uint8_t server_cert_pem_start[] asm("_binary_isrgrootx1_pem_start");
-extern const uint8_t server_cert_pem_end[] asm("_binary_isrgrootx1_pem_end");
-
 typedef struct data_callback_t data_callback_t;
 struct data_callback_t {
     void *data;
@@ -70,8 +67,7 @@ static esp_err_t hatchery_http_get(const char *url, data_callback_t *data_callba
     // ESP_LOGI(TAG, "http get");
 
     esp_http_client_config_t config = {.url               = url,
-                                       .crt_bundle_attach = esp_crt_bundle_attach,
-                                       .cert_pem          = (char *) server_cert_pem_start,
+                                       .use_global_ca_store = true,
                                        .event_handler     = _http_event_handler_data_callback,
                                        .user_data         = data_callback,
                                        .keep_alive_enable = true};

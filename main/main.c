@@ -39,7 +39,9 @@
 #include "settings.h"
 #include "system_wrapper.h"
 #include "webusb.h"
+#include "wifi_cert.h"
 #include "wifi_connection.h"
+#include "wifi_defaults.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
 
@@ -233,6 +235,26 @@ void app_main(void) {
 
     /* Start WiFi */
     wifi_init();
+
+    if (!wifi_check_configured()) {
+        if (wifi_set_defaults()) {
+            const pax_font_t* font = pax_get_font("saira regular");
+            pax_background(&pax_buffer, 0xFFFFFF);
+            pax_draw_text(&pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 continue");
+            render_message(&pax_buffer, "Default WiFi settings\nhave been restored!\nPress A to continue...");
+            ili9341_write(ili9341, pax_buffer.buf);
+            wait_for_button(rp2040->queue);
+        } else {
+            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to configure WiFi", "Flash may be corrupted", reset_board_str);
+            stop();
+        }
+    }
+
+    res = init_ca_store();
+    if (res != ESP_OK) {
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize", "TLS certificate storage", reset_board_str);
+        stop();
+    }
 
     /* Clear RTC memory */
     rtc_memory_clear();

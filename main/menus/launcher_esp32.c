@@ -13,10 +13,10 @@
 #include "graphics_wrapper.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
-#include "metadata.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -55,7 +55,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
     const char* title   = NULL;
     uint16_t    version = 0xFFFF;
     appfsEntryInfoExt(fd, &name, &title, &version, NULL);
-    menu_t* menu            = menu_alloc(title, 20, 18);
+    menu_t* menu = menu_alloc(title, 20, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -103,7 +103,7 @@ void context_menu(appfs_handle_t fd, xQueueHandle buttonQueue, pax_buf_t* pax_bu
             }
         }
         if (render) {
-            menu_render(pax_buffer, menu, 20, 20, 280, 180, 0xFF491d88);
+            menu_render(pax_buffer, menu, 20, 20, 280, 180);
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }
@@ -186,7 +186,7 @@ void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
             pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
             if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;

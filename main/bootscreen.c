@@ -30,7 +30,7 @@ void display_busy(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_noclip(pax_buffer);
     pax_buf_t icon;
     pax_decode_png_buf(&icon, (void*) hourglass_png_start, hourglass_png_end - hourglass_png_start, PAX_BUF_32_8888ARGB, 0);
-    
+
     float x = (pax_buffer->width - icon.width) / 2;
     float y = (pax_buffer->height - icon.height) / 2;
     pax_simple_rect(pax_buffer, 0xFFFFFFFF, x - 1, y - 1, icon.width + 2, icon.height + 2);

@@ -16,15 +16,16 @@
 #include "appfs.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rtc_memory.h"
 #include "system_wrapper.h"
-#include "metadata.h"
 
 extern const uint8_t python_png_start[] asm("_binary_python_png_start");
 extern const uint8_t python_png_end[] asm("_binary_python_png_end");
@@ -42,26 +43,17 @@ static void start_python_app(const char* path) {
 }
 
 static bool populate_menu(menu_t* menu) {
-    bool internal_result = populate_menu_from_path(menu, "/internal/apps", (void*) python_png_start, python_png_end - python_png_start);
-    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps", (void*) python_png_start, python_png_end - python_png_start);
+    bool internal_result = populate_menu_from_path(menu, "/internal/apps/python", (void*) python_png_start, python_png_end - python_png_start);
+    bool sdcard_result   = populate_menu_from_path(menu, "/sd/apps/python", (void*) python_png_start, python_png_end - python_png_start);
     return internal_result | sdcard_result;
 }
 
 void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    python_appfs_fd = appfsOpen("python");
+    python_appfs_fd           = appfsOpen("python");
+    bool python_not_installed = (python_appfs_fd == APPFS_INVALID_FD);
 
-    if (python_appfs_fd == APPFS_INVALID_FD) {
-        pax_noclip(pax_buffer);
-        const pax_font_t* font = pax_get_font("saira regular");
-        pax_background(pax_buffer, 0xFFFFFF);
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0,
-                      "BadgePython not installed!\nPlease install BadgePython\nusing the Hatchery.\n\nPress A or B to return.");
-        ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(button_queue);
-        return;
-    }
-
-    menu_t* menu = menu_alloc("BadgePython apps", 34, 18);
+    const char* title = "BadgePython apps";
+    menu_t*     menu  = menu_alloc(title, 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -80,11 +72,10 @@ void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
     pax_buf_t icon_hatchery;
     pax_decode_png_buf(&icon_hatchery, (void*) hatchery_png_start, hatchery_png_end - hatchery_png_start, PAX_BUF_32_8888ARGB, 0);
 
-    populate_menu(menu);
-    menu_insert_item_icon(menu, "Python Hatchery", NULL, (void*) strdup("dashboard.installer"), -1, &icon_hatchery);
-    // menu_insert_item(menu, "Home", NULL, (void*) strdup("dashboard.home"), -1);
-    // menu_insert_item(menu, "Launcher", NULL, (void*) strdup("dashboard.launcher"), -1);
-    // menu_insert_item(menu, "About", NULL, (void*) strdup("dashboard.other.about"), -1);
+    if (!python_not_installed) {
+        populate_menu(menu);
+        menu_insert_item_icon(menu, "Python Hatchery", NULL, (void*) strdup("dashboard.installer"), -1, &icon_hatchery);
+    }
 
     char* app_to_start = NULL;
     bool  render       = true;
@@ -96,11 +87,15 @@ void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
             if (buttonMessage.state) {
                 switch (buttonMessage.input) {
                     case RP2040_INPUT_JOYSTICK_DOWN:
-                        menu_navigate_next(menu);
+                        if (!python_not_installed) {
+                            menu_navigate_next(menu);
+                        }
                         render = true;
                         break;
                     case RP2040_INPUT_JOYSTICK_UP:
-                        menu_navigate_previous(menu);
+                        if (!python_not_installed) {
+                            menu_navigate_previous(menu);
+                        }
                         render = true;
                         break;
                     case RP2040_INPUT_BUTTON_HOME:
@@ -111,7 +106,9 @@ void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
                     case RP2040_INPUT_JOYSTICK_PRESS:
                     case RP2040_INPUT_BUTTON_SELECT:
                     case RP2040_INPUT_BUTTON_START:
-                        app_to_start = (char*) menu_get_callback_args(menu, menu_get_position(menu));
+                        if (!python_not_installed) {
+                            app_to_start = (char*) menu_get_callback_args(menu, menu_get_position(menu));
+                        }
                         break;
                     default:
                         break;
@@ -123,12 +120,21 @@ void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
             const pax_font_t* font = pax_get_font("saira regular");
             pax_background(pax_buffer, 0xFFFFFF);
             pax_noclip(pax_buffer);
-            pax_draw_text(pax_buffer, 0xFFfa448c, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
+            if (!python_not_installed) {
+                pax_draw_text(pax_buffer, 0xFFfa448c, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
+            } else {
+                pax_draw_text(pax_buffer, 0xFFfa448c, font, 18, 5, 240 - 18, "🅱 back");
+            }
             render_help = false;
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220, 0xFF491d88);
+            if (!python_not_installed) {
+                menu_render(pax_buffer, menu, 0, 0, 320, 220);
+            } else {
+                render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, menu->titleColor, menu->titleBgColor, &icon_python, title);
+                render_message(pax_buffer, "BadgePython is not installed\n\nPlease install BadgePython\nusing the Hatchery.");
+            }
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
         }

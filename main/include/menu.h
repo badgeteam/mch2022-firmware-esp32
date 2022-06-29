@@ -66,8 +66,8 @@ size_t     menu_get_length(menu_t* menu);
 void*      menu_get_callback_args(menu_t* menu, size_t position);
 pax_buf_t* menu_get_icon(menu_t* menu, size_t position);
 void       menu_debug(menu_t* menu);
-void       menu_render(pax_buf_t* aBuffer, menu_t* menu, float aPosX, float aPosY, float aWidth, float aHeight, pax_col_t aColor);
-void       menu_render_grid(pax_buf_t* buffer, menu_t* menu, float position_x, float position_y, float width, float height, pax_col_t color);
+void       menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height);
+void       menu_render_grid(pax_buf_t* buffer, menu_t* menu, float position_x, float position_y, float width, float height);
 
 #ifdef __cplusplus
 }
