@@ -35,10 +35,12 @@ idf_component_register(
          "rtc_memory.c"
          "metadata.c"
          "wifi_defaults.c"
+         "wifi_cert.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
     EMBED_TXTFILES ${project_dir}/resources/isrgrootx1.pem
+                   ${project_dir}/resources/custom_ota_cert.pem
     EMBED_FILES ${project_dir}/resources/fpga_selftest.bin
                 ${project_dir}/resources/rp2040_firmware.bin
                 ${project_dir}/resources/boot.snd

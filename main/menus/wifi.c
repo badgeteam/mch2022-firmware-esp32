@@ -25,6 +25,7 @@
 #include "wifi_connection.h"
 #include "wifi_ota.h"
 #include "wifi_defaults.h"
+#include "wifi_test.h"
 
 typedef enum action {
     /* ==== GENERIC ACTIONS ==== */
@@ -141,7 +142,7 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
         if (action != ACTION_NONE) {
             if (action == ACTION_SHOW) {
                 // Show the current WiFi settings.
-                wifi_show(buttonQueue, pax_buffer, ili9341);
+                wifi_connection_test(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_SCAN) {
                 // Set network by scanning for it.
                 wifi_setup(buttonQueue, pax_buffer, ili9341, true);
@@ -163,89 +164,6 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     }
 
     menu_free(menu);
-}
-
-void wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_get_font("saira regular");
-    nvs_handle_t      handle;
-
-    nvs_open("system", NVS_READWRITE, &handle);
-    char                      ssid[33]      = "<not set>";
-    char                      password[65]  = "<not set>";
-    char                      username[129] = "<not set>";
-    wifi_auth_mode_t          authmode;
-    esp_eap_ttls_phase2_types phase2;
-    size_t                    requiredSize;
-
-    esp_err_t res = nvs_get_str(handle, "wifi.ssid", NULL, &requiredSize);
-    if ((res == ESP_OK) && (requiredSize < sizeof(ssid))) {
-        res = nvs_get_str(handle, "wifi.ssid", ssid, &requiredSize);
-    }
-
-    res = nvs_get_str(handle, "wifi.password", NULL, &requiredSize);
-    if ((res == ESP_OK) && (requiredSize < sizeof(password))) {
-        res = nvs_get_str(handle, "wifi.password", password, &requiredSize);
-    }
-
-    uint8_t dummy = 0;
-    res           = nvs_get_u8(handle, "wifi.authmode", &dummy);
-    authmode      = dummy;
-
-    if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
-        res = nvs_get_str(handle, "wifi.username", NULL, &requiredSize);
-        if ((res == ESP_OK) && (requiredSize < sizeof(username))) {
-            res = nvs_get_str(handle, "wifi.username", username, &requiredSize);
-        }
-
-        dummy  = 0;
-        res    = nvs_get_u8(handle, "wifi.phase2", &dummy);
-        phase2 = dummy;
-    }
-
-    nvs_close(handle);
-
-    char buffer[300];
-    pax_noclip(pax_buffer);
-    pax_background(pax_buffer, 0xFFFFFF);
-    if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  WPA2 Ent + %s\nUsername:\n  %s\nPassword:\n  %s", ssid, wifi_phase2_names[phase2],
-                 username, password);
-    } else {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, wifi_auth_names[authmode], password);
-    }
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 test 🅱 back");
-    ili9341_write(ili9341, pax_buffer->buf);
-
-    bool quit = false;
-    while (!quit) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            switch (pin) {
-                case RP2040_INPUT_BUTTON_HOME:
-                case RP2040_INPUT_BUTTON_BACK:
-                    if (value) quit = true;
-                    break;
-                case RP2040_INPUT_BUTTON_ACCEPT:
-                case RP2040_INPUT_JOYSTICK_PRESS:
-                case RP2040_INPUT_BUTTON_SELECT:
-                case RP2040_INPUT_BUTTON_START:
-                    if (value) {
-                        pax_vec1_t size = pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3 * 18, "Connecting...");
-                        ili9341_write(ili9341, pax_buffer->buf);
-                        bool connected = wifi_connect_to_stored();
-                        pax_draw_rect(pax_buffer, 0xFFFFFFFF, 0, 240 - 3 * 18, 320, size.y);
-                        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3 * 18, connected ? "Connected successfully" : "Failed to connect");
-                        ili9341_write(ili9341, pax_buffer->buf);
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
 }
 
 wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, size_t num_aps, wifi_ap_record_t* aps) {

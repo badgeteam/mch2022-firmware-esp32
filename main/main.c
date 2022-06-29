@@ -43,6 +43,7 @@
 #include "wifi_ota.h"
 #include "ws2812.h"
 #include "wifi_defaults.h"
+#include "wifi_cert.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -247,6 +248,12 @@ void app_main(void) {
             display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to configure WiFi", "Flash may be corrupted", reset_board_str);
             stop();
         }
+    }
+    
+    res = init_ca_store();
+    if (res != ESP_OK) {
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize", "TLS certificate storage", reset_board_str);
+        stop();
     }
 
     /* Clear RTC memory */

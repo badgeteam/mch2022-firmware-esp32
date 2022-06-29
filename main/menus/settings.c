@@ -24,7 +24,6 @@
 #include "wifi.h"
 #include "wifi_connect.h"
 #include "wifi_ota.h"
-#include "wifi_test.h"
 
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
@@ -35,7 +34,6 @@ typedef enum action {
     ACTION_WIFI,
     ACTION_OTA,
     ACTION_RP2040_BL,
-    ACTION_WIFI_TEST,
     ACTION_NICKNAME
 } menu_settings_action_t;
 
@@ -65,8 +63,7 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     menu_set_icon(menu, &icon_settings);
 
     menu_insert_item(menu, "Edit nickname", NULL, (void*) ACTION_NICKNAME, -1);
-    menu_insert_item(menu, "WiFi configuration", NULL, (void*) ACTION_WIFI, -1);
-    menu_insert_item(menu, "Test WiFi connection", NULL, (void*) ACTION_WIFI_TEST, -1);
+    menu_insert_item(menu, "WiFi settings", NULL, (void*) ACTION_WIFI, -1);
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
 
@@ -125,8 +122,6 @@ void menu_settings(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
                 esp_restart();
             } else if (action == ACTION_OTA) {
                 ota_update(pax_buffer, ili9341);
-            } else if (action == ACTION_WIFI_TEST) {
-                wifi_connection_test(pax_buffer, ili9341);
             } else if (action == ACTION_WIFI) {
                 menu_wifi(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
