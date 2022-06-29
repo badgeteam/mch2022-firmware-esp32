@@ -1,3 +1,4 @@
+import os
 import usb.core
 import usb.util
 from enum import Enum
@@ -58,7 +59,12 @@ class WebUSBPacket():
 
 class WebUSB():
     def __init__(self, boot = True):
-        self.device = usb.core.find(idVendor=0x16d0, idProduct=0x0f9a)
+        if os.name == 'nt':
+            from usb.backend import libusb1
+            lube = libusb1.get_backend(find_library=lambda x: os.path.dirname(__file__) + "\\libusb-1.0.dll")
+            self.device = usb.core.find(idVendor=0x16d0, idProduct=0x0f9a, backend=lube)
+        else:
+            self.device = usb.core.find(idVendor=0x16d0, idProduct=0x0f9a)
 
         if self.device is None:
             raise ValueError("Badge not found")

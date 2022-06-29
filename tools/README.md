@@ -1,6 +1,8 @@
 ## Using WebUSB tools
 This directory contains command line tools for use with your badge.
 
+To use them, you will need to `pip install pyusb`.
+
 ### AppFS
 The AppFS contains binary ESP32 apps - standalone firmwares that can be booted and used as apps.
 

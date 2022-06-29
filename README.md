@@ -21,6 +21,9 @@ Source code included as submodules is licensed separately, please check the foll
 | components/spi-ice40        | MIT                               | Nicolai Electronics                                    |
 | components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |
 | components/ws2812           | MIT                               | Unlicense / Public domain                              |
+| tools/[libusb-1.0.dll]      | GNU LGPL 2.1                      | Public domain                                          |
+
+[libusb-1.0.dll]: https://libusb.info
 
 Some of the icons in `resources/icons` are licensed under MIT license `Copyright (c) 2019-2021 The Bootstrap Authors`. The source files for these icons can be found at https://icons.getbootstrap.com/.
 
