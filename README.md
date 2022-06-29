@@ -8,20 +8,20 @@ The source code contained in this repository is licensed under terms of the MIT 
 
 Source code included as submodules is licensed separately, please check the following table for details.
 
-| Submodule                   | License                           | Author                                                 |
-|-----------------------------|-----------------------------------|--------------------------------------------------------|
-| esp-idf                     | Apache License 2.0                | Espressif Systems (Shanghai) CO LTD                    |
-| components/appfs            | THE BEER-WARE LICENSE Revision 42 | Jeroen Domburg <jeroen@spritesmods.com>                |
-| components/bus-i2c          | MIT                               | Nicolai Electronics                                    |
-| components/i2c-bno055       | MIT                               | Nicolai Electronics                                    |
-| components/mch2022-rp2040   | MIT                               | Renze Nicolai                                          |
-| components/pax-graphics     | MIT                               | Julian Scheffers                                       |
-| components/pax-keyboard     | MIT                               | Julian Scheffers                                       |
-| components/sdcard           | MIT                               | Nicolai Electronics                                    |
-| components/spi-ice40        | MIT                               | Nicolai Electronics                                    |
-| components/spi-ili9341      | MIT                               | Nicolai Electronics                                    |
-| components/ws2812           | MIT                               | Unlicense / Public domain                              |
-| tools/[libusb-1.0.dll]      | GNU LGPL 2.1                      | Public domain                                          |
+| Submodule                   | License                           | Author                                                                                          |
+|-----------------------------|-----------------------------------|-------------------------------------------------------------------------------------------------|
+| esp-idf                     | Apache License 2.0                | Espressif Systems (Shanghai) CO LTD                                                             |
+| components/appfs            | THE BEER-WARE LICENSE Revision 42 | Jeroen Domburg <jeroen@spritesmods.com>                                                         |
+| components/bus-i2c          | MIT                               | Nicolai Electronics                                                                             |
+| components/i2c-bno055       | MIT                               | Nicolai Electronics                                                                             |
+| components/mch2022-rp2040   | MIT                               | Renze Nicolai                                                                                   |
+| components/pax-graphics     | MIT                               | Julian Scheffers                                                                                |
+| components/pax-keyboard     | MIT                               | Julian Scheffers                                                                                |
+| components/sdcard           | MIT                               | Nicolai Electronics                                                                             |
+| components/spi-ice40        | MIT                               | Nicolai Electronics                                                                             |
+| components/spi-ili9341      | MIT                               | Nicolai Electronics                                                                             |
+| components/ws2812           | MIT                               | Unlicense / Public domain                                                                       |
+| tools/[libusb-1.0.dll]      | GNU LGPL 2.1                      | See the [AUTHORS](https://github.com/libusb/libusb/blob/master/AUTHORS) document of the project |
 
 [libusb-1.0.dll]: https://libusb.info
 
