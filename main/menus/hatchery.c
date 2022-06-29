@@ -15,11 +15,27 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "bootscreen.h"
 
 static const char *TAG = "HatchMenu";
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
+
+// Store app to appfs/fat
+
+static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
+    hatchery_query_file(app, app->files);
+
+    if (app->files->contents != NULL) {
+        esp_err_t res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, app->slug, app->name, app->version, app->files->size, app->files->contents);
+    }
+
+    free(app->files->contents);
+    app->files->contents = NULL;
+}
+
+// Menus
 
 typedef void (*fill_menu_items_fn_t)(menu_t *menu, void *context);
 typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args);
@@ -112,15 +128,8 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341
             if (app->files == NULL) {
                 return;
             }
-
-            hatchery_query_file(app, app->files);
-
-            if (app->files->contents != NULL) {
-                appfs_store_in_memory_app(pax_buffer, ili9341, app->slug, app->name, app->version, app->files->size, app->files->contents);
-            }
-
-            free(app->files->contents);
-            app->files->contents = NULL;
+            display_busy(pax_buffer, ili9341);
+            store_app(buttonQueue, pax_buffer, ili9341, app);
 
             break;
         }
@@ -256,6 +265,7 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI934
         }
 
         if (menuArgs != NULL) {
+            display_busy(pax_buffer, ili9341);
             action(buttonQueue, pax_buffer, ili9341, menuArgs);
             menuArgs = NULL;
             render   = true;
