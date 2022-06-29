@@ -18,6 +18,7 @@
 #include "nvs_flash.h"
 #include "string.h"
 #include "wifi.h"
+#include "wifi_connection.h"
 #include "wifi_connect.h"
 #include "system_wrapper.h"
 #include "esp_timer.h"
@@ -30,16 +31,16 @@ static const char* wifi_phase2_names[] = {
     "EAP", "MSCHAPv2", "MSCHAP", "PAP", "CHAP",
 };
 
-static void display_test_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text, const char* ssid, const char* password, wifi_auth_mode_t authmode, esp_eap_ttls_phase2_types phase2, const char* username, const char* anon_ident, bool buttons) {
+static void display_test_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text, const char* ssid, const char* password, wifi_auth_mode_t authmode, esp_eap_ttls_phase2_types phase2, const char* username, const char* anon_ident, esp_netif_ip_info_t* ip_info, bool buttons) {
     const pax_font_t* font = pax_get_font("saira regular");
-    char buffer[300];
+    char buffer[512];
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
     if (authmode == WIFI_AUTH_WPA2_ENTERPRISE) {
-        snprintf(buffer, sizeof(buffer), "SSID:\n  %s\nSecurity:\n  WPA2 Ent + %s\nIdentity:\n  %s\nAnonymous identity:\n  %s\nPassword:\n  %s", ssid, wifi_phase2_names[phase2],
-                 username, anon_ident, password);
+        snprintf(buffer, sizeof(buffer), "SSID: %s\nSecurity: WPA2 Ent + %s\nIdentity: %s\nAnonymous identity: %s\nPassword: %s\nIP address: " IPSTR "\nNetmask: " IPSTR "\nGateway: " IPSTR "\n", ssid, wifi_phase2_names[phase2],
+                 username, anon_ident, password, IP2STR(&ip_info->ip), IP2STR(&ip_info->netmask), IP2STR(&ip_info->gw));
     } else {
-        snprintf(buffer, sizeof(buffer), "WiFi SSID:\n  %s\nSecurity:\n  %s\nWiFi password:\n  %s", ssid, wifi_auth_names[authmode], password);
+        snprintf(buffer, sizeof(buffer), "SSID: %s\nSecurity: %s\nPassword: %s\nIP address: " IPSTR "\nNetmask: " IPSTR "\nGateway: " IPSTR "\n", ssid, wifi_auth_names[authmode], password, IP2STR(&ip_info->ip), IP2STR(&ip_info->netmask), IP2STR(&ip_info->gw));
     }
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3 * 18, text);
@@ -93,18 +94,19 @@ void wifi_connection_test(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
     bool quit = false;
     char test_result[128] = {0};
     while (!quit) {
+        esp_netif_ip_info_t* ip_info = wifi_get_ip_info();
         wifi_disconnect_and_disable();
-        display_test_state(pax_buffer, ili9341, test_result, ssid, password, authmode, phase2, username, anon_ident, true);
+        display_test_state(pax_buffer, ili9341, test_result, ssid, password, authmode, phase2, username, anon_ident, ip_info, true);
         quit = !wait_for_button(button_queue);
         if (quit) break;
-        display_test_state(pax_buffer, ili9341, "Connecting...", ssid, password, authmode, phase2, username, anon_ident, false);
+        display_test_state(pax_buffer, ili9341, "Connecting...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
 
         if (!wifi_connect_to_stored()) {
             sprintf(test_result, "Failed to connect to network!");
             continue;
         }
-        
-        display_test_state(pax_buffer, ili9341, "Testing...", ssid, password, authmode, phase2, username, anon_ident, false);
+
+        display_test_state(pax_buffer, ili9341, "Testing...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
 
         esp_wifi_set_ps(WIFI_PS_NONE);  // Disable any WiFi power save mode
 
