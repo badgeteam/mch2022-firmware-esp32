@@ -46,3 +46,6 @@
 [submodule "components/i2c-bme680"]
 	path = components/i2c-bme680
 	url = https://github.com/badgeteam/esp32-component-bme680.git
+[submodule "tools"]
+	path = tools
+	url = https://github.com/badgeteam/mch2022-tools
