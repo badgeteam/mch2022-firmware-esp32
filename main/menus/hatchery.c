@@ -7,6 +7,7 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "appfs_wrapper.h"
 #include "hatchery_client.h"
@@ -22,17 +23,144 @@ static const char *TAG = "HatchMenu";
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
+const char *internal_path = "/internal";
+const char *esp32_type = "esp32";
+const char *esp32_bin_fn = "main.bin";
+
 // Store app to appfs/fat
 
-static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
-    hatchery_query_file(app, app->files);
+static bool create_dir(const char *path) {
+    struct stat st = {0};
 
-    if (app->files->contents != NULL) {
-        esp_err_t res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, app->slug, app->name, app->version, app->files->size, app->files->contents);
+    if (stat(path, &st) == 0) {
+        return (st.st_mode & S_IFDIR) != 0;
+    }
+    
+    return mkdir(path, 0777) == 0;
+}
+
+static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
+    ESP_LOGI(TAG, "");
+    if (app->files == NULL) {
+        // No files in this app
+        ESP_LOGI(TAG, "No file in this app");
+        return;
     }
 
-    free(app->files->contents);
-    app->files->contents = NULL;
+    const char *app_type_slug = app->category->app_type->slug;
+
+    // If there is a esp32 bin among the files, let first try to store it
+    hatchery_file_t *esp32_bin_file = NULL;
+    bool other_files = false;
+    if (strcmp(app_type_slug, esp32_type) == 0) {
+        for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
+            if (strcmp(app_file->name, esp32_bin_fn) == 0) {
+                esp32_bin_file = app_file;
+            } else {
+                other_files = true;
+            }
+        }
+    } else {
+        other_files = true;
+    }
+
+    if (esp32_bin_file != NULL) {
+        ESP_LOGI(TAG, "%s found %s", esp32_type, esp32_bin_fn);
+
+        hatchery_query_file(app, esp32_bin_file);
+
+        if (esp32_bin_file->contents == NULL) {
+            // esp32 bin file is empty of failed to load
+            ESP_LOGI(TAG, "Failed to download %s", esp32_bin_fn);
+            return;
+        }
+
+        esp_err_t res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, app->slug, app->name, app->version, esp32_bin_file->size, esp32_bin_file->contents);
+        free(esp32_bin_file->contents);
+        esp32_bin_file->contents = NULL;
+        if (res != ESP_OK) {
+            ESP_LOGI(TAG, "Failed to store ESP bin");
+            // failed to save esp32 bin file
+            return;
+        }
+        ESP_LOGI(TAG, "Stored EPS bin");
+    }
+
+    // If there are no other files, we are done
+    if (!other_files) {
+        return;
+    }
+
+    // Now first create directories
+    char path[257];
+    path[256] = '\0';
+    snprintf(path, 200, "%s/app", internal_path);
+    if (!create_dir(path)) {
+        // Failed to create app directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        return;
+    }
+
+    snprintf(path, 256, "%s/app/%s", internal_path, app_type_slug);
+    if (!create_dir(path)) {
+        // failed to create app type directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        return;
+    }
+
+    snprintf(path, 256, "%s/app/%s/%s", internal_path, app_type_slug, app->slug);
+    if (!create_dir(path)) {
+        // failed to create app directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        return;
+    }
+
+    // Now save other files
+    bool okay = true;
+    for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
+        if (app_file != esp32_bin_file) {
+
+            ESP_LOGI(TAG, "Query %s", app->name);
+
+            hatchery_query_file(app, app_file);
+
+            if (app_file->contents == NULL) {
+                // Failed to retrieve file from hatchery
+                okay = false;
+                break;
+            }
+
+            // Open file
+            snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, app_file->name);
+            FILE *f = fopen(path, "w");
+            ESP_LOGI(TAG, "Open %s %p", path, f);
+
+            if (f == NULL) {
+                // Failed to open the file for writing
+                okay = false;
+                break;
+            }
+
+            size_t wsize = fwrite(app_file->contents, 1, app_file->size, f);
+            fclose(f);
+            free(app_file->contents);
+            app_file->contents = NULL;
+            if (wsize != app_file->size) {
+                // Failed to write
+                ESP_LOGI(TAG, "Failed to save %d != %d", wsize, app_file->size);
+
+                okay = false;
+                break;
+            }
+        }
+    }
+
+    if (!okay) {
+        // Something went wrong
+        return;
+    }
+
+    // App was installed
 }
 
 // Menus
