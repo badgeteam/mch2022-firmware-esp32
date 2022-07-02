@@ -276,7 +276,7 @@ static void json_cb_process(void *callback_data, const char *data, int data_len)
                                         }
                                         // generate UTF-8 for surrogate pair
                                         ESP_LOGI(TAG, "surrogage %x %x", parser->first_pair, parser->unicode_ch);
-                                        u_int16_t fp = parser->first_pair & 0x3ff;
+                                        u_int16_t fp = (parser->first_pair & 0x3ff) + 0x40;
                                         u_int16_t sp = parser->unicode_ch & 0x3ff;
                                         string_appender_append(&parser->string_appender, 0xf0 | ((fp >> 8) & 0x03));
                                         string_appender_append(&parser->string_appender, 0x80 | ((fp >> 2) & 0x3f));
