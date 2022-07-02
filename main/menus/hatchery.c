@@ -26,6 +26,7 @@ extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 const char *internal_path = "/internal";
 const char *esp32_type = "esp32";
 const char *esp32_bin_fn = "main.bin";
+const char *metadata_json_fn = "metadata.json";
 
 // Store app to appfs/fat
 
@@ -39,6 +40,24 @@ static bool create_dir(const char *path) {
     return mkdir(path, 0777) == 0;
 }
 
+static void write_JSON_string(FILE *f, const char *s) {
+    for (; *s != '\0'; s++) {
+        if (*s == '\n') {
+            fputs("\\n", f);
+        } else if (*s == '\r') {
+            fputs("\\r", f);
+        } else if (*s == '\t') {
+            fputs("\\t", f);
+        } else if (*s == '"') {
+            fputs("\\\"", f);
+        } else if (*s == '\\') {
+            fputs("\\\\", f);
+        } else if (*s >= ' ') {
+            fputc(*s, f);
+        }
+    }
+}
+
 static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
     ESP_LOGI(TAG, "");
     if (app->files == NULL) {
@@ -48,16 +67,21 @@ static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *
     }
 
     const char *app_type_slug = app->category->app_type->slug;
+    bool is_esp32_app = strcmp(app_type_slug, esp32_type) == 0;
 
     // If there is a esp32 bin among the files, let first try to store it
     hatchery_file_t *esp32_bin_file = NULL;
+    bool has_metadata_json = false;
     bool other_files = false;
-    if (strcmp(app_type_slug, esp32_type) == 0) {
+    if (is_esp32_app) {
         for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
             if (strcmp(app_file->name, esp32_bin_fn) == 0) {
                 esp32_bin_file = app_file;
             } else {
                 other_files = true;
+                if (strcmp(app_file->name, metadata_json_fn) == 0) {
+                    has_metadata_json = true;
+                }
             }
         }
     } else {
@@ -86,8 +110,8 @@ static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *
         ESP_LOGI(TAG, "Stored EPS bin");
     }
 
-    // If there are no other files, we are done
-    if (!other_files) {
+    // If there are no other files with an esp32 app, we are done
+    if (is_esp32_app && !other_files) {
         return;
     }
 
@@ -153,6 +177,31 @@ static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *
                 break;
             }
         }
+    }
+
+    if (okay && !has_metadata_json) {
+
+            // Open file
+            snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, metadata_json_fn);
+            FILE *f = fopen(path, "w");
+            ESP_LOGI(TAG, "Open %s %p", path, f);
+
+            if (f == NULL) {
+                okay = false;
+            } else {
+                fprintf(f, "{\"name\":\"");
+                write_JSON_string(f, app->name);
+                fprintf(f, "\",\"description\":\"");
+                write_JSON_string(f, app->description);
+                fprintf(f, "\",\"category\":\"");
+                write_JSON_string(f, app->category->name);
+                fprintf(f, "\",\"author\":\"");
+                write_JSON_string(f, app->author);
+                fprintf(f, "\",\"license\":\"");
+                write_JSON_string(f, app->license);
+                fprintf(f, "\",\"revision\":%d}", app->version);
+                fclose(f);
+            }
     }
 
     if (!okay) {
