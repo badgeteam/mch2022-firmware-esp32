@@ -61,7 +61,7 @@ static void write_JSON_string(FILE *f, const char *s) {
             fputc(*s, f);
         } else if ((*s & 0xe0) == 0xc0 && (s[1] & 0xc0) == 0x80) {
             fprintf(f, "\\u%04x",
-                        ((u_int16_t)(*s & 0x0f) << 6) |
+                        ((u_int16_t)(*s & 0x1f) << 6) |
                         (u_int16_t)(s[1] & 0x3f));
             s++;
         } else if ((*s & 0xf0) == 0xe0 && (s[1] & 0xc0) == 0x80 && (s[2] & 0xc0) == 0x80) {
