@@ -62,13 +62,13 @@ void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     pax_simple_rect(pax_buffer, 0xFF491d88, x + margin + ((percentage * bar_width) / 100), y + margin, bar_width - ((percentage * bar_width) / 100),
                     height - (margin * 2));
     if (charging) {
-        const pax_font_t* font = pax_get_font("saira regular");
+        const pax_font_t* font = pax_font_saira_regular;
         pax_draw_text(pax_buffer, 0xffffffff, font, 18, x + width - 6, y + 2, "+");
     }
 }
 
 void render_start_help(pax_buf_t* pax_buffer, const char* text) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept");

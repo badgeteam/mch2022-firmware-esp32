@@ -117,7 +117,7 @@ void menu_launcher_python(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
         }
 
         if (render_help) {
-            const pax_font_t* font = pax_get_font("saira regular");
+            const pax_font_t* font = pax_font_saira_regular;
             pax_background(pax_buffer, 0xFFFFFF);
             pax_noclip(pax_buffer);
             if (!python_not_installed) {

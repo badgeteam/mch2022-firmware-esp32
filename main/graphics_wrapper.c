@@ -8,7 +8,7 @@
 
 void render_header(pax_buf_t* pax_buffer, float position_x, float position_y, float width, float height, float text_height, pax_col_t text_color,
                    pax_col_t bg_color, pax_buf_t* icon, const char* label) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_simple_rect(pax_buffer, bg_color, position_x, position_y, width, height);
     pax_clip(pax_buffer, position_x + 1, position_y + ((height - text_height) / 2) + 1, width - 2, text_height);
@@ -21,7 +21,7 @@ void render_header(pax_buf_t* pax_buffer, float position_x, float position_y, fl
 }
 
 void render_message(pax_buf_t* pax_buffer, char* message) {
-    const pax_font_t* font    = pax_get_font("saira regular");
+    const pax_font_t* font    = pax_font_saira_regular;
     pax_vec1_t        size    = pax_text_size(font, 18, message);
     float             margin  = 4;
     float             width   = size.x + (margin * 2);
@@ -39,7 +39,7 @@ void render_message(pax_buf_t* pax_buffer, char* message) {
 
 bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle,
               const char* aHint, char* aOutput, size_t aOutputSize) {
-    const pax_font_t* font     = pax_get_font("saira regular");
+    const pax_font_t* font     = pax_font_saira_regular;
     bool              accepted = false;
     pkb_ctx_t         kb_ctx;
     pkb_init(pax_buffer, &kb_ctx, 1024);

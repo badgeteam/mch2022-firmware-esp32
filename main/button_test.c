@@ -9,7 +9,7 @@
 #include "rp2040.h"
 
 void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
 
     bool render = true;
     bool quit   = false;

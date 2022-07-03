@@ -82,7 +82,7 @@ static void send_ir_repeated(uint16_t address, uint8_t command) {
 }
 
 void menu_ir(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, bool alternative) {
-    const pax_font_t* font  = pax_get_font("saira regular");
+    const pax_font_t* font  = pax_font_saira_regular;
     menu_t*           menu  = menu_alloc("Infrared remote", 34, 16);
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;

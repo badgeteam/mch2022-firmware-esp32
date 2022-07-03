@@ -123,7 +123,7 @@ bool run_basic_tests(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     bool              ok   = true;
 
     /* Screen init */
-    font = pax_get_font("sky mono");
+    font = pax_font_sky_mono;
 
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0x8060f0);

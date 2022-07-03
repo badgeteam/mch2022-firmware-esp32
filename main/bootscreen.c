@@ -13,7 +13,7 @@ extern const uint8_t hourglass_png_start[] asm("_binary_hourglass_png_start");
 extern const uint8_t hourglass_png_end[] asm("_binary_hourglass_png_end");
 
 void display_boot_screen(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
 
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);

@@ -136,7 +136,7 @@ static bool is_bitstream(FILE* fd) {
 }
 
 static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* filename, const char* label) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
 
@@ -307,7 +307,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             if (renderbg) {
                 pax_background(pax_buffer, 0xFFFFFF);
                 pax_noclip(pax_buffer);
-                const pax_font_t* font = pax_get_font("saira regular");
+                const pax_font_t* font = pax_font_saira_regular;
                 pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 19, "🅰 install  🅱 back");
                 renderbg = false;
             }

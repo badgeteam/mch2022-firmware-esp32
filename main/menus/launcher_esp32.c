@@ -136,7 +136,7 @@ void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
     pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
     menu_set_icon(menu, &icon_apps);
 
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
 
     bool empty = populate(menu);
 

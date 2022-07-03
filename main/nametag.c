@@ -55,9 +55,9 @@ void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *il
 }
 
 static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *name, nickname_theme_t theme, bool instructions) {
-    const pax_font_t *title_font        = pax_get_font("saira condensed");
-    const pax_font_t *instructions_font = pax_get_font("saira regular");
-    const pax_font_t *name_font         = pax_get_font((theme == NICKNAME_THEME_HELLO) ? "permanentmarker" : "saira condensed");
+    const pax_font_t *title_font        = pax_font_saira_condensed;
+    const pax_font_t *instructions_font = pax_font_saira_regular;
+    const pax_font_t *name_font         = (theme == NICKNAME_THEME_HELLO) ? pax_font_marker : pax_font_saira_condensed;
 
     float      scale = (theme == NICKNAME_THEME_HELLO) ? 60 : name_font->default_size;
     pax_vec1_t dims  = pax_text_size(name_font, scale, name);
