@@ -7,6 +7,7 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #include "appfs_wrapper.h"
 #include "hatchery_client.h"
@@ -15,11 +16,258 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "bootscreen.h"
+#include "graphics_wrapper.h"
+#include "system_wrapper.h"
+
 
 static const char *TAG = "HatchMenu";
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
+
+const char *internal_path = "/internal";
+const char *esp32_type = "esp32";
+const char *esp32_bin_fn = "main.bin";
+const char *metadata_json_fn = "metadata.json";
+
+// Store app to appfs/fat
+
+static bool create_dir(const char *path) {
+    struct stat st = {0};
+
+    if (stat(path, &st) == 0) {
+        return (st.st_mode & S_IFDIR) != 0;
+    }
+    
+    return mkdir(path, 0777) == 0;
+}
+
+static void write_JSON_string(FILE *f, const char *s) {
+    for (; *s != '\0'; s++) {
+        if (*s == '\n') {
+            fputs("\\n", f);
+        } else if (*s == '\r') {
+            fputs("\\r", f);
+        } else if (*s == '\t') {
+            fputs("\\t", f);
+        } else if (*s == '"') {
+            fputs("\\\"", f);
+        } else if (*s == '\\') {
+            fputs("\\\\", f);
+        } else if (*s < ' ') {
+            // ignore control characters
+        } else if (*s < 0x80) {
+            fputc(*s, f);
+        } else if ((*s & 0xe0) == 0xc0 && (s[1] & 0xc0) == 0x80) {
+            fprintf(f, "\\u%04x",
+                        ((u_int16_t)(*s & 0x1f) << 6) |
+                        (u_int16_t)(s[1] & 0x3f));
+            s++;
+        } else if ((*s & 0xf0) == 0xe0 && (s[1] & 0xc0) == 0x80 && (s[2] & 0xc0) == 0x80) {
+            fprintf(f, "\\u%04x",
+                        ((u_int16_t)(*s & 0x0f) << 12) |
+                        ((u_int16_t)(s[1] & 0x3f) << 6) |
+                        (u_int16_t)(s[2] & 0x3f));
+            s += 2;
+        } else if ((*s & 0xf8) == 0xf0 && (s[1] & 0xc0) == 0x80 && (s[2] & 0xc0) == 0x80 && (s[3] & 0xc0) == 0x80) {
+            fprintf(f, "\\u%04x\\u%04x",
+                        (u_int16_t)0xd800 |
+                        (u_int16_t)((((u_int16_t)(*s & 0x03) << 8) |
+                                     ((u_int16_t)(s[1] & 0x3f) << 2) |
+                                     ((u_int16_t)(s[2] & 0x30) >> 4)) - 0x40),
+                        (u_int16_t)0xdc00 |
+                        ((u_int16_t)(s[2] & 0x0f) << 6) |
+                        (u_int16_t)(s[3] & 0x3f));
+            s += 3;
+        }
+    }
+}
+
+static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
+    ESP_LOGI(TAG, "");
+    if (app->files == NULL) {
+        // No files in this app
+        ESP_LOGI(TAG, "No file in this app");
+        return;
+    }
+
+    const char *app_type_slug = app->category->app_type->slug;
+    bool is_esp32_app = strcmp(app_type_slug, esp32_type) == 0;
+
+    // If there is a esp32 bin among the files, let first try to store it
+    hatchery_file_t *esp32_bin_file = NULL;
+    bool has_metadata_json = false;
+    bool other_files = false;
+    if (is_esp32_app) {
+        for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
+            if (strcmp(app_file->name, esp32_bin_fn) == 0) {
+                esp32_bin_file = app_file;
+            } else {
+                other_files = true;
+                if (strcmp(app_file->name, metadata_json_fn) == 0) {
+                    has_metadata_json = true;
+                }
+            }
+        }
+    } else {
+        other_files = true;
+    }
+
+    if (esp32_bin_file != NULL) {
+        ESP_LOGI(TAG, "%s found %s", esp32_type, esp32_bin_fn);
+
+        hatchery_query_file(app, esp32_bin_file);
+
+        if (esp32_bin_file->contents == NULL) {
+            // esp32 bin file is empty of failed to load
+            ESP_LOGI(TAG, "Failed to download %s", esp32_bin_fn);
+            render_message(pax_buffer, "Failed download file");
+            ili9341_write(ili9341, pax_buffer->buf);
+            wait_for_button(buttonQueue);
+            return;
+        }
+
+        esp_err_t res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, app->slug, app->name, app->version, esp32_bin_file->size, esp32_bin_file->contents);
+        free(esp32_bin_file->contents);
+        esp32_bin_file->contents = NULL;
+        if (res != ESP_OK) {
+            ESP_LOGI(TAG, "Failed to store ESP bin");
+            // failed to save esp32 bin file
+            render_message(pax_buffer, "Failed save app");
+            ili9341_write(ili9341, pax_buffer->buf);
+            wait_for_button(buttonQueue);
+            return;
+        }
+        ESP_LOGI(TAG, "Stored EPS bin");
+    }
+
+    // If there are no other files with an esp32 app, we are done
+    if (is_esp32_app && !other_files) {
+        return;
+    }
+
+    // Now first create directories
+    char path[257];
+    path[256] = '\0';
+    snprintf(path, 200, "%s/app", internal_path);
+    if (!create_dir(path)) {
+        // Failed to create app directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        render_message(pax_buffer, "Failed create folder");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(buttonQueue);
+        return;
+    }
+
+    snprintf(path, 256, "%s/app/%s", internal_path, app_type_slug);
+    if (!create_dir(path)) {
+        // failed to create app type directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        render_message(pax_buffer, "Failed create folder");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(buttonQueue);
+        return;
+    }
+
+    snprintf(path, 256, "%s/app/%s/%s", internal_path, app_type_slug, app->slug);
+    if (!create_dir(path)) {
+        // failed to create app directory
+        ESP_LOGI(TAG, "Failed to create %s", path);
+        render_message(pax_buffer, "Failed create folder");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(buttonQueue);
+        return;
+    }
+
+    // Now save other files
+    bool okay = true;
+    for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
+        if (app_file != esp32_bin_file) {
+
+            ESP_LOGI(TAG, "Query %s", app->name);
+
+            hatchery_query_file(app, app_file);
+
+            if (app_file->contents == NULL) {
+                // Failed to download file from hatchery
+                okay = false;
+                render_message(pax_buffer, "Failed download file");
+                ili9341_write(ili9341, pax_buffer->buf);
+                wait_for_button(buttonQueue);
+                break;
+            }
+
+            // Open file
+            snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, app_file->name);
+            FILE *f = fopen(path, "w");
+            ESP_LOGI(TAG, "Open %s %p", path, f);
+
+            if (f == NULL) {
+                // Failed to open the file for writing
+                okay = false;
+                render_message(pax_buffer, "Failed save file");
+                ili9341_write(ili9341, pax_buffer->buf);
+                wait_for_button(buttonQueue);
+                break;
+            }
+
+            size_t wsize = fwrite(app_file->contents, 1, app_file->size, f);
+            fclose(f);
+            free(app_file->contents);
+            app_file->contents = NULL;
+            if (wsize != app_file->size) {
+                // Failed to write
+                ESP_LOGI(TAG, "Failed to save %d != %d", wsize, app_file->size);
+                render_message(pax_buffer, "Failed save file");
+                ili9341_write(ili9341, pax_buffer->buf);
+                wait_for_button(buttonQueue);
+                okay = false;
+                break;
+            }
+        }
+    }
+
+    if (okay && !has_metadata_json) {
+
+        // Open file
+        snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, metadata_json_fn);
+        FILE *f = fopen(path, "w");
+        ESP_LOGI(TAG, "Open %s %p", path, f);
+
+        if (f == NULL) {
+            render_message(pax_buffer, "Failed create file");
+            ili9341_write(ili9341, pax_buffer->buf);
+            wait_for_button(buttonQueue);
+            okay = false;
+        } else {
+            fprintf(f, "{\"name\":\"");
+            write_JSON_string(f, app->name);
+            fprintf(f, "\",\"description\":\"");
+            write_JSON_string(f, app->description);
+            fprintf(f, "\",\"category\":\"");
+            write_JSON_string(f, app->category->name);
+            fprintf(f, "\",\"author\":\"");
+            write_JSON_string(f, app->author);
+            fprintf(f, "\",\"license\":\"");
+            write_JSON_string(f, app->license);
+            fprintf(f, "\",\"revision\":%d}", app->version);
+            fclose(f);
+        }
+    }
+
+    if (!okay) {
+        // Something went wrong
+        return;
+    }
+
+    // App was installed
+    render_message(pax_buffer, "App has been installed");
+    ili9341_write(ili9341, pax_buffer->buf);
+    wait_for_button(buttonQueue);
+}
+
+// Menus
 
 typedef void (*fill_menu_items_fn_t)(menu_t *menu, void *context);
 typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args);
@@ -112,15 +360,8 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341
             if (app->files == NULL) {
                 return;
             }
-
-            hatchery_query_file(app, app->files);
-
-            if (app->files->contents != NULL) {
-                appfs_store_in_memory_app(pax_buffer, ili9341, app->slug, app->name, app->version, app->files->size, app->files->contents);
-            }
-
-            free(app->files->contents);
-            app->files->contents = NULL;
+            display_busy(pax_buffer, ili9341);
+            store_app(buttonQueue, pax_buffer, ili9341, app);
 
             break;
         }
@@ -256,6 +497,7 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI934
         }
 
         if (menuArgs != NULL) {
+            display_busy(pax_buffer, ili9341);
             action(buttonQueue, pax_buffer, ili9341, menuArgs);
             menuArgs = NULL;
             render   = true;

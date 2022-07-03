@@ -167,7 +167,7 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0, "ESP32 application\n\nPress A to install\nPress B to go back");
             ili9341_write(ili9341, pax_buffer->buf);
             if (wait_for_button(buttonQueue)) {
-                appfs_store_app(pax_buffer, ili9341, filename, label, label, 0xFFFF);
+                appfs_store_app(buttonQueue, pax_buffer, ili9341, filename, label, label, 0xFFFF);
             }
         } else {
             char buffer[128];

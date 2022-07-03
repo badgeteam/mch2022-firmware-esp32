@@ -21,6 +21,7 @@
 #include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "system_wrapper.h"
+#include "graphics_wrapper.h"
 
 static const char* TAG = "appfs wrapper";
 
@@ -38,62 +39,67 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
+void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
     esp_err_t res;
     FILE*     app_fd = fopen(path, "rb");
     if (app_fd == NULL) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to open file");
+        render_message(pax_buffer, "Failed to open file");
+        ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to open file");
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        wait_for_button(buttonQueue);
         return;
     }
     size_t   app_size = get_file_size(app_fd);
     uint8_t* app      = load_file_to_ram(app_fd);
     fclose(app_fd);
     if (app == NULL) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to load app to RAM");
+        render_message(pax_buffer, "Failed to load app to RAM");
+        ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to load application into RAM");
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        wait_for_button(buttonQueue);
         return;
     }
 
     ESP_LOGI(TAG, "Application size %d", app_size);
 
-    appfs_store_in_memory_app(pax_buffer, ili9341, name, title, version, app_size, app);
+    res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, name, title, version, app_size, app);
+    if (res == ESP_OK) {
+        render_message(pax_buffer, "App installed!");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(buttonQueue);
+    }
 
     free(app);
 }
 
-void appfs_store_in_memory_app(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
+esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
     esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to create file");
+        render_message(pax_buffer, "Failed to create file");
+        ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        free(app);
-        return;
+        wait_for_button(buttonQueue);
+        return res;
     }
     int roundedSize = (app_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
     res             = appfsErase(handle, 0, roundedSize);
     if (res != ESP_OK) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to erase file");
+        render_message(pax_buffer, "Failed to erase file");
+        ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        free(app);
-        return;
+        wait_for_button(buttonQueue);
+        return res;
     }
     res = appfsWrite(handle, 0, app, app_size);
     if (res != ESP_OK) {
-        display_boot_screen(pax_buffer, ili9341, "Failed to write file");
+        render_message(pax_buffer, "Failed to write file");
+        ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
-        free(app);
-        return;
+        wait_for_button(buttonQueue);
+        return res;
     }
     ESP_LOGI(TAG, "Application is now stored in AppFS");
-    display_boot_screen(pax_buffer, ili9341, "App installed!");
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    return;
+    return res;
 }
