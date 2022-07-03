@@ -119,7 +119,7 @@ static void fpga_display_message(pax_buf_t* pax_buffer, ILI9341* ili9341, uint32
     line = 0;
     m = c = message;
 
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     while (!done) {
         // End ?
         done = (*c == '\0');

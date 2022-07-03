@@ -54,7 +54,7 @@ extern const uint8_t logo_screen_png_end[] asm("_binary_logo_screen_png_end");
 static const char* TAG = "main";
 
 void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* line0, const char* line1, const char* line2, const char* line3) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xa85a32);
     if (line0 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 23, 0, 20 * 0, line0);
@@ -65,7 +65,7 @@ void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* li
 }
 
 void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Oops...");
@@ -81,7 +81,7 @@ void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buf
 }
 
 bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Flashing attempt detected");
@@ -100,7 +100,7 @@ bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_
 }
 
 void display_rp2040_debug_message(pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Debug mode");
@@ -281,7 +281,7 @@ void app_main(void) {
 
     if (!wifi_check_configured()) {
         if (wifi_set_defaults()) {
-            const pax_font_t* font = pax_get_font("saira regular");
+            const pax_font_t* font = pax_font_saira_regular;
             pax_background(&pax_buffer, 0xFFFFFF);
             pax_draw_text(&pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 continue");
             render_message(&pax_buffer, "Default WiFi settings\nhave been restored!\nPress A to continue...");

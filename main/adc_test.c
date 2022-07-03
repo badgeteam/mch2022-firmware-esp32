@@ -13,7 +13,7 @@ void test_adc(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
     bool quit = false;
 
     RP2040*           rp2040 = get_rp2040();
-    const pax_font_t* font   = pax_get_font("saira regular");
+    const pax_font_t* font   = pax_font_saira_regular;
 
     while (!quit) {
         bool error = false;

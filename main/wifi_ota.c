@@ -112,7 +112,7 @@ static void get_sha256_of_partitions(void) {
 
 void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text) {
     pax_noclip(pax_buffer);
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t *font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     pax_vec1_t title_size = pax_text_size(font, 18, "Firmware update");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, "Firmware update");

@@ -44,7 +44,7 @@ void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili934
     }
     bool quit = false;
     while (!quit) {
-        const pax_font_t* font = pax_get_font("saira regular");
+        const pax_font_t* font = pax_font_saira_regular;
         pax_noclip(pax_buffer);
         pax_background(pax_buffer, 0xFFFFFF);
         pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Flashing lock");
@@ -65,7 +65,7 @@ void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili934
 }
 
 void render_settings_help(pax_buf_t* pax_buffer) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");

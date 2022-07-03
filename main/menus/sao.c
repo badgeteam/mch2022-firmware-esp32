@@ -49,7 +49,7 @@ static void program_sao(uint8_t type) {
 }
 
 static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
     char buffer[64];
@@ -75,7 +75,7 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
 }
 
 static void render_sao_not_detected(pax_buf_t* pax_buffer) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFAAAA);
     pax_noclip(pax_buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 0, "No SAO detected");

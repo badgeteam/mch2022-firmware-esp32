@@ -25,7 +25,7 @@
 #include "system_wrapper.h"
 
 void webusb_print_status(pax_buf_t* pax_buffer, ILI9341* ili9341, char* message) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0x000000);
     pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 20, 0, 23 * 0, "WebUSB");

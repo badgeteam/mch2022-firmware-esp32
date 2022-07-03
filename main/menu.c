@@ -244,7 +244,7 @@ void menu_debug(menu_t* menu) {
 }
 
 void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
 
     float  entry_height = menu->entry_height;  // 18 + 2;
     float  text_height  = menu->text_height;
@@ -331,7 +331,7 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
 }
 
 void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
 
     float header_height = menu->entry_height;
 

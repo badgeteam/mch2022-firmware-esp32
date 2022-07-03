@@ -34,7 +34,7 @@ extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
 extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
 
 static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     char              filename[128];
     snprintf(filename, sizeof(filename), "%s/bitstream.bin", path);
     FILE* fd = fopen(filename, "rb");
@@ -130,7 +130,7 @@ void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
         }
 
         if (render_help) {
-            const pax_font_t* font = pax_get_font("saira regular");
+            const pax_font_t* font = pax_font_saira_regular;
             pax_background(pax_buffer, 0xFFFFFF);
             pax_noclip(pax_buffer);
             pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");

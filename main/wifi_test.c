@@ -33,7 +33,7 @@ static const char* wifi_phase2_names[] = {
 
 static void display_test_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text, const char* ssid, const char* password, wifi_auth_mode_t authmode,
                                esp_eap_ttls_phase2_types phase2, const char* username, const char* anon_ident, esp_netif_ip_info_t* ip_info, bool buttons) {
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     char              buffer[512];
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);

@@ -46,7 +46,7 @@ static void action_apps(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341
         hatchery_query_app(app);
     }
 
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t *font = pax_font_saira_regular;
 
     float entry_height = 34;
     float text_height  = 18;
@@ -201,7 +201,7 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI934
 
     menu_set_icon(menu, &icon_apps);
 
-    const pax_font_t *font = pax_get_font("saira regular");
+    const pax_font_t *font = pax_font_saira_regular;
 
     fill_menu_items(menu, context);
 

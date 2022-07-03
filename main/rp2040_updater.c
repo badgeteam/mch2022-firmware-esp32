@@ -29,7 +29,7 @@ static void draw_text_centered(pax_buf_t* pax_buffer, const pax_font_t* font, pa
 
 void display_rp2040_update_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text1, const char* text2) {
     pax_noclip(pax_buffer);
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     draw_text_centered(pax_buffer, font, 0xFF000000, -16, "Co-processor update");
     draw_text_centered(pax_buffer, font, 0xFF000000, 8, text1);
@@ -41,7 +41,7 @@ void display_rp2040_update_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const 
 
 void display_rp2040_update_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text) {
     pax_noclip(pax_buffer);
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xa85a32);
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, -8, "ERROR");
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 8, text);
@@ -50,7 +50,7 @@ void display_rp2040_update_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const 
 
 void display_rp2040_update_old_bootloader(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_noclip(pax_buffer);
-    const pax_font_t* font = pax_get_font("saira regular");
+    const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xa85a32);
 
     int line_height = 16;
