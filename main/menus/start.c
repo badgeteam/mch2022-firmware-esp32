@@ -209,7 +209,6 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
                 display_busy(pax_buffer, ili9341);
                 menu_launcher_esp32(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_HATCHERY) {
-                display_busy(pax_buffer, ili9341);
                 menu_hatchery(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_NAMETAG) {
                 show_nametag(buttonQueue, pax_buffer, ili9341);
