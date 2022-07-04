@@ -296,8 +296,8 @@ bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax
         return false;
     }
 
-    printf("Creating dir: %s\r\n", buffer);
     snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s", to_sd_card ? sdcard_path : internal_path, type_slug);
+    printf("Creating dir: %s\r\n", buffer);
     if (!create_dir(buffer)) {
         // failed to create app type directory
         ESP_LOGI(TAG, "Failed to create %s", buffer);
@@ -307,8 +307,8 @@ bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax
         return false;
     }
 
-    printf("Creating dir: %s\r\n", buffer);
     snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug);
+    printf("Creating dir: %s\r\n", buffer);
     if (!create_dir(buffer)) {
         // failed to create app directory
         ESP_LOGI(TAG, "Failed to create %s", buffer);
@@ -324,7 +324,7 @@ bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax
         cJSON* name_obj = cJSON_GetObjectItem(file_obj, "name");
         cJSON* url_obj = cJSON_GetObjectItem(file_obj, "url");
         cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
-        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn))) {
+        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn) == 0)) {
             snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s' to AppFS", app_name_obj->valuestring, name_obj->valuestring);
             render_message(pax_buffer, buffer);
             ili9341_write(ili9341, pax_buffer->buf);
@@ -339,33 +339,34 @@ bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax
                 wait_for_button(button_queue);
                 return false;
             }
-            esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, app_slug, name_obj->valuestring, version_obj->valueint, esp32_binary_size, esp32_binary_data);
-            if (res != ESP_OK) {
-                free(esp32_binary_data);
-                ESP_LOGI(TAG, "Failed to store ESP32 binary");
-                render_message(pax_buffer, "Failed to install app to AppFS");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(button_queue);
-                return false;
-            }
-            if (to_sd_card) {
-                render_message(pax_buffer, "Storing a copy of the ESP32\nbinary to the SD card...");
-                ili9341_write(ili9341, pax_buffer->buf);
-                printf("Creating file: %s\r\n", buffer);
-                FILE* binary_fd = fopen(buffer, "w");
-                if (binary_fd == NULL) {
+            if (esp32_binary_data != NULL) { // Ignore 0 bytes files
+                esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, app_slug, app_name_obj->valuestring, version_obj->valueint, esp32_binary_size, esp32_binary_data);
+                if (res != ESP_OK) {
                     free(esp32_binary_data);
-                    ESP_LOGI(TAG, "Failed to install ESP32 binary to %s", buffer);
-                    render_message(pax_buffer, "Failed to install app to SD card");
+                    ESP_LOGI(TAG, "Failed to store ESP32 binary");
+                    render_message(pax_buffer, "Failed to install app to AppFS");
                     ili9341_write(ili9341, pax_buffer->buf);
                     wait_for_button(button_queue);
                     return false;
                 }
-                fwrite(esp32_binary_data, 1, esp32_binary_size, binary_fd);
-                fclose(binary_fd);
+                if (to_sd_card) {
+                    render_message(pax_buffer, "Storing a copy of the ESP32\nbinary to the SD card...");
+                    ili9341_write(ili9341, pax_buffer->buf);
+                    printf("Creating file: %s\r\n", buffer);
+                    FILE* binary_fd = fopen(buffer, "w");
+                    if (binary_fd == NULL) {
+                        free(esp32_binary_data);
+                        ESP_LOGI(TAG, "Failed to install ESP32 binary to %s", buffer);
+                        render_message(pax_buffer, "Failed to install app to SD card");
+                        ili9341_write(ili9341, pax_buffer->buf);
+                        wait_for_button(button_queue);
+                        return false;
+                    }
+                    fwrite(esp32_binary_data, 1, esp32_binary_size, binary_fd);
+                    fclose(binary_fd);
+                }
                 free(esp32_binary_data);
             }
-            free(esp32_binary_data);
         } else {
             snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s'...", app_name_obj->valuestring, name_obj->valuestring);
             render_message(pax_buffer, buffer);
