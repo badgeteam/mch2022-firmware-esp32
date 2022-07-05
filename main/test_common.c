@@ -15,6 +15,7 @@
 typedef bool (*test_fn)(uint32_t *rc);
 
 bool test_wait_for_response(uint32_t *rc) {
+    printf("Waiting for button press...\r\n");
     RP2040                *rp2040         = get_rp2040();
     rp2040_input_message_t button_message = {0};
     if (rc != NULL) *rc = 0;
@@ -40,6 +41,8 @@ bool test_wait_for_response(uint32_t *rc) {
 bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, int line, const char *test_name, test_fn fn) {
     bool     test_result;
     uint32_t rc;
+    
+    printf("Starting test %s...\r\n", test_name);
 
     /* Test name */
     pax_draw_text(pax_buffer, 0xffffffff, font, 18, 0, 20 * line, test_name);
@@ -60,6 +63,8 @@ bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, i
     }
 
     if (ili9341) ili9341_write(ili9341, pax_buffer->buf);
+    
+    printf("    Test %s result: %s\r\n", test_name, test_result ? "OK" : "FAIL");
 
     /* Pass through the 'OK' status */
     return test_result;
