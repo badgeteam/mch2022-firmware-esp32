@@ -269,6 +269,7 @@ static bool load_app_info(const char* type_slug, const char* category_slug, cons
 }
 
 bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug, const char* category_slug, const char* app_slug, bool to_sd_card) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
     cJSON* app_name_obj = cJSON_GetObjectItem(json_app_info, "name");
     cJSON* author_obj = cJSON_GetObjectItem(json_app_info, "author");
@@ -400,6 +401,8 @@ bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax
     render_message(pax_buffer, "App has been installed!");
     ili9341_write(ili9341, pax_buffer->buf);
     wait_for_button(button_queue);
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak in installer: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
     return true;
 }
 
@@ -654,8 +657,11 @@ bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t *pax_buffer, 
 }
 
 void menu_hatchery(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy(pax_buffer, ili9341);
+
     if (!connect_to_wifi(button_queue, pax_buffer, ili9341)) return;
+
     if (!load_types()) {
         wifi_disconnect_and_disable();
         hatchery_free();
@@ -682,4 +688,6 @@ void menu_hatchery(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *il
     hatchery_menu_destroy(menu);
     wifi_disconnect_and_disable();
     hatchery_free();
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
 }

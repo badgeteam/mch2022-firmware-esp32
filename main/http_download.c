@@ -108,6 +108,7 @@ bool download_file(const char* url, const char* path) {
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_err_t err = esp_http_client_perform(client);
     fclose(fd);
+    esp_http_client_cleanup(client);
     return (!(info.error || info.out_of_allocated || info.out_of_memory)) && info.finished;
 }
 
@@ -120,5 +121,6 @@ bool download_ram(const char* url, uint8_t** ptr, size_t* size) {
     bool success = (!(info.error || info.out_of_allocated || info.out_of_memory)) && info.finished;
     if (success && (size != NULL)) *size = info.size;
     printf("Buffer: %p -> %p\r\n", ptr, *ptr);
+    esp_http_client_cleanup(client);
     return success;
 }
