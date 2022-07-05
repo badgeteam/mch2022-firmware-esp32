@@ -328,6 +328,26 @@ void app_main(void) {
             }
         }
 
+        /* Crash check */
+        appfs_handle_t crashed_app = appfs_detect_crash();
+        if (crashed_app != APPFS_INVALID_FD) {
+            const char* app_name = NULL;
+            appfsEntryInfo(crashed_app, &app_name, NULL);
+            pax_background(&pax_buffer, 0xFFFFFF);
+            render_header(&pax_buffer, 0, 0, pax_buffer.width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
+            if (app_name != NULL) {
+                char buffer[64];
+                buffer[sizeof(buffer) - 1] = '\0';
+                snprintf(buffer, sizeof(buffer) - 1, "App: %s", app_name);
+                pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
+            }
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer.height - 18, "🅰 continue");
+            ili9341_write(ili9341, pax_buffer.buf);
+            wait_for_button(rp2040->queue);
+        }
+
         /* Rick that roll */
         play_bootsound();
 
