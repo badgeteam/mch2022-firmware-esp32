@@ -10,7 +10,6 @@
 #include <sys/stat.h>
 
 #include "appfs_wrapper.h"
-#include "hatchery_client.h"
 #include "ili9341.h"
 #include "menu.h"
 #include "pax_codecs.h"
@@ -19,414 +18,444 @@
 #include "bootscreen.h"
 #include "graphics_wrapper.h"
 #include "system_wrapper.h"
+#include "http_download.h"
+#include "wifi_connect.h"
+#include "cJSON.h"
+#include "filesystems.h"
 
 
-static const char *TAG = "HatchMenu";
+static const char *TAG = "Hatchery";
 
-extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
-extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
+extern const uint8_t hatchery_png_start[] asm("_binary_hatchery_png_start");
+extern const uint8_t hatchery_png_end[] asm("_binary_hatchery_png_end");
 
-const char *internal_path = "/internal";
-const char *esp32_type = "esp32";
-const char *esp32_bin_fn = "main.bin";
-const char *metadata_json_fn = "metadata.json";
-
-// Store app to appfs/fat
+const char* sdcard_path = "/sd";
+const char* internal_path = "/internal";
+const char* esp32_type = "esp32";
+const char* esp32_bin_fn = "main.bin";
+const char* metadata_json_fn = "metadata.json";
 
 static bool create_dir(const char *path) {
     struct stat st = {0};
-
     if (stat(path, &st) == 0) {
         return (st.st_mode & S_IFDIR) != 0;
     }
-    
     return mkdir(path, 0777) == 0;
 }
 
-static void write_JSON_string(FILE *f, const char *s) {
-    for (; *s != '\0'; s++) {
-        if (*s == '\n') {
-            fputs("\\n", f);
-        } else if (*s == '\r') {
-            fputs("\\r", f);
-        } else if (*s == '\t') {
-            fputs("\\t", f);
-        } else if (*s == '"') {
-            fputs("\\\"", f);
-        } else if (*s == '\\') {
-            fputs("\\\\", f);
-        } else if (*s < ' ') {
-            // ignore control characters
-        } else if (*s < 0x80) {
-            fputc(*s, f);
-        } else if ((*s & 0xe0) == 0xc0 && (s[1] & 0xc0) == 0x80) {
-            fprintf(f, "\\u%04x",
-                        ((u_int16_t)(*s & 0x1f) << 6) |
-                        (u_int16_t)(s[1] & 0x3f));
-            s++;
-        } else if ((*s & 0xf0) == 0xe0 && (s[1] & 0xc0) == 0x80 && (s[2] & 0xc0) == 0x80) {
-            fprintf(f, "\\u%04x",
-                        ((u_int16_t)(*s & 0x0f) << 12) |
-                        ((u_int16_t)(s[1] & 0x3f) << 6) |
-                        (u_int16_t)(s[2] & 0x3f));
-            s += 2;
-        } else if ((*s & 0xf8) == 0xf0 && (s[1] & 0xc0) == 0x80 && (s[2] & 0xc0) == 0x80 && (s[3] & 0xc0) == 0x80) {
-            fprintf(f, "\\u%04x\\u%04x",
-                        (u_int16_t)0xd800 |
-                        (u_int16_t)((((u_int16_t)(*s & 0x03) << 8) |
-                                     ((u_int16_t)(s[1] & 0x3f) << 2) |
-                                     ((u_int16_t)(s[2] & 0x30) >> 4)) - 0x40),
-                        (u_int16_t)0xdc00 |
-                        ((u_int16_t)(s[2] & 0x0f) << 6) |
-                        (u_int16_t)(s[3] & 0x3f));
-            s += 3;
+static menu_t* hatchery_menu_create(const char* title) {
+    menu_t *menu = menu_alloc(title, 34, 18);
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFFFFFFFF;
+    menu->selectedItemColor = 0xFFfa448c;
+    menu->borderColor       = 0xFF491d88;
+    menu->titleColor        = 0xFFfa448c;
+    menu->titleBgColor      = 0xFF491d88;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+    pax_buf_t* icon_hatchery = malloc(sizeof(pax_buf_t));
+    if (icon_hatchery) {
+        pax_decode_png_buf(icon_hatchery, (void *) hatchery_png_start, hatchery_png_end - hatchery_png_start, PAX_BUF_32_8888ARGB, 0);
+        menu_set_icon(menu, icon_hatchery);
+    }
+    return menu;
+}
+
+static void hatchery_menu_destroy(menu_t* menu) {
+    pax_buf_destroy(menu->icon);
+    free(menu->icon);
+    menu_free(menu);
+}
+
+int wait_for_button_press(xQueueHandle button_queue, TickType_t timeout) {
+    int button = -1;
+    while (true) {
+        rp2040_input_message_t message;
+        xQueueReceive(button_queue, &message, portMAX_DELAY);
+        button = message.input;
+        if (message.state) break;
+    }
+    return button;
+}
+
+static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, menu_t* menu, const char* prompt, bool* back_btn, bool* select_btn, bool* menu_btn, bool* home_btn) {
+    bool quit = false;
+    bool render = true;
+    void* return_value = NULL;
+    while (!quit) {
+        if (render) {
+            pax_background(pax_buffer, 0xFFFFFF);
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, prompt);
+            ili9341_write(ili9341, pax_buffer->buf);
+            render = false;
         }
+
+        int button = wait_for_button_press(button_queue, portMAX_DELAY);
+        switch (button) {
+            case RP2040_INPUT_JOYSTICK_DOWN:
+                menu_navigate_next(menu);
+                render = true;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+                menu_navigate_previous(menu);
+                render = true;
+                break;
+            case RP2040_INPUT_BUTTON_ACCEPT:
+            case RP2040_INPUT_JOYSTICK_PRESS:
+            case RP2040_INPUT_BUTTON_START:
+                return_value = menu_get_callback_args(menu, menu_get_position(menu));
+                quit = true;
+                break;
+            case RP2040_INPUT_BUTTON_BACK:
+                quit = true;
+                if (back_btn) *back_btn = true;
+                break;
+            case RP2040_INPUT_BUTTON_SELECT:
+                quit = true;
+                if (select_btn) *select_btn = true;
+                break;
+            case RP2040_INPUT_BUTTON_MENU:
+                quit = true;
+                if (menu_btn) *menu_btn = true;
+                break;
+            case RP2040_INPUT_BUTTON_HOME:
+                quit = true;
+                if (home_btn) *home_btn = true;
+                break;
+            default:
+                break;
+        }
+    }
+    
+    return return_value;
+}
+
+static char* data_types = NULL;
+static size_t size_types = 0;
+static cJSON* json_types = NULL;
+
+static char* data_categories = NULL;
+static size_t size_categories = 0;
+static cJSON* json_categories = NULL;
+
+static char* data_apps = NULL;
+static size_t size_apps = 0;
+static cJSON* json_apps = NULL;
+
+static char* data_app_info = NULL;
+static size_t size_app_info = 0;
+static cJSON* json_app_info = NULL;
+
+static bool connect_to_wifi(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    if (!wifi_connect_to_stored()) {
+        wifi_disconnect_and_disable();
+        render_message(pax_buffer, "Unable to connect to\nthe WiFi network");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(button_queue);
+        return false;
+    }
+    return true;
+}
+
+static void hatchery_free_types() {
+    if (json_types != NULL) {
+        cJSON_Delete(json_types);
+        json_types = NULL;
+    }
+
+    if (data_types != NULL) {
+        free(data_types);
+        data_types = NULL;
+        size_types = 0;
     }
 }
 
-static void store_app(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, hatchery_app_t *app) {
-    ESP_LOGI(TAG, "");
-    if (app->files == NULL) {
-        // No files in this app
-        ESP_LOGI(TAG, "No file in this app");
-        return;
+static void hatchery_free_categories() {
+    if (json_categories != NULL) {
+        cJSON_Delete(json_categories);
+        json_categories = NULL;
     }
 
-    const char *app_type_slug = app->category->app_type->slug;
-    bool is_esp32_app = strcmp(app_type_slug, esp32_type) == 0;
+    if (data_categories != NULL) {
+        free(data_categories);
+        data_categories = NULL;
+        size_categories = 0;
+    }
+}
 
-    // If there is a esp32 bin among the files, let first try to store it
-    hatchery_file_t *esp32_bin_file = NULL;
-    bool has_metadata_json = false;
-    bool other_files = false;
-    if (is_esp32_app) {
-        for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
-            if (strcmp(app_file->name, esp32_bin_fn) == 0) {
-                esp32_bin_file = app_file;
-            } else {
-                other_files = true;
-                if (strcmp(app_file->name, metadata_json_fn) == 0) {
-                    has_metadata_json = true;
-                }
-            }
-        }
-    } else {
-        other_files = true;
+static void hatchery_free_apps() {
+    if (json_apps != NULL) {
+        cJSON_Delete(json_apps);
+        json_apps = NULL;
     }
 
-    if (esp32_bin_file != NULL) {
-        ESP_LOGI(TAG, "%s found %s", esp32_type, esp32_bin_fn);
+    if (data_apps != NULL) {
+        free(data_apps);
+        data_apps = NULL;
+        size_apps = 0;
+    }
+}
 
-        hatchery_query_file(app, esp32_bin_file);
-
-        if (esp32_bin_file->contents == NULL) {
-            // esp32 bin file is empty of failed to load
-            ESP_LOGI(TAG, "Failed to download %s", esp32_bin_fn);
-            render_message(pax_buffer, "Failed download file");
-            ili9341_write(ili9341, pax_buffer->buf);
-            wait_for_button(buttonQueue);
-            return;
-        }
-
-        esp_err_t res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, app->slug, app->name, app->version, esp32_bin_file->size, esp32_bin_file->contents);
-        free(esp32_bin_file->contents);
-        esp32_bin_file->contents = NULL;
-        if (res != ESP_OK) {
-            ESP_LOGI(TAG, "Failed to store ESP bin");
-            // failed to save esp32 bin file
-            render_message(pax_buffer, "Failed save app");
-            ili9341_write(ili9341, pax_buffer->buf);
-            wait_for_button(buttonQueue);
-            return;
-        }
-        ESP_LOGI(TAG, "Stored EPS bin");
+static void hatchery_free_app_info() {
+    if (json_app_info != NULL) {
+        cJSON_Delete(json_app_info);
+        json_app_info = NULL;
     }
 
-    // If there are no other files with an esp32 app, we are done
-    if (is_esp32_app && !other_files) {
-        return;
+    if (data_app_info != NULL) {
+        free(data_app_info);
+        data_app_info = NULL;
+        size_app_info = 0;
     }
+}
 
-    // Now first create directories
-    char path[257];
-    path[256] = '\0';
-    snprintf(path, 200, "%s/app", internal_path);
-    if (!create_dir(path)) {
+static void hatchery_free() {
+    hatchery_free_types();
+    hatchery_free_categories();
+    hatchery_free_apps();
+    hatchery_free_app_info();
+}
+
+static void show_communication_error(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    render_message(pax_buffer, "Unable to communicate with\nthe Hatchery server");
+    ili9341_write(ili9341, pax_buffer->buf);
+    wait_for_button(button_queue);
+}
+
+static bool load_types() {
+    if (data_types == NULL) {
+        bool success = download_ram("https://mch2022.badge.team/v2/mch2022/types", (uint8_t**) &data_types, &size_types);
+        if (!success) return false;
+    }
+    if (data_types == NULL) return false;
+    json_types = cJSON_ParseWithLength(data_types, size_types);
+    if (json_types == NULL) return false;
+    return true;
+}
+
+static bool load_categories(const char* type_slug) {
+    char url[128];
+    snprintf(url, sizeof(url) - 1, "https://mch2022.badge.team/v2/mch2022/%s/categories", type_slug);
+    bool success = download_ram(url, (uint8_t**) &data_categories, &size_categories);
+    if (!success) return false;
+    if (data_categories == NULL) return false;
+    json_categories = cJSON_ParseWithLength(data_categories, size_categories);
+    if (json_categories == NULL) return false;
+    return true;
+}
+
+static bool load_apps(const char* type_slug, const char* category_slug) {
+    char url[128];
+    snprintf(url, sizeof(url) - 1, "https://mch2022.badge.team/v2/mch2022/%s/%s", type_slug, category_slug);
+    bool success = download_ram(url, (uint8_t**) &data_apps, &size_apps);
+    if (!success) return false;
+    if (data_apps == NULL) return false;
+    json_apps = cJSON_ParseWithLength(data_apps, size_apps);
+    if (json_apps == NULL) return false;
+    return true;
+}
+
+static bool load_app_info(const char* type_slug, const char* category_slug, const char* app_slug) {
+    char url[128];
+    snprintf(url, sizeof(url) - 1, "https://mch2022.badge.team/v2/mch2022/%s/%s/%s", type_slug, category_slug, app_slug);
+    bool success = download_ram(url, (uint8_t**) &data_app_info, &size_app_info);
+    if (!success) return false;
+    if (data_app_info == NULL) return false;
+    json_app_info = cJSON_ParseWithLength(data_app_info, size_app_info);
+    if (json_app_info == NULL) return false;
+    return true;
+}
+
+bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug, const char* category_slug, const char* app_slug, bool to_sd_card) {
+    cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
+    cJSON* app_name_obj = cJSON_GetObjectItem(json_app_info, "name");
+    cJSON* author_obj = cJSON_GetObjectItem(json_app_info, "author");
+    cJSON* license_obj = cJSON_GetObjectItem(json_app_info, "license");
+    cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
+    cJSON* version_obj = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON* files_obj = cJSON_GetObjectItem(json_app_info, "files");
+
+    char buffer[257];
+    buffer[sizeof(buffer) - 1] = '\0';
+
+    // Create folders
+    snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nCreating folders...", app_name_obj->valuestring);
+    render_message(pax_buffer, buffer);
+    ili9341_write(ili9341, pax_buffer->buf);
+
+    snprintf(buffer, sizeof(buffer) - 1, "%s/apps", to_sd_card ? sdcard_path : internal_path);
+    printf("Creating dir: %s\r\n", buffer);
+    if (!create_dir(buffer)) {
         // Failed to create app directory
-        ESP_LOGI(TAG, "Failed to create %s", path);
+        ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message(pax_buffer, "Failed create folder");
         ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(buttonQueue);
-        return;
+        wait_for_button(button_queue);
+        return false;
     }
 
-    snprintf(path, 256, "%s/app/%s", internal_path, app_type_slug);
-    if (!create_dir(path)) {
+    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s", to_sd_card ? sdcard_path : internal_path, type_slug);
+    printf("Creating dir: %s\r\n", buffer);
+    if (!create_dir(buffer)) {
         // failed to create app type directory
-        ESP_LOGI(TAG, "Failed to create %s", path);
+        ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message(pax_buffer, "Failed create folder");
         ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(buttonQueue);
-        return;
+        wait_for_button(button_queue);
+        return false;
     }
 
-    snprintf(path, 256, "%s/app/%s/%s", internal_path, app_type_slug, app->slug);
-    if (!create_dir(path)) {
+    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug);
+    printf("Creating dir: %s\r\n", buffer);
+    if (!create_dir(buffer)) {
         // failed to create app directory
-        ESP_LOGI(TAG, "Failed to create %s", path);
+        ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message(pax_buffer, "Failed create folder");
         ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(buttonQueue);
-        return;
+        wait_for_button(button_queue);
+        return false;
     }
 
-    // Now save other files
-    bool okay = true;
-    for (hatchery_file_t *app_file = app->files; app_file != NULL; app_file = app_file->next) {
-        if (app_file != esp32_bin_file) {
-
-            ESP_LOGI(TAG, "Query %s", app->name);
-
-            hatchery_query_file(app, app_file);
-
-            if (app_file->contents == NULL) {
-                // Failed to download file from hatchery
-                okay = false;
-                render_message(pax_buffer, "Failed download file");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(buttonQueue);
-                break;
-            }
-
-            // Open file
-            snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, app_file->name);
-            FILE *f = fopen(path, "w");
-            ESP_LOGI(TAG, "Open %s %p", path, f);
-
-            if (f == NULL) {
-                // Failed to open the file for writing
-                okay = false;
-                render_message(pax_buffer, "Failed save file");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(buttonQueue);
-                break;
-            }
-
-            size_t wsize = fwrite(app_file->contents, 1, app_file->size, f);
-            fclose(f);
-            free(app_file->contents);
-            app_file->contents = NULL;
-            if (wsize != app_file->size) {
-                // Failed to write
-                ESP_LOGI(TAG, "Failed to save %d != %d", wsize, app_file->size);
-                render_message(pax_buffer, "Failed save file");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(buttonQueue);
-                okay = false;
-                break;
-            }
-        }
-    }
-
-    if (okay && !has_metadata_json) {
-
-        // Open file
-        snprintf(path, 256, "%s/app/%s/%s/%s", internal_path, app_type_slug, app->slug, metadata_json_fn);
-        FILE *f = fopen(path, "w");
-        ESP_LOGI(TAG, "Open %s %p", path, f);
-
-        if (f == NULL) {
-            render_message(pax_buffer, "Failed create file");
+    // Download files
+    cJSON* file_obj;
+    cJSON_ArrayForEach(file_obj, files_obj) {
+        cJSON* name_obj = cJSON_GetObjectItem(file_obj, "name");
+        cJSON* url_obj = cJSON_GetObjectItem(file_obj, "url");
+        cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
+        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn) == 0)) {
+            snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s' to AppFS", app_name_obj->valuestring, name_obj->valuestring);
+            render_message(pax_buffer, buffer);
             ili9341_write(ili9341, pax_buffer->buf);
-            wait_for_button(buttonQueue);
-            okay = false;
+            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, name_obj->valuestring);
+            uint8_t* esp32_binary_data;
+            size_t esp32_binary_size;
+            bool success = download_ram(url_obj->valuestring, (uint8_t**) &esp32_binary_data, &esp32_binary_size);
+            if (!success) {
+                ESP_LOGI(TAG, "Failed to download %s to RAM", url_obj->valuestring);
+                render_message(pax_buffer, "Failed to download file");
+                ili9341_write(ili9341, pax_buffer->buf);
+                wait_for_button(button_queue);
+                return false;
+            }
+            if (esp32_binary_data != NULL) { // Ignore 0 bytes files
+                esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, app_slug, app_name_obj->valuestring, version_obj->valueint, esp32_binary_size, esp32_binary_data);
+                if (res != ESP_OK) {
+                    free(esp32_binary_data);
+                    ESP_LOGI(TAG, "Failed to store ESP32 binary");
+                    render_message(pax_buffer, "Failed to install app to AppFS");
+                    ili9341_write(ili9341, pax_buffer->buf);
+                    wait_for_button(button_queue);
+                    return false;
+                }
+                if (to_sd_card) {
+                    render_message(pax_buffer, "Storing a copy of the ESP32\nbinary to the SD card...");
+                    ili9341_write(ili9341, pax_buffer->buf);
+                    printf("Creating file: %s\r\n", buffer);
+                    FILE* binary_fd = fopen(buffer, "w");
+                    if (binary_fd == NULL) {
+                        free(esp32_binary_data);
+                        ESP_LOGI(TAG, "Failed to install ESP32 binary to %s", buffer);
+                        render_message(pax_buffer, "Failed to install app to SD card");
+                        ili9341_write(ili9341, pax_buffer->buf);
+                        wait_for_button(button_queue);
+                        return false;
+                    }
+                    fwrite(esp32_binary_data, 1, esp32_binary_size, binary_fd);
+                    fclose(binary_fd);
+                }
+                free(esp32_binary_data);
+            }
         } else {
-            fprintf(f, "{\"name\":\"");
-            write_JSON_string(f, app->name);
-            fprintf(f, "\",\"description\":\"");
-            write_JSON_string(f, app->description);
-            fprintf(f, "\",\"category\":\"");
-            write_JSON_string(f, app->category->name);
-            fprintf(f, "\",\"author\":\"");
-            write_JSON_string(f, app->author);
-            fprintf(f, "\",\"license\":\"");
-            write_JSON_string(f, app->license);
-            fprintf(f, "\",\"revision\":%d}", app->version);
-            fclose(f);
-        }
-    }
-
-    if (!okay) {
-        // Something went wrong
-        return;
-    }
-
-    // App was installed
-    render_message(pax_buffer, "App has been installed");
-    ili9341_write(ili9341, pax_buffer->buf);
-    wait_for_button(buttonQueue);
-}
-
-// Menus
-
-typedef void (*fill_menu_items_fn_t)(menu_t *menu, void *context);
-typedef void (*action_fn_t)(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args);
-
-static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *select, fill_menu_items_fn_t fill_menu_items,
-                         action_fn_t action, void *context);
-static void add_menu_item(menu_t *menu, const char *name, void *callback_args);
-
-// Apps menu
-
-static void fill_menu_items_apps(menu_t *menu, void *context) {
-    hatchery_category_t *category = (hatchery_category_t *) context;
-
-    hatchery_query_apps(category);
-    for (hatchery_app_t *apps = category->apps; apps != NULL; apps = apps->next) {
-        add_menu_item(menu, apps->name, apps);
-    }
-}
-
-static void action_apps(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args) {
-    hatchery_app_t *app = (hatchery_app_t *) args;
-
-    if (app->files == NULL) {
-        hatchery_query_app(app);
-    }
-
-    const pax_font_t *font = pax_font_saira_regular;
-
-    float entry_height = 34;
-    float text_height  = 18;
-    float text_offset  = ((entry_height - text_height) / 2) + 1;
-
-    pax_buf_t icon_apps;
-    pax_decode_png_buf(&icon_apps, (void *) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
-
-    // Show information about app and give user option to install app
-    pax_background(pax_buffer, 0xFFFFFF);
-
-    pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 5, 240 - 18, "🅰 Install 🅱 Back");
-
-    pax_simple_rect(pax_buffer, 0xFF491d88, 0, 0, 320, entry_height);
-    pax_clip(pax_buffer, 1, text_offset, 320 - 2, text_height);
-    pax_draw_text(pax_buffer, 0xFFfa448c, font, text_height, icon_apps.width + 1, text_offset, "Hatchery");
-    pax_noclip(pax_buffer);
-    pax_draw_image(pax_buffer, &icon_apps, 0, 0);
-    pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 40, app->name);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 60, app->author);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 80, app->license);
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 100, app->description);
-    char buffer[21];
-    snprintf(buffer, 20, "version %d", 1);
-    buffer[20] = '\0';
-    pax_draw_text(pax_buffer, 0xFF000000, font, text_height, 1, 120, buffer);
-    ili9341_write(ili9341, pax_buffer->buf);
-
-    bool load_app = false;
-    bool quit     = false;
-
-    while (1) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            switch (pin) {
-                case RP2040_INPUT_JOYSTICK_DOWN:
-                case RP2040_INPUT_JOYSTICK_UP:
-                    break;
-                case RP2040_INPUT_BUTTON_HOME:
-                case RP2040_INPUT_BUTTON_BACK:
-                    if (value) {
-                        quit = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_ACCEPT:
-                case RP2040_INPUT_JOYSTICK_PRESS:
-                case RP2040_INPUT_BUTTON_SELECT:
-                case RP2040_INPUT_BUTTON_START:
-                    if (value) {
-                        load_app = true;
-                    }
-                    break;
-                default:
-                    break;
+            snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s'...", app_name_obj->valuestring, name_obj->valuestring);
+            render_message(pax_buffer, buffer);
+            ili9341_write(ili9341, pax_buffer->buf);
+            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, name_obj->valuestring);
+            printf("Downloading file: %s\r\n", buffer);
+            if (!download_file(url_obj->valuestring, buffer)) {
+                ESP_LOGI(TAG, "Failed to download %s to %s", url_obj->valuestring, buffer);
+                render_message(pax_buffer, "Failed to download file");
+                ili9341_write(ili9341, pax_buffer->buf);
+                wait_for_button(button_queue);
+                return false;
             }
         }
+    }
 
-        if (load_app) {
-            if (app->files == NULL) {
-                return;
-            }
-            display_busy(pax_buffer, ili9341);
-            store_app(buttonQueue, pax_buffer, ili9341, app);
+    // Install metadata.json
+    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, metadata_json_fn);
+    FILE* metadata_fd = fopen(buffer, "w");
+    if (metadata_fd == NULL) {
+        ESP_LOGI(TAG, "Failed to install metadata to %s", buffer);
+        render_message(pax_buffer, "Failed to install metadata");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(button_queue);
+        return false;
+    }
+    fwrite(data_app_info, 1, size_app_info, metadata_fd);
+    fclose(metadata_fd);
 
-            break;
+    ESP_LOGI(TAG, "App installed!");
+    render_message(pax_buffer, "App has been installed!");
+    ili9341_write(ili9341, pax_buffer->buf);
+    wait_for_button(button_queue);
+    return true;
+}
+
+bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug, const char* category_slug, const char* app_slug) {
+    cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
+    cJSON* name_obj = cJSON_GetObjectItem(json_app_info, "name");
+    cJSON* author_obj = cJSON_GetObjectItem(json_app_info, "author");
+    cJSON* license_obj = cJSON_GetObjectItem(json_app_info, "license");
+    cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
+    cJSON* version_obj = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON* files_obj = cJSON_GetObjectItem(json_app_info, "files");
+
+    uint64_t size_fat = 0;
+    uint64_t size_appfs = 0;
+
+    cJSON* file_obj;
+    cJSON_ArrayForEach(file_obj, files_obj) {
+        cJSON* name_obj = cJSON_GetObjectItem(file_obj, "name");
+        cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
+        uint64_t size = size_obj->valueint;
+        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn))) {
+            size_appfs += size;
+        } else {
+            size_fat += size;
         }
-        if (quit) {
-            break;
-        }
     }
 
-    // pax_buf_destroy(&icon_apps);
-}
+    printf("App selected: %s (version %u) by %s. Size: %llu, Appfs size: %llu\r\n", name_obj->valuestring, version_obj->valueint, author_obj->valuestring, size_fat, size_appfs);
 
-// Category menu
+    uint64_t fs_free;
+    get_internal_filesystem_size_and_available(NULL, &fs_free);
+    bool can_install_to_internal = (fs_free >= size_fat);
+    bool can_install_to_sdcard = false;
 
-static void fill_menu_items_categories(menu_t *menu, void *context) {
-    hatchery_app_type_t *app_type = (hatchery_app_type_t *) context;
-
-    hatchery_query_categories(app_type);
-    for (hatchery_category_t *category = app_type->categories; category != NULL; category = category->next) {
-        add_menu_item(menu, category->name, category);
+    if (get_sdcard_mounted()) {
+        get_sdcard_filesystem_size_and_available(NULL, &fs_free);
+        can_install_to_sdcard = (fs_free >= size_fat);
     }
-}
 
-static void action_categories(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select app  🅱 back", fill_menu_items_apps, action_apps, args);
-}
+    bool can_install_to_appfs = appfsGetFreeMem() >= size_appfs;
 
-// App types menu
-
-static void fill_menu_items_types(menu_t *menu, void *context) {
-    hatchery_server_t *server = (hatchery_server_t *) context;
-
-    hatchery_query_app_types(server);
-    for (hatchery_app_type_t *app_type = server->app_types; app_type != NULL; app_type = app_type->next) {
-        add_menu_item(menu, app_type->name, app_type);
+    if (!can_install_to_appfs) {
+        render_message(pax_buffer, "Can not install app\nNot enough space available\non the AppFS filesystem");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(button_queue);
+        return false;
     }
-}
 
-static void action_types(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, void *args) {
-    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select category  🅱 back", fill_menu_items_categories, action_categories, args);
-}
-
-// Main entry function
-
-void menu_hatchery(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
-    hatchery_server_t server;
-    server.url       = "https://mch2022.badge.team/v2/mch2022";
-    server.app_types = NULL;
-    menu_generic(buttonQueue, pax_buffer, ili9341, "🅰 select type  🅱 back", fill_menu_items_types, action_types, &server);
-    hatchery_app_type_free(server.app_types);
-}
-
-// Generic functions
-
-static void add_menu_item(menu_t *menu, const char *name, void *callback_args) {
-    static int nothing;
-    if (callback_args == NULL) {
-        callback_args = &nothing;
+    if ((!can_install_to_internal) && (!can_install_to_sdcard)) {
+        render_message(pax_buffer, "Can not install app\nNot enough space available\non the FAT filesystem");
+        ili9341_write(ili9341, pax_buffer->buf);
+        wait_for_button(button_queue);
+        return false;
     }
-    menu_insert_item(menu, name, NULL, callback_args, -1);
-}
 
-static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *select, fill_menu_items_fn_t fill_menu_items,
-                         action_fn_t action, void *context) {
-    menu_t *menu = menu_alloc("Hatchery", 34, 18);
-
+    menu_t *menu = menu_alloc("Install to", 20, 18);
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
     menu->bgTextColor       = 0xFFFFFFFF;
@@ -437,79 +466,220 @@ static void menu_generic(xQueueHandle buttonQueue, pax_buf_t *pax_buffer, ILI934
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
 
-    pax_buf_t icon_apps;
-    pax_decode_png_buf(&icon_apps, (void *) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
+    if (can_install_to_internal) menu_insert_item(menu, "Internal memory", NULL, (void*) 0, -1);
+    if (can_install_to_sdcard) menu_insert_item(menu, "SD card", NULL, (void*) 1, -1);
+    menu_insert_item(menu, "Cancel", NULL, (void*) 2, -1);
 
-    menu_set_icon(menu, &icon_apps);
-
-    const pax_font_t *font = pax_font_saira_regular;
-
-    fill_menu_items(menu, context);
-
-    bool  render   = true;
-    void *menuArgs = NULL;
-
-    pax_background(pax_buffer, 0xFFFFFF);
-    pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, select);
-
+    bool render = true;
     bool quit = false;
-
-    while (1) {
-        rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
-            uint8_t pin   = buttonMessage.input;
-            bool    value = buttonMessage.state;
-            switch (pin) {
-                case RP2040_INPUT_JOYSTICK_DOWN:
-                    if (value) {
-                        menu_navigate_next(menu);
-                        render = true;
-                    }
-                    break;
-                case RP2040_INPUT_JOYSTICK_UP:
-                    if (value) {
-                        menu_navigate_previous(menu);
-                        render = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_HOME:
-                case RP2040_INPUT_BUTTON_BACK:
-                    if (value) {
-                        quit = true;
-                    }
-                    break;
-                case RP2040_INPUT_BUTTON_ACCEPT:
-                case RP2040_INPUT_JOYSTICK_PRESS:
-                case RP2040_INPUT_BUTTON_SELECT:
-                case RP2040_INPUT_BUTTON_START:
-                    if (value) {
-                        menuArgs = menu_get_callback_args(menu, menu_get_position(menu));
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-
-        if (quit) {
-            break;
-        }
-
-        if (menuArgs != NULL) {
-            display_busy(pax_buffer, ili9341);
-            action(buttonQueue, pax_buffer, ili9341, menuArgs);
-            menuArgs = NULL;
-            render   = true;
-        }
-
+    bool result = false;
+    while (!quit) {
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220);
+            menu_render(pax_buffer, menu, (pax_buffer->width / 2) - 10, (pax_buffer->height / 2) - 10, (pax_buffer->width / 2), (pax_buffer->height / 2));
             ili9341_write(ili9341, pax_buffer->buf);
             render = false;
+        }
+
+        int button = wait_for_button_press(button_queue, portMAX_DELAY);
+        switch (button) {
+            case RP2040_INPUT_JOYSTICK_DOWN:
+                menu_navigate_next(menu);
+                render = true;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+                menu_navigate_previous(menu);
+                render = true;
+                break;
+            case RP2040_INPUT_BUTTON_ACCEPT:
+            case RP2040_INPUT_JOYSTICK_PRESS:
+            case RP2040_INPUT_BUTTON_START: {
+                int action = (int) menu_get_callback_args(menu, menu_get_position(menu));
+                switch (action) {
+                    case 0:
+                        result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug, false);
+                        break;
+                    case 1:
+                        result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug, true);
+                        break;
+                    case 2:
+                    default:
+                        break;
+                }
+                quit = true;
+                break;
+            }
+            case RP2040_INPUT_BUTTON_BACK:
+            case RP2040_INPUT_BUTTON_SELECT:
+            case RP2040_INPUT_BUTTON_MENU:
+            case RP2040_INPUT_BUTTON_HOME:
+                quit = true;
+                break;
+            default:
+                break;
         }
     }
 
     menu_free(menu);
-    pax_buf_destroy(&icon_apps);
+    return result;
+}
+
+bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug, const char* category_slug, const char* app_slug) {
+    display_busy(pax_buffer, ili9341);
+    if (!load_app_info(type_slug, category_slug, app_slug)) {
+        show_communication_error(button_queue, pax_buffer, ili9341);
+        return false;
+    }
+
+    cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
+    cJSON* name_obj = cJSON_GetObjectItem(json_app_info, "name");
+    cJSON* author_obj = cJSON_GetObjectItem(json_app_info, "author");
+    cJSON* license_obj = cJSON_GetObjectItem(json_app_info, "license");
+    cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
+    cJSON* version_obj = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON* files_obj = cJSON_GetObjectItem(json_app_info, "files");
+
+    bool render = true;
+    bool quit = false;
+    while (!quit) {
+        if (render) {
+            pax_background(pax_buffer, 0xFFFFFF);
+            render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, name_obj->valuestring);
+            char buffer[128];
+            snprintf(buffer, sizeof(buffer) - 1, "Author: %s", author_obj->valuestring);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, buffer);
+            snprintf(buffer, sizeof(buffer) - 1, "License: %s", license_obj->valuestring);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 1, buffer);
+            snprintf(buffer, sizeof(buffer) - 1, "Version: %u", version_obj->valueint);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 2, buffer);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 3, description_obj->valuestring);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 install app  🅱 back");
+            ili9341_write(ili9341, pax_buffer->buf);
+            render = false;
+        }
+
+        int button = wait_for_button_press(button_queue, portMAX_DELAY);
+        switch (button) {
+            case RP2040_INPUT_JOYSTICK_DOWN:
+                render = true;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+                render = true;
+                break;
+            case RP2040_INPUT_BUTTON_ACCEPT:
+            case RP2040_INPUT_JOYSTICK_PRESS:
+            case RP2040_INPUT_BUTTON_START:
+                render = true;
+                menu_hatchery_install_app(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug);
+                break;
+            case RP2040_INPUT_BUTTON_BACK:
+                quit = true;
+                break;
+            case RP2040_INPUT_BUTTON_SELECT:
+                quit = true;
+                break;
+            case RP2040_INPUT_BUTTON_MENU:
+                quit = true;
+                break;
+            case RP2040_INPUT_BUTTON_HOME:
+                quit = true;
+                break;
+            default:
+                break;
+        }
+    }
+
+    hatchery_free_app_info();
+    return true;
+}
+
+bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug, const char* category_slug) {
+    display_busy(pax_buffer, ili9341);
+    if (!load_apps(type_slug, category_slug)) {
+        show_communication_error(button_queue, pax_buffer, ili9341);
+        return false;
+    }
+
+    menu_t* menu = hatchery_menu_create("Apps");
+
+    cJSON* app_obj;
+    cJSON_ArrayForEach(app_obj, json_apps) {
+        cJSON* slug_obj = cJSON_GetObjectItem(app_obj, "slug");
+        cJSON* name_obj = cJSON_GetObjectItem(app_obj, "name");
+        cJSON* author_obj = cJSON_GetObjectItem(app_obj, "author");
+        cJSON* license_obj = cJSON_GetObjectItem(app_obj, "license");
+        cJSON* description_obj = cJSON_GetObjectItem(app_obj, "description");
+        cJSON* version_obj = cJSON_GetObjectItem(app_obj, "version");
+        menu_insert_item(menu, name_obj->valuestring, NULL, (void*) slug_obj->valuestring, -1);
+    }
+
+    bool quit = false;
+    while (!quit) {
+        const char* app_slug = (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select app  🅱 back", &quit, NULL, NULL, &quit);
+        if (quit) break;
+        quit = !menu_hatchery_app_info(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug);
+    }
+
+    hatchery_menu_destroy(menu);
+    hatchery_free_apps();
+    return true;
+}
+
+bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char* type_slug) {
+    display_busy(pax_buffer, ili9341);
+    if (!load_categories(type_slug)) {
+        show_communication_error(button_queue, pax_buffer, ili9341);
+        return false;
+    }
+
+    menu_t* menu = hatchery_menu_create("Categories");
+
+    cJSON* category_obj;
+    cJSON_ArrayForEach(category_obj, json_categories) {
+        cJSON* slug_obj = cJSON_GetObjectItem(category_obj, "slug");
+        cJSON* name_obj = cJSON_GetObjectItem(category_obj, "name");
+        cJSON* apps_obj = cJSON_GetObjectItem(category_obj, "apps");
+        menu_insert_item(menu, name_obj->valuestring, NULL, (void*) slug_obj->valuestring, -1);
+    }
+
+    bool quit = false;
+    while (!quit) {
+        const char* category_slug = (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select category  🅱 back", &quit, NULL, NULL, &quit);
+        if (quit) break;
+        quit = !menu_hatchery_apps(button_queue, pax_buffer, ili9341, type_slug, category_slug);
+    }
+
+    hatchery_menu_destroy(menu);
+    hatchery_free_categories();
+    return true;
+}
+
+void menu_hatchery(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
+    display_busy(pax_buffer, ili9341);
+    if (!connect_to_wifi(button_queue, pax_buffer, ili9341)) return;
+    if (!load_types()) {
+        wifi_disconnect_and_disable();
+        hatchery_free();
+        show_communication_error(button_queue, pax_buffer, ili9341);
+        return;
+    }
+
+    menu_t* menu = hatchery_menu_create("Hatchery");
+
+    cJSON* type_obj;
+    cJSON_ArrayForEach(type_obj, json_types) {
+        cJSON* slug_obj = cJSON_GetObjectItem(type_obj, "slug");
+        cJSON* name_obj = cJSON_GetObjectItem(type_obj, "name");
+        menu_insert_item(menu, name_obj->valuestring, NULL, (void*) slug_obj->valuestring, -1);
+    }
+
+    bool quit = false;
+    while (!quit) {
+        const char* type_slug = (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select type  🅱 back", &quit, NULL, NULL, &quit);
+        if (quit) break;
+        quit = !menu_hatchery_categories(button_queue, pax_buffer, ili9341, type_slug);
+    }
+
+    hatchery_menu_destroy(menu);
+    wifi_disconnect_and_disable();
+    hatchery_free();
 }

@@ -255,7 +255,7 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
 
     pax_noclip(pax_buffer);
 
-    if (max_items > 1) {
+    if ((max_items > 1) && (strlen(menu->title) > 0)) {
         float offsetX = 0;
         if (menu->icon != NULL) {
             offsetX = 32;  // Fixed width by choice, could also use "menu->icon->width"
@@ -279,8 +279,8 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
         item_offset = menu->position - max_items + 1;
     }
 
-    pax_outline_rect(pax_buffer, menu->borderColor, position_x, position_y, width, height);
     pax_simple_rect(pax_buffer, menu->bgColor, position_x, current_position_y, width, height - current_position_y + position_y);
+    pax_outline_rect(pax_buffer, menu->borderColor, position_x, position_y, width, height);
 
     for (size_t index = item_offset; (index < item_offset + max_items) && (index < menu->length); index++) {
         menu_item_t* item = _menu_find_item(menu, index);

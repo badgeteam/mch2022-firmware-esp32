@@ -27,6 +27,13 @@ static const char* TAG = "appfs wrapper";
 
 esp_err_t appfs_init(void) { return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE); }
 
+appfs_handle_t appfs_detect_crash() {
+	uint32_t r=REG_READ(RTC_CNTL_STORE0_REG);
+	ESP_LOGI(TAG, "RTC store0 reg: %x", r);
+	if ((r&0xFF000000)!=0xA6000000) return APPFS_INVALID_FD;
+	return r&0xff;
+}
+
 void appfs_boot_app(int fd) {
     if (fd < 0 || fd > 255) {
         REG_WRITE(RTC_CNTL_STORE0_REG, 0);

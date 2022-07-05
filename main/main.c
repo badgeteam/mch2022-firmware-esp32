@@ -35,7 +35,6 @@
 #include "rp2040bl.h"
 #include "rtc_memory.h"
 #include "sao_eeprom.h"
-#include "sdcard.h"
 #include "settings.h"
 #include "system_wrapper.h"
 #include "webusb.h"
@@ -44,6 +43,7 @@
 #include "wifi_defaults.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
+#include "filesystems.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
@@ -240,34 +240,15 @@ void app_main(void) {
     }
 
     /* Start internal filesystem */
-    const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
-
-    wl_handle_t s_wl_handle = WL_INVALID_HANDLE;
-
-    if (fs_partition != NULL) {
-        const esp_vfs_fat_mount_config_t mount_config = {
-            .format_if_mount_failed = true,
-            .max_files              = 5,
-            .allocation_unit_size   = 0,
-        };
-        esp_err_t res = esp_vfs_fat_spiflash_mount("/internal", "locfd", &mount_config, &s_wl_handle);
-        if (res != ESP_OK) {
-            ESP_LOGE(TAG, "failed to mount locfd (%d)", res);
-            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
-            stop();
-        } else {
-            ESP_LOGI(TAG, "Internal filesystem mounted");
-        }
-    } else {
-        ESP_LOGE(TAG, "locfd partition not found");
+    if (mount_internal_filesystem() != ESP_OK) {
+        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
+        stop();
     }
 
     /* Start SD card filesystem */
-    res               = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
-    bool sdcard_ready = (res == ESP_OK);
-    if (sdcard_ready) {
+    bool sdcard_mounted = (mount_sdcard_filesystem() == ESP_OK);
+    if (sdcard_mounted) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
-
         /* LED power is on: start LED driver and turn LEDs off */
         ws2812_init(GPIO_LED_DATA);
         const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
@@ -345,6 +326,26 @@ void app_main(void) {
             } else {
                 ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
             }
+        }
+
+        /* Crash check */
+        appfs_handle_t crashed_app = appfs_detect_crash();
+        if (crashed_app != APPFS_INVALID_FD) {
+            const char* app_name = NULL;
+            appfsEntryInfo(crashed_app, &app_name, NULL);
+            pax_background(&pax_buffer, 0xFFFFFF);
+            render_header(&pax_buffer, 0, 0, pax_buffer.width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
+            if (app_name != NULL) {
+                char buffer[64];
+                buffer[sizeof(buffer) - 1] = '\0';
+                snprintf(buffer, sizeof(buffer) - 1, "App: %s", app_name);
+                pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
+            }
+            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer.height - 18, "🅰 continue");
+            ili9341_write(ili9341, pax_buffer.buf);
+            wait_for_button(rp2040->queue);
         }
 
         /* Rick that roll */
