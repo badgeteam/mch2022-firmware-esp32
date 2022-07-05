@@ -29,11 +29,11 @@ static const char *TAG = "Hatchery";
 extern const uint8_t hatchery_png_start[] asm("_binary_hatchery_png_start");
 extern const uint8_t hatchery_png_end[] asm("_binary_hatchery_png_end");
 
-const char* sdcard_path = "/sd";
-const char* internal_path = "/internal";
-const char* esp32_type = "esp32";
-const char* esp32_bin_fn = "main.bin";
-const char* metadata_json_fn = "metadata.json";
+static const char* sdcard_path = "/sd";
+static const char* internal_path = "/internal";
+static const char* esp32_type = "esp32";
+static const char* esp32_bin_fn = "main.bin";
+static const char* metadata_json_fn = "metadata.json";
 
 static bool create_dir(const char *path) {
     struct stat st = {0};

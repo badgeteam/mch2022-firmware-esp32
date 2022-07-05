@@ -17,9 +17,13 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "filesystems.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
+
+static const char* sdcard_path = "/sd/apps/esp32/";
+static const char* internal_path = "/internal/apps/esp32/";
 
 static bool populate(menu_t* menu) {
     size_t previous_position = menu_get_position(menu);
@@ -34,12 +38,17 @@ static bool populate(menu_t* menu) {
     appfs_handle_t appfs_fd = appfsNextEntry(APPFS_INVALID_FD);
     while (appfs_fd != APPFS_INVALID_FD) {
         empty               = false;
-        const char* name    = NULL;
+        const char* slug    = NULL;
         const char* title   = NULL;
         uint16_t    version = 0xFFFF;
-        appfsEntryInfoExt(appfs_fd, &name, &title, &version, NULL);
+        appfsEntryInfoExt(appfs_fd, &slug, &title, &version, NULL);
         appfs_handle_t* args = malloc(sizeof(appfs_handle_t));
         *args                = appfs_fd;
+        char buffer[257];
+        buffer[sizeof(buffer) - 1] = '\0';
+        snprintf(buffer, sizeof(buffer) - 1, "%s/%s/icon.png", internal_path, slug);
+        //FILE* icon_fd = openf(buffer, "r");
+
         menu_insert_item(menu, title, NULL, (void*) args, -1);
         appfs_fd = appfsNextEntry(appfs_fd);
     }
