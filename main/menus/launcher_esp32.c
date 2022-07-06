@@ -18,6 +18,7 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "filesystems.h"
+#include "system_wrapper.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -44,12 +45,27 @@ static bool populate(menu_t* menu) {
         appfsEntryInfoExt(appfs_fd, &slug, &title, &version, NULL);
         appfs_handle_t* args = malloc(sizeof(appfs_handle_t));
         *args                = appfs_fd;
-        char buffer[257];
-        buffer[sizeof(buffer) - 1] = '\0';
-        snprintf(buffer, sizeof(buffer) - 1, "%s/%s/icon.png", internal_path, slug);
-        //FILE* icon_fd = openf(buffer, "r");
+        char icon_file_path[257];
+        icon_file_path[sizeof(icon_file_path) - 1] = '\0';
+        snprintf(icon_file_path, sizeof(icon_file_path) - 1, "%s/%s/icon.png", internal_path, slug);
 
-        menu_insert_item(menu, title, NULL, (void*) args, -1);
+        FILE* icon_fd = fopen(icon_file_path, "rb");
+        if (icon_fd != NULL) {
+            pax_buf_t* icon = NULL;
+            size_t   icon_size = get_file_size(icon_fd);
+            uint8_t* icon_data = load_file_to_ram(icon_fd);
+            if (icon_data != NULL) {
+                icon = malloc(sizeof(pax_buf_t));
+                if (icon != NULL) {
+                    pax_decode_png_buf(icon, (void*) icon_data, icon_size, PAX_BUF_32_8888ARGB, 0);
+                }
+                free(icon_data);
+            }
+            fclose(icon_fd);
+            menu_insert_item_icon(menu, title, NULL, (void*) args, -1, icon);
+        } else {
+            menu_insert_item(menu, title, NULL, (void*) args, -1);
+        }
         appfs_fd = appfsNextEntry(appfs_fd);
     }
 
@@ -194,7 +210,7 @@ void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
 
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
-            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start 🅱 back 🅼 options");
+            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start app  🅱 back  🅼 options");
             menu_render(pax_buffer, menu, 0, 0, 320, 220);
             if (empty) render_message(pax_buffer, "No apps installed");
             ili9341_write(ili9341, pax_buffer->buf);
@@ -208,6 +224,8 @@ void menu_launcher_esp32(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI934
     }
 
     for (size_t index = 0; index < menu_get_length(menu); index++) {
+        pax_buf_t* icon = menu_get_icon(menu, index);
+        if (icon != NULL) pax_buf_destroy(icon);
         free(menu_get_callback_args(menu, index));
     }
 

@@ -8,6 +8,7 @@
 #include "include/fsob_backend.h"
 #include "include/filefunctions.h"
 #include "include/packetutils.h"
+#include "driver_fsoverbus.h"
 
 #define TAG "fsoveruart_ff"
 
@@ -40,10 +41,10 @@ int getdir(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, 
         return 1;
     }
      //TODO: Fix when folder list exceeds buffer
-    ESP_LOGI(TAG, "%s", data);
+    fsob_log("%s", data);
     char dir_name[size+20];   //Take length of the folder and add the spiflash mountpoint
     buildfile((char *) data, dir_name);
-    ESP_LOGI(TAG, "%s", dir_name);
+    fsob_log("%s", dir_name);
     DIR *d;
     struct dirent *dir;
     d = opendir(dir_name);  //Loop through all files/directories
@@ -59,7 +60,7 @@ int getdir(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, 
         strcpy((char *) data, "Directory_not_found");  //Cant find directory, request dir doesnt exists
     }
     uint8_t header[12];
-    //ESP_LOGI(TAG, "len: %d", strlen((char *) data));
+    //fsob_log("len: %d", strlen((char *) data));
     createMessageHeader(header, command, strlen((char *) data), message_id);
     fsob_write_bytes((const char*) header, 12);
     fsob_write_bytes((const char*) data, strlen((char *) data));
@@ -78,7 +79,7 @@ int readfile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size
     if(fptr_glb) {
         fseek(fptr_glb, 0, SEEK_END);
         uint32_t size_file = ftell(fptr_glb);
-        ESP_LOGI(TAG, "file size: %d", size_file);    
+        fsob_log("file size: %d", size_file);    
         //Create header with file size
         uint8_t header[12];
         createMessageHeader(header, command, size_file, message_id);
@@ -127,7 +128,7 @@ int writefile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
                 if (len < 0) {
                     ESP_LOGE(TAG, "Buffer is too small");
                 }
-                ESP_LOGI(TAG, "Writing: %s", dir_name_tmp);
+                fsob_log("Writing: %s", dir_name_tmp);
 
                 fptr = fopen(dir_name_tmp, "w");
                 if(fptr) {
@@ -135,7 +136,7 @@ int writefile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
                         fwrite(&data[i+1], 1, received-i-1, fptr);
                     }
                 } else {
-                    ESP_LOGI(TAG, "Open failed");
+                    fsob_log("Open failed");
                     failed_open = 1;
                 }
 
@@ -156,7 +157,7 @@ int writefile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t siz
         }
         return 0;   //Found no 0 terminator. File path not received. Wait for more data to arrived to get the filename
     } else if(fptr) {
-        ESP_LOGI(TAG, "fptr: %d %d", (uint32_t) data, length);
+        fsob_log("fptr: %d %d", (uint32_t) data, length);
         fwrite(data, 1, length, fptr);
         if(received == size) {  //Finished receiving
             sendok(command, message_id);
@@ -184,8 +185,8 @@ int delfile(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size,
     
     char dir_name[size+10];   //Take length of the folder and add the spiflash mountpoint
     buildfile((char *) data, dir_name);
-    ESP_LOGI(TAG, "Source: %s", data);
-    ESP_LOGI(TAG, "Deleting: %s", dir_name);
+    fsob_log("Source: %s", data);
+    fsob_log("Deleting: %s", dir_name);
     
     if(remove(dir_name) == 0) {
         sendok(command, message_id);
@@ -231,8 +232,8 @@ int cpyfile(uint8_t *data, uint16_t command, uint32_t size, uint32_t received, u
     char dest_file[dest_len+30];
     buildfile((char *) dest, dest_file);
 
-    ESP_LOGI(TAG, "source: %s", source_file);
-    ESP_LOGI(TAG, "dest: %s", dest_file);
+    fsob_log("source: %s", source_file);
+    fsob_log("dest: %s", dest_file);
 
     if(strcmp(source_file, dest_file) == 0) return 0;   //If dest and source are the same return error
 
@@ -286,7 +287,7 @@ int makedir(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size,
 
     char dir_name[size+20];   //Take length of the folder and add the spiflash mountpoint
     buildfile((char *) data, dir_name);
-    ESP_LOGI(TAG, "mkdir: %s", dir_name);
+    fsob_log("mkdir: %s", dir_name);
 
     if(mkdir(dir_name, 0777) == 0) {
         sendok(command, message_id);

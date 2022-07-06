@@ -77,6 +77,16 @@ static bool populate_menu(menu_t* menu) {
     return internal_result | sdcard_result;
 }
 
+static void show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* app_slug) {
+    //char* title = NULL;
+    //parse_metadata(metadata_file_path, &title, NULL, NULL, NULL, NULL);
+    pax_simple_rect(pax_buffer, 0xFFFFFFFF, 0, pax_buffer->height - 20, pax_buffer->width, 20);
+    pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 start  🅱 back  🅴 uninstall");
+    render_outline(pax_buffer, 0, 0, pax_buffer->width, pax_buffer->height - 20, 0xFF43b5a0, 0xFFFFFFFF);
+    render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFFFFFFF, 0xFF43b5a0, NULL, app_slug);
+    ili9341_write(ili9341, pax_buffer->buf);
+}
+
 void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     menu_t* menu = menu_alloc("FPGA apps", 34, 18);
 
@@ -101,6 +111,21 @@ void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
     bool  render_help  = true;
     bool  quit         = false;
     while (!quit) {
+        if (render_help) {
+            const pax_font_t* font = pax_font_saira_regular;
+            pax_background(pax_buffer, 0xFFFFFF);
+            pax_noclip(pax_buffer);
+            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start  🅱 back  🅼 options");
+            render_help = false;
+        }
+
+        if (render) {
+            menu_render(pax_buffer, menu, 0, 0, 320, 220);
+            if (empty) render_message(pax_buffer, "No FPGA bitstreams installed");
+            ili9341_write(ili9341, pax_buffer->buf);
+            render = false;
+        }
+        
         rp2040_input_message_t buttonMessage = {0};
         if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             if (buttonMessage.state) {
@@ -123,25 +148,13 @@ void menu_launcher_fpga(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
                     case RP2040_INPUT_BUTTON_START:
                         app_to_start = (char*) menu_get_callback_args(menu, menu_get_position(menu));
                         break;
+                    case RP2040_INPUT_BUTTON_MENU:
+                        show_app_details(button_queue, pax_buffer, ili9341, (char*) menu_get_callback_args(menu, menu_get_position(menu)));
+                        break;
                     default:
                         break;
                 }
             }
-        }
-
-        if (render_help) {
-            const pax_font_t* font = pax_font_saira_regular;
-            pax_background(pax_buffer, 0xFFFFFF);
-            pax_noclip(pax_buffer);
-            pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start app 🅱 back");
-            render_help = false;
-        }
-
-        if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            if (empty) render_message(pax_buffer, "No FPGA bitstreams installed");
-            ili9341_write(ili9341, pax_buffer->buf);
-            render = false;
         }
 
         if (app_to_start != NULL) {

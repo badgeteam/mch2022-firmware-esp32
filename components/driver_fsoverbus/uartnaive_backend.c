@@ -22,22 +22,59 @@ bool fsob_uart_sync(uint32_t* size, uint16_t* command, uint32_t* message_id) {
     return true;
 }
 
+/*typedef struct {
+    uint16_t command;
+    uint32_t size;
+    uint16_t magic;
+    uint32_t message_id;
+} fsob_uart_sync_data_t;
+
+bool fsob_uart_sync(uint32_t* size, uint16_t* command, uint32_t* message_id) {
+    fsob_uart_sync_data_t packet;
+
+    int read = uart_read_bytes(CONFIG_DRIVER_FSOVERBUS_UART_NUM, (uint8_t*) &packet, sizeof(packet), pdMS_TO_TICKS(1000));
+    if (read != sizeof(packet)) {
+        return false;
+    }
+
+    if (packet.magic != 0xADDE) {
+        return false;
+    }
+    
+    if (command != NULL) {
+        *command = packet.command;
+    }
+
+    if (size != NULL) {
+        *size = packet.size;
+    }
+
+    if (message_id != NULL) {
+        *message_id = packet.message_id;
+    }
+
+    return true;
+}*/
+
 void fsob_task(void *pvParameter) {
     uint32_t size, message_id;
     uint16_t command;
     
     while (true) {
         // 1) Wait for webusb header
+        fsob_log("Waiting for sync...");
         while (!fsob_uart_sync(&size, &command, &message_id)) {
             vTaskDelay(10);
         }
+        
+        fsob_log("Sync received!");
 
         // 2) Allocate RAM for the data to be received if there is a payload
         uint8_t* buffer = NULL;
         if (size > 0) {
             buffer = malloc(size);
             if (buffer == NULL) {
-                ESP_LOGI(TAG, "Failed to allocate buffer");
+                fsob_log("Failed to allocate buffer");
                 continue;
             }
 
@@ -45,11 +82,12 @@ void fsob_task(void *pvParameter) {
             int read = uart_read_bytes(CONFIG_DRIVER_FSOVERBUS_UART_NUM, buffer, size, pdMS_TO_TICKS(50));
             if (read != size) {
                 free(buffer);
-                ESP_LOGI(TAG, "Failed to read all data");
+                fsob_log("Failed to read all data");
                 continue;
             }
         }
 
+        fsob_log("Handle command!");
         handleFSCommand(buffer, command, message_id, size, size, size);
         if(buffer != NULL) {
             free(buffer);

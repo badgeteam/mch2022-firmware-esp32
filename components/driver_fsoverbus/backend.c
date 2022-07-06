@@ -75,7 +75,7 @@ void fsob_task(void *pvParameters) {
                     size = *((uint32_t *) &header_full[2]);
                     verif = *((uint16_t *) &header_full[6]);
                     message_id = *((uint32_t *) &header_full[8]);
-                    ESP_LOGI(TAG, "new packet: %d %d %d %d", command, size, verif, message_id);
+                    fsob_log("new packet: %d %d %d %d", command, size, verif, message_id);
                     if(verif == 0xADDE) {
                         receiving = 1;
                         fsob_start_timeout();
@@ -83,7 +83,7 @@ void fsob_task(void *pvParameters) {
                         continue_reading = !(xRingbufferGetCurFreeSize(buf_handle) == CONFIG_DRIVER_FSOVERBUS_NOBACKEND_HELPER_Size);
                     } else {
                         receiving = 0;
-                        ESP_LOGI(TAG, "Packet header not correct.");
+                        fsob_log("Packet header not correct.");
                         clearBuffer();
                         //Received wrong command, flushing uart queue
                     }

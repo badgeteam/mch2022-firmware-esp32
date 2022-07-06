@@ -8,6 +8,7 @@
 #include "esp_sleep.h"
 #include "fsob_backend.h"
 #include "esp_spi_flash.h"
+#include "driver_fsoverbus.h"
 
 #define TAG "fsob_appfs"
 
@@ -97,7 +98,7 @@ int appfswrite(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t si
                 }
 
                 int roundedSize=(app_size+(SPI_FLASH_MMU_PAGE_SIZE-1))&(~(SPI_FLASH_MMU_PAGE_SIZE-1));
-                ESP_LOGI(TAG, "Erasing flash");
+                fsob_log("Erasing flash");
                 res = appfsErase(handle, 0, roundedSize);
 
                 if(length > i) {

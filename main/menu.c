@@ -5,6 +5,7 @@
 
 #include "pax_codecs.h"
 #include "pax_gfx.h"
+#include "graphics_wrapper.h"
 
 menu_t* menu_alloc(const char* title, float entry_height, float text_height) {
     if (title == NULL) return NULL;
@@ -255,22 +256,11 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
 
     pax_noclip(pax_buffer);
 
-    if ((max_items > 1) && (strlen(menu->title) > 0)) {
-        float offsetX = 0;
-        if (menu->icon != NULL) {
-            offsetX = 32;  // Fixed width by choice, could also use "menu->icon->width"
-        }
+    render_outline(pax_buffer, position_x, position_y, width, height, menu->borderColor, menu->bgColor);
 
+    if ((max_items > 1) && (strlen(menu->title) > 0)) {
+        render_header(pax_buffer, position_x, position_y, width, entry_height, text_height, menu->titleColor, menu->titleBgColor, menu->icon, menu->title);
         max_items--;
-        pax_simple_rect(pax_buffer, menu->titleBgColor, position_x, current_position_y, width, entry_height);
-        // pax_simple_line(pax_buffer, menu->titleColor, position_x + 1, position_y + entry_height, position_x + width - 2, position_y + entry_height - 1);
-        pax_clip(pax_buffer, position_x + 1, current_position_y + text_offset, width - 2, text_height);
-        pax_draw_text(pax_buffer, menu->titleColor, font, text_height, position_x + offsetX + 1, current_position_y + text_offset, menu->title);
-        if (menu->icon != NULL) {
-            pax_clip(pax_buffer, position_x, current_position_y, 32, 32);
-            pax_draw_image(pax_buffer, menu->icon, position_x, current_position_y);
-        }
-        pax_noclip(pax_buffer);
         current_position_y += entry_height;
     }
 
@@ -278,9 +268,6 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
     if (menu->position >= max_items) {
         item_offset = menu->position - max_items + 1;
     }
-
-    pax_simple_rect(pax_buffer, menu->bgColor, position_x, current_position_y, width, height - current_position_y + position_y);
-    pax_outline_rect(pax_buffer, menu->borderColor, position_x, position_y, width, height);
 
     for (size_t index = item_offset; (index < item_offset + max_items) && (index < menu->length); index++) {
         menu_item_t* item = _menu_find_item(menu, index);

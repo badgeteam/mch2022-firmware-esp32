@@ -40,6 +40,7 @@ void fsob_timeout_function( TimerHandle_t xTimer );
 
 int (*specialfunction[SPECIALFUNCTIONSLEN])(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length);
 int (*filefunction[FILEFUNCTIONSLEN])(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length);
+fsob_log_fn_t log_fn = NULL;
 
 void handleFSCommand(uint8_t *data, uint16_t command, uint32_t message_id, uint32_t size, uint32_t received, uint32_t length) {
     static uint32_t write_pos;
@@ -71,7 +72,7 @@ void handleFSCommand(uint8_t *data, uint16_t command, uint32_t message_id, uint3
 }
 
 void fsob_timeout_function( TimerHandle_t xTimer ) {
-    ESP_LOGI(TAG, "Saw no message for 1s assuming task crashed. Resetting...");
+    fsob_log("Saw no message for 1s assuming task crashed. Resetting...");
     fsob_reset();
 }
 
@@ -83,7 +84,24 @@ void fsob_start_timeout() {
     xTimerStart(timeout, 1);
 }
 
-esp_err_t driver_fsoverbus_init(void) { 
+void fsob_log(char* fmt, ...) {
+    char* buffer = malloc(256);
+    if (buffer == NULL) return;
+    buffer[255] = '\0';
+    va_list va;
+    va_start(va, fmt);
+    vsnprintf(buffer, 255, fmt, va);
+    va_end (va);
+    if (log_fn != NULL) {
+        log_fn(buffer);
+    } else {
+        ESP_LOGI(TAG, "%s", buffer);
+        free(buffer);
+    }
+}
+
+esp_err_t driver_fsoverbus_init(fsob_log_fn_t a_log_fn) {
+    log_fn = a_log_fn;
     specialfunction[EXECFILE] = execfile;
     specialfunction[HEARTBEAT] = heartbeat;
     specialfunction[PYTHONSTDIN] = pythonstdin;
@@ -110,7 +128,7 @@ esp_err_t driver_fsoverbus_init(void) {
         
     fsob_init();
 
-    ESP_LOGI(TAG, "fs over bus registered.");
+    fsob_log("fs over bus registered.");
     
     timeout = xTimerCreate("FSoverBUS_timeout", 100, false, 0, fsob_timeout_function);
     return ESP_OK;
