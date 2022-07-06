@@ -13,9 +13,7 @@
 #include "hardware.h"
 #include "hatchery.h"
 #include "ili9341.h"
-#include "launcher_esp32.h"
-#include "launcher_fpga.h"
-#include "launcher_python.h"
+#include "launcher.h"
 #include "math.h"
 #include "menu.h"
 #include "nametag.h"
@@ -48,7 +46,7 @@ extern const uint8_t python_png_end[] asm("_binary_python_png_end");
 extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
 extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS, ACTION_PYTHON, ACTION_FPGA } menu_start_action_t;
+typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_LAUNCHER, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS } menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     float width     = 30;
@@ -107,18 +105,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     pax_decode_png_buf(&icon_bitstream, (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start, PAX_BUF_32_8888ARGB, 0);
 
     menu_set_icon(menu, &icon_home);
-    /*menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
-    menu_insert_item_icon(menu, "ESP32 apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
-    menu_insert_item_icon(menu, "BadgePython apps", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
-    menu_insert_item_icon(menu, "FPGA apps", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
-    menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
-    menu_insert_item_icon(menu, "Development tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
-    menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);*/
-
     menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
-    menu_insert_item_icon(menu, "Apps", NULL, (void*) ACTION_APPS, -1, &icon_apps);
-    menu_insert_item_icon(menu, "Python", NULL, (void*) ACTION_PYTHON, -1, &icon_python);
-    menu_insert_item_icon(menu, "FPGA", NULL, (void*) ACTION_FPGA, -1, &icon_bitstream);
+    menu_insert_item_icon(menu, "Apps", NULL, (void*) ACTION_LAUNCHER, -1, &icon_apps);
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
@@ -205,10 +193,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         if (action != ACTION_NONE) {
-            if (action == ACTION_APPS) {
-                display_busy(pax_buffer, ili9341);
-                menu_launcher_esp32(buttonQueue, pax_buffer, ili9341);
-            } else if (action == ACTION_HATCHERY) {
+            if (action == ACTION_HATCHERY) {
                 menu_hatchery(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_NAMETAG) {
                 show_nametag(buttonQueue, pax_buffer, ili9341);
@@ -216,12 +201,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
                 menu_settings(buttonQueue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {
                 menu_dev(buttonQueue, pax_buffer, ili9341);
-            } else if (action == ACTION_PYTHON) {
-                display_busy(pax_buffer, ili9341);
-                menu_launcher_python(buttonQueue, pax_buffer, ili9341);
-            } else if (action == ACTION_FPGA) {
-                display_busy(pax_buffer, ili9341);
-                menu_launcher_fpga(buttonQueue, pax_buffer, ili9341);
+            } else if (action == ACTION_LAUNCHER) {
+                menu_launcher(buttonQueue, pax_buffer, ili9341);
             }
             action = ACTION_NONE;
             render = true;
