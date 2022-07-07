@@ -10,6 +10,7 @@
 
 #include "appfs.h"
 #include "appfs_wrapper.h"
+#include "filesystems.h"
 #include "graphics_wrapper.h"
 #include "ili9341.h"
 #include "menu.h"
@@ -17,13 +18,12 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
-#include "filesystems.h"
 #include "system_wrapper.h"
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
 
-static const char* sdcard_path = "/sd/apps/esp32/";
+static const char* sdcard_path   = "/sd/apps/esp32/";
 static const char* internal_path = "/internal/apps/esp32/";
 
 static bool populate(menu_t* menu) {
@@ -51,9 +51,9 @@ static bool populate(menu_t* menu) {
 
         FILE* icon_fd = fopen(icon_file_path, "rb");
         if (icon_fd != NULL) {
-            pax_buf_t* icon = NULL;
-            size_t   icon_size = get_file_size(icon_fd);
-            uint8_t* icon_data = load_file_to_ram(icon_fd);
+            pax_buf_t* icon      = NULL;
+            size_t     icon_size = get_file_size(icon_fd);
+            uint8_t*   icon_data = load_file_to_ram(icon_fd);
             if (icon_data != NULL) {
                 icon = malloc(sizeof(pax_buf_t));
                 if (icon != NULL) {

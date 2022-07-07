@@ -22,6 +22,7 @@
 #include "esp_vfs.h"
 #include "esp_vfs_fat.h"
 #include "factory_test.h"
+#include "filesystems.h"
 #include "fpga_download.h"
 #include "fpga_test.h"
 #include "graphics_wrapper.h"
@@ -43,7 +44,6 @@
 #include "wifi_defaults.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
-#include "filesystems.h"
 
 extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
 extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");

@@ -41,7 +41,7 @@ bool test_wait_for_response(uint32_t *rc) {
 bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, int line, const char *test_name, test_fn fn) {
     bool     test_result;
     uint32_t rc;
-    
+
     printf("Starting test %s...\r\n", test_name);
 
     /* Test name */
@@ -63,7 +63,7 @@ bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, i
     }
 
     if (ili9341) ili9341_write(ili9341, pax_buffer->buf);
-    
+
     printf("    Test %s result: %s\r\n", test_name, test_result ? "OK" : "FAIL");
 
     /* Pass through the 'OK' status */

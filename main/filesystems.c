@@ -1,4 +1,3 @@
-#include <stdint.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
@@ -6,6 +5,7 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -43,18 +43,16 @@ esp_err_t mount_internal_filesystem() {
 }
 
 esp_err_t mount_sdcard_filesystem() {
-    esp_err_t res = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
+    esp_err_t res  = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
     sdcard_mounted = (res == ESP_OK);
     return res;
 }
 
-bool get_sdcard_mounted() {
-    return sdcard_mounted;
-}
+bool get_sdcard_mounted() { return sdcard_mounted; }
 
 void get_internal_filesystem_size_and_available(uint64_t* fs_size, uint64_t* fs_free) {
-    FATFS *fs;
-    DWORD fre_clust, fre_sect, tot_sect;
+    FATFS* fs;
+    DWORD  fre_clust, fre_sect, tot_sect;
 
     /* Get volume information and free clusters of drive 0 */
     FRESULT res = f_getfree("0:", &fre_clust, &fs);
@@ -72,8 +70,8 @@ void get_sdcard_filesystem_size_and_available(uint64_t* fs_size, uint64_t* fs_fr
         if (fs_free != NULL) *fs_free = 0;
         return;
     }
-    FATFS *fs;
-    DWORD fre_clust, fre_sect, tot_sect;
+    FATFS* fs;
+    DWORD  fre_clust, fre_sect, tot_sect;
 
     /* Get volume information and free clusters of drive 1 */
     FRESULT res = f_getfree("1:", &fre_clust, &fs);

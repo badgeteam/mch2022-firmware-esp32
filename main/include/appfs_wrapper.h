@@ -14,8 +14,10 @@
 #include "ili9341.h"
 #include "pax_gfx.h"
 
-esp_err_t appfs_init(void);
+esp_err_t      appfs_init(void);
 appfs_handle_t appfs_detect_crash();
-void      appfs_boot_app(int fd);
-void      appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version);
-esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app);
+void           appfs_boot_app(int fd);
+void           appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title,
+                               uint16_t version);
+esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version,
+                                    size_t app_size, uint8_t* app);

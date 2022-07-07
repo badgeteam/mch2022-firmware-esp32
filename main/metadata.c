@@ -19,7 +19,7 @@
 #include "pax_gfx.h"
 #include "system_wrapper.h"
 
-static const char *TAG = "Metadata";
+static const char* TAG = "Metadata";
 
 void parse_metadata(const char* path, char** name, char** description, char** category, char** author, int* version, char** license) {
     FILE* fd = fopen(path, "r");
@@ -87,26 +87,25 @@ void free_launcher_app(launcher_app_t* app) {
 static appfs_handle_t find_appfs_handle_for_slug(const char* search_slug) {
     appfs_handle_t appfs_fd = appfsNextEntry(APPFS_INVALID_FD);
     while (appfs_fd != APPFS_INVALID_FD) {
-        const char* slug    = NULL;
+        const char* slug = NULL;
         appfsEntryInfoExt(appfs_fd, &slug, NULL, NULL, NULL);
-         if ((strlen(search_slug) == strlen(slug)) && (strcmp(search_slug, slug) == 0)) {
-             return appfs_fd;
-         }
+        if ((strlen(search_slug) == strlen(slug)) && (strcmp(search_slug, slug) == 0)) {
+            return appfs_fd;
+        }
         appfs_fd = appfsNextEntry(appfs_fd);
     }
-    
+
     return APPFS_INVALID_FD;
 }
 
-void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* type, const char* slug, void* default_icon_data,
-                                   size_t default_icon_size) {
+void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* type, const char* slug, void* default_icon_data, size_t default_icon_size) {
     char metadata_file_path[128];
     snprintf(metadata_file_path, sizeof(metadata_file_path), "%s/%s/metadata.json", path, slug);
     char icon_file_path[128];
     snprintf(icon_file_path, sizeof(icon_file_path), "%s/%s/icon.png", path, slug);
     char app_path[128];
     snprintf(app_path, sizeof(app_path), "%s/%s", path, slug);
-    
+
     launcher_app_t* app = malloc(sizeof(launcher_app_t));
     if (app == NULL) {
         ESP_LOGE(TAG, "Malloc for app entry failed");
@@ -114,9 +113,9 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* t
     }
     memset(app, 0, sizeof(launcher_app_t));
     app->appfs_fd = (strcmp(type, "esp32") == 0) ? find_appfs_handle_for_slug(slug) : APPFS_INVALID_FD;
-    app->path = strdup(app_path);
-    app->type = strdup(type);
-    app->slug = strdup(slug);
+    app->path     = strdup(app_path);
+    app->type     = strdup(type);
+    app->slug     = strdup(slug);
     parse_metadata(metadata_file_path, &app->title, &app->description, &app->category, &app->author, &app->version, &app->license);
     app->icon = NULL;
 

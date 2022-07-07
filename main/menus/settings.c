@@ -20,6 +20,7 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "rp2040_updater.h"
 #include "system_wrapper.h"
 #include "wifi.h"
 #include "wifi_connect.h"
@@ -146,8 +147,7 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
         if (action != ACTION_NONE) {
             if (action == ACTION_RP2040_BL) {
                 display_boot_screen(pax_buffer, ili9341, "Please wait...");
-                rp2040_reboot_to_bootloader(get_rp2040());
-                esp_restart();
+                rp2040_update_start(get_rp2040(), pax_buffer, ili9341);
             } else if (action == ACTION_OTA) {
                 ota_update(pax_buffer, ili9341);
             } else if (action == ACTION_WIFI) {

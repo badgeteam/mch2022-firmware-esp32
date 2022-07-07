@@ -23,14 +23,11 @@
 #include "managed_i2c.h"
 #include "pax_gfx.h"
 #include "system_wrapper.h"
-#include <freertos/FreeRTOS.h>
-#include <freertos/queue.h>
-#include <freertos/task.h>
 
 #define LOG_LINES 9
 
-char* log_lines[LOG_LINES] = {NULL};
-static QueueHandle_t status_queue = NULL;
+char*                log_lines[LOG_LINES] = {NULL};
+static QueueHandle_t status_queue         = NULL;
 
 void webusb_print_status(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     const pax_font_t* font = pax_font_saira_regular;
@@ -53,9 +50,7 @@ void webusb_push_status(char* buffer) {
     log_lines[LOG_LINES - 1] = buffer;
 }
 
-void webusb_print_status_wrapped(char* buffer) {
-    xQueueSend(status_queue, &buffer, portMAX_DELAY);
-}
+void webusb_print_status_wrapped(char* buffer) { xQueueSend(status_queue, &buffer, portMAX_DELAY); }
 
 void webusb_main(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     status_queue = xQueueCreate(4, sizeof(char*));

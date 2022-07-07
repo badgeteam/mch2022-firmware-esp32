@@ -3,9 +3,9 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "graphics_wrapper.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
-#include "graphics_wrapper.h"
 
 menu_t* menu_alloc(const char* title, float entry_height, float text_height) {
     if (title == NULL) return NULL;

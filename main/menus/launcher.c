@@ -30,7 +30,7 @@
 #include "rtc_memory.h"
 #include "system_wrapper.h"
 
-static const char *TAG = "Launcher";
+static const char* TAG = "Launcher";
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -44,8 +44,8 @@ extern const uint8_t python_png_end[] asm("_binary_python_png_end");
 extern const uint8_t dev_png_start[] asm("_binary_dev_png_start");
 extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 
-static appfs_handle_t python_appfs_fd = APPFS_INVALID_FD;
-static bool python_not_installed = false;
+static appfs_handle_t python_appfs_fd      = APPFS_INVALID_FD;
+static bool           python_not_installed = false;
 
 static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path) {
     const pax_font_t* font = pax_font_saira_regular;
@@ -103,29 +103,29 @@ static bool find_menu_item_for_type_and_slug(menu_t* menu, const char* type, con
 }
 
 static bool populate_menu_from_other_appfs_entries(menu_t* menu) {
-    bool empty = true;
+    bool            empty = true;
     launcher_app_t* other_apps[64];
-    size_t other_apps_count = 0;
-    appfs_handle_t appfs_fd = appfsNextEntry(APPFS_INVALID_FD);
+    size_t          other_apps_count = 0;
+    appfs_handle_t  appfs_fd         = appfsNextEntry(APPFS_INVALID_FD);
     while (appfs_fd != APPFS_INVALID_FD) {
-        if (other_apps_count >= sizeof(other_apps) - 1) break; // Prevent overflow
+        if (other_apps_count >= sizeof(other_apps) - 1) break;  // Prevent overflow
         empty               = false;
         const char* slug    = NULL;
         const char* title   = NULL;
         uint16_t    version = 0xFFFF;
         appfsEntryInfoExt(appfs_fd, &slug, &title, &version, NULL);
-        
+
         if (!find_menu_item_for_type_and_slug(menu, "esp32", slug)) {
             // AppFS entry has no metadata installed, create a simple menu entry anyway
             launcher_app_t* app = malloc(sizeof(launcher_app_t));
             if (app != NULL) {
                 memset(app, 0, sizeof(launcher_app_t));
                 app->appfs_fd = appfs_fd;
-                app->type = strdup("esp32");
-                app->slug = strdup(slug);
-                app->title = strdup(title);
-                app->version = version;
-                app->icon = malloc(sizeof(pax_buf_t));
+                app->type     = strdup("esp32");
+                app->slug     = strdup(slug);
+                app->title    = strdup(title);
+                app->version  = version;
+                app->icon     = malloc(sizeof(pax_buf_t));
                 if (app->icon != NULL) {
                     pax_decode_png_buf(app->icon, (void*) dev_png_start, dev_png_end - dev_png_start, PAX_BUF_32_8888ARGB, 0);
                 }
@@ -134,24 +134,25 @@ static bool populate_menu_from_other_appfs_entries(menu_t* menu) {
         }
         appfs_fd = appfsNextEntry(appfs_fd);
     }
-    
+
     for (size_t index = 0; index < other_apps_count; index++) {
         launcher_app_t* app = other_apps[index];
         menu_insert_item_icon(menu, (app->title != NULL) ? app->title : app->slug, NULL, (void*) app, -1, app->icon);
     }
-    
+
     return !empty;
 }
 
 static bool populate_menu(menu_t* menu) {
-    bool internal_result_esp32  = populate_menu_from_path(menu, "/internal/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
-    bool sdcard_result_esp32    = populate_menu_from_path(menu, "/sd/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
-    bool other_result_esp32     = populate_menu_from_other_appfs_entries(menu); // Keep this one last!
-    bool internal_result_ice40  = populate_menu_from_path(menu, "/internal/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
-    bool sdcard_result_ice40    = populate_menu_from_path(menu, "/sd/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool internal_result_esp32 = populate_menu_from_path(menu, "/internal/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
+    bool sdcard_result_esp32   = populate_menu_from_path(menu, "/sd/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
+    bool other_result_esp32    = populate_menu_from_other_appfs_entries(menu);  // Keep this one last!
+    bool internal_result_ice40 = populate_menu_from_path(menu, "/internal/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
+    bool sdcard_result_ice40   = populate_menu_from_path(menu, "/sd/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
     bool internal_result_python = populate_menu_from_path(menu, "/internal/apps", "python", (void*) python_png_start, python_png_end - python_png_start);
     bool sdcard_result_python   = populate_menu_from_path(menu, "/sd/apps", "python", (void*) python_png_start, python_png_end - python_png_start);
-    return internal_result_esp32 | sdcard_result_esp32 | other_result_esp32 | internal_result_ice40 | sdcard_result_ice40 | internal_result_python | sdcard_result_python;
+    return internal_result_esp32 | sdcard_result_esp32 | other_result_esp32 | internal_result_ice40 | sdcard_result_ice40 | internal_result_python |
+           sdcard_result_python;
 }
 
 static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app_to_start) {
@@ -168,7 +169,7 @@ static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341*
         }
     } else if ((strlen(app_to_start->type) == strlen("esp32")) && (strncmp(app_to_start->type, "esp32", strlen(app_to_start->type)) == 0)) {
         appfs_handle_t appfs_fd_to_start = app_to_start->appfs_fd;
-        uint16_t version_in_appfs = 0xFFFF;
+        uint16_t       version_in_appfs  = 0xFFFF;
         appfsEntryInfoExt(appfs_fd_to_start, NULL, NULL, &version_in_appfs, NULL);
         if (app_to_start->version != version_in_appfs) {
             // TO DO: update the AppFS entry from FAT if possible
@@ -176,7 +177,7 @@ static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341*
             render_message(pax_buffer, "Warning:\nAppFS entry version does not\nmatch version in app metadata");
             ili9341_write(ili9341, pax_buffer->buf);
             wait_for_button(button_queue);
-            appfs_boot_app(appfs_fd_to_start); // Start anyway
+            appfs_boot_app(appfs_fd_to_start);  // Start anyway
         } else if (appfs_fd_to_start != APPFS_INVALID_FD) {
             appfs_boot_app(appfs_fd_to_start);
         } else {
@@ -193,81 +194,10 @@ static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341*
     }
 }
 
-bool remove_recursive(const char* path) {
-    size_t path_len;
-    char *full_path;
-    DIR *dir;
-    struct stat stat_path, stat_entry;
-    struct dirent *entry;
-
-    // stat for the path
-    stat(path, &stat_path);
-
-    // if path does not exists or is not dir - exit with status -1
-    if (S_ISDIR(stat_path.st_mode) == 0) {
-        printf("%s: %s\n", "Is not directory", path);
-        return false;
-    }
-
-    // if not possible to read the directory for this user
-    if ((dir = opendir(path)) == NULL) {
-        printf("%s: %s\n", "Can`t open directory", path);
-        return false;
-    }
-    
-    bool failed = false;
-
-    // the length of the path
-    path_len = strlen(path);
-
-    // iteration through entries in the directory
-    while ((entry = readdir(dir)) != NULL) {
-
-        // skip entries "." and ".."
-        if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, "..")) {
-            continue;
-        }
-
-        // determinate a full path of an entry
-        full_path = calloc(path_len + strlen(entry->d_name) + 1, sizeof(char));
-        strcpy(full_path, path);
-        strcat(full_path, "/");
-        strcat(full_path, entry->d_name);
-
-        // stat for the entry
-        stat(full_path, &stat_entry);
-
-        // recursively remove a nested directory
-        if (S_ISDIR(stat_entry.st_mode) != 0) {
-            rmtree(full_path);
-            continue;
-        }
-
-        // remove a file object
-        if (unlink(full_path) == 0) {
-            printf("Removed a file: %s\n", full_path);
-        } else {
-            printf("Can`t remove a file: %s\n", full_path);
-            failed = true;
-        }
-        free(full_path);
-    }
-
-    // remove the devastated directory and close the object of it
-    if (rmdir(path) == 0) {
-        printf("Removed a directory: %s\n", path);
-    } else {
-        printf("Can`t remove a directory: %s\n", path);
-        failed = true;
-    }
-    closedir(dir);
-    return !failed;
-}
-
 static bool uninstall_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app) {
     render_message(pax_buffer, "Uninstalling...");
     ili9341_write(ili9341, pax_buffer->buf);
-    
+
     // 1) Remove AppFS entry
     if (app->appfs_fd != APPFS_INVALID_FD) {
         printf("Removing AppFS entry...\r\n");
@@ -275,20 +205,20 @@ static bool uninstall_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
         appfsEntryInfoExt(app->appfs_fd, &slug, NULL, NULL, NULL);
         appfsDeleteFile(slug);
     }
-    
+
     // 2) Remove data from filesystem
     if (app->path != NULL) {
         printf("Removing directory '%s'...\r\n", app->path);
         remove_recursive(app->path);
     }
-    
+
     return true;
 }
 
 static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app) {
     bool return_value = false;
-    bool render = true;
-    bool quit = false;
+    bool render       = true;
+    bool quit         = false;
     while (!quit) {
         if (render) {
             pax_simple_rect(pax_buffer, 0xFFFFFFFF, 0, pax_buffer->height - 20, pax_buffer->width, 20);
@@ -318,14 +248,14 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
                         break;
                     case RP2040_INPUT_JOYSTICK_PRESS:
                     case RP2040_INPUT_BUTTON_ACCEPT:
-                        case RP2040_INPUT_BUTTON_START:
+                    case RP2040_INPUT_BUTTON_START:
                         start_app(button_queue, pax_buffer, ili9341, app);
                         render = true;
                         break;
                     case RP2040_INPUT_BUTTON_SELECT:
                         if (uninstall_app(button_queue, pax_buffer, ili9341, app)) {
                             return_value = true;
-                            quit = true;
+                            quit         = true;
                         }
                         break;
                     default:
@@ -339,11 +269,11 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
 
 void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    bool reload = true;
+    bool   reload     = true;
     while (reload) {
         reload = false;
         display_busy(pax_buffer, ili9341);
-        python_appfs_fd           = appfsOpen("python");
+        python_appfs_fd      = appfsOpen("python");
         python_not_installed = (python_appfs_fd == APPFS_INVALID_FD);
 
         menu_t* menu = menu_alloc("App launcher", 34, 18);
@@ -365,8 +295,8 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
         bool empty = !populate_menu(menu);
 
         launcher_app_t* app_to_start = NULL;
-        bool  render       = true;
-        bool  quit         = false;
+        bool            render       = true;
+        bool            quit         = false;
         while (!quit) {
             if (render) {
                 const pax_font_t* font = pax_font_saira_regular;
@@ -378,7 +308,7 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                 ili9341_write(ili9341, pax_buffer->buf);
                 render = false;
             }
-            
+
             rp2040_input_message_t buttonMessage = {0};
             if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
                 if (buttonMessage.state) {
@@ -403,7 +333,7 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                         case RP2040_INPUT_BUTTON_MENU:
                             if (show_app_details(button_queue, pax_buffer, ili9341, (launcher_app_t*) menu_get_callback_args(menu, menu_get_position(menu)))) {
                                 reload = true;
-                                quit = true;
+                                quit   = true;
                             } else {
                                 render = true;
                             }

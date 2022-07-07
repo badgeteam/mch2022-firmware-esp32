@@ -13,6 +13,7 @@
 #include "appfs.h"
 #include "bootscreen.h"
 #include "esp_sleep.h"
+#include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
 #include "menu.h"
@@ -21,17 +22,16 @@
 #include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
 #include "system_wrapper.h"
-#include "graphics_wrapper.h"
 
 static const char* TAG = "appfs wrapper";
 
 esp_err_t appfs_init(void) { return appfsInit(APPFS_PART_TYPE, APPFS_PART_SUBTYPE); }
 
 appfs_handle_t appfs_detect_crash() {
-	uint32_t r=REG_READ(RTC_CNTL_STORE0_REG);
-	ESP_LOGI(TAG, "RTC store0 reg: %x", r);
-	if ((r&0xFF000000)!=0xA6000000) return APPFS_INVALID_FD;
-	return r&0xff;
+    uint32_t r = REG_READ(RTC_CNTL_STORE0_REG);
+    ESP_LOGI(TAG, "RTC store0 reg: %x", r);
+    if ((r & 0xFF000000) != 0xA6000000) return APPFS_INVALID_FD;
+    return r & 0xff;
 }
 
 void appfs_boot_app(int fd) {
@@ -46,7 +46,8 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title, uint16_t version) {
+void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title,
+                     uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
     esp_err_t res;
     FILE*     app_fd = fopen(path, "rb");
@@ -80,7 +81,8 @@ void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
     free(app);
 }
 
-esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
+esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version,
+                                    size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
     esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
