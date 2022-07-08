@@ -108,7 +108,7 @@ static void terminal_add(char* buffer) {
 }
 
 static void terminal_free() {
-    for (uint8_t i = 0; i < AMOUNT_OF_LINES - 1; i++) {
+    for (uint8_t i = 0; i < AMOUNT_OF_LINES; i++) {
         if (terminal_lines[i] != NULL) {
             free(terminal_lines[i]);
             terminal_lines[i] = NULL;
@@ -200,6 +200,7 @@ end:
 }
 
 void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     terminal_add(strdup("Connecting to WiFi..."));
     terminal_render(pax_buffer, ili9341);
 
@@ -223,4 +224,7 @@ void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
     for_entity_in_path("/sd/apps/ice40", true, &callback, &args);
 
     terminal_free();
+    wifi_disconnect_and_disable();
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
 }

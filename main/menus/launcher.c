@@ -304,7 +304,7 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                 pax_noclip(pax_buffer);
                 pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start  🅱 back  🅼 options");
                 menu_render(pax_buffer, menu, 0, 0, 320, 220);
-                if (empty) render_message(pax_buffer, "No FPGA bitstreams installed");
+                if (empty) render_message(pax_buffer, "No apps installed");
                 ili9341_write(ili9341, pax_buffer->buf);
                 render = false;
             }
