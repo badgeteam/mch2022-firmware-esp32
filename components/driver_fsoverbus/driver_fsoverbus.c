@@ -49,9 +49,9 @@ void handleFSCommand(uint8_t *data, uint16_t command, uint32_t message_id, uint3
     }
     uint8_t *buffer = command_in;
     
-    /*if(length > CACHE_SIZE){  //Incoming buffer exceeds local cache, directly use buffer instead of copying
+    if(length > CACHE_SIZE){  //Incoming buffer exceeds local cache, directly use buffer instead of copying
         buffer = data;
-    } else */if(length > 0) {
+    } else if(length > 0) {
         memcpy(&command_in[write_pos], data, length);
         write_pos += length;
     }
