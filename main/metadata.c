@@ -21,9 +21,12 @@
 
 static const char* TAG = "Metadata";
 
-void parse_metadata(const char* path, char** name, char** description, char** category, char** author, int* version, char** license) {
+void parse_metadata(const char* path, char** device, char** type, char** category, char** slug, char** name, char** description, char** author, int* version, char** license) {
     FILE* fd = fopen(path, "r");
-    if (fd == NULL) return;
+    if (fd == NULL) {
+        ESP_LOGW(TAG, "Failed to open metadata file %s", path);
+        return;
+    }
     char* json_data = (char*) load_file_to_ram(fd);
     fclose(fd);
     if (json_data == NULL) return;
@@ -31,6 +34,30 @@ void parse_metadata(const char* path, char** name, char** description, char** ca
     if (root == NULL) {
         free(json_data);
         return;
+    }
+    if (device) {
+        cJSON* device_obj = cJSON_GetObjectItem(root, "device");
+        if (device_obj) {
+            *device = strdup(device_obj->valuestring);
+        }
+    }
+    if (type) {
+        cJSON* type_obj = cJSON_GetObjectItem(root, "type");
+        if (type_obj) {
+            *type = strdup(type_obj->valuestring);
+        }
+    }
+    if (category) {
+        cJSON* category_obj = cJSON_GetObjectItem(root, "category");
+        if (category_obj) {
+            *category = strdup(category_obj->valuestring);
+        }
+    }
+    if (slug) {
+        cJSON* slug_obj = cJSON_GetObjectItem(root, "slug");
+        if (slug_obj) {
+            *slug = strdup(slug_obj->valuestring);
+        }
     }
     if (name) {
         cJSON* name_obj = cJSON_GetObjectItem(root, "name");
@@ -42,12 +69,6 @@ void parse_metadata(const char* path, char** name, char** description, char** ca
         cJSON* description_obj = cJSON_GetObjectItem(root, "description");
         if (description_obj) {
             *description = strdup(description_obj->valuestring);
-        }
-    }
-    if (category) {
-        cJSON* category_obj = cJSON_GetObjectItem(root, "category");
-        if (category_obj) {
-            *category = strdup(category_obj->valuestring);
         }
     }
     if (author) {
@@ -116,7 +137,7 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* t
     app->path     = strdup(app_path);
     app->type     = strdup(type);
     app->slug     = strdup(slug);
-    parse_metadata(metadata_file_path, &app->title, &app->description, &app->category, &app->author, &app->version, &app->license);
+    parse_metadata(metadata_file_path, NULL, NULL, &app->category, NULL, &app->title, &app->description, &app->author, &app->version, &app->license);
     app->icon = NULL;
 
     FILE* icon_fd = fopen(icon_file_path, "rb");
@@ -144,19 +165,35 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* t
 }
 
 bool populate_menu_from_path(menu_t* menu, const char* path, const char* arg_type, void* default_icon_data,
-                             size_t default_icon_size) {  // Path is here the folder containing the Python apps, for example /internal/apps
+                             size_t default_icon_size) {  // Path is here the folder containing the apps, for example /internal/apps
     char path_with_type[256];
     path_with_type[sizeof(path_with_type) - 1] = '\0';
     snprintf(path_with_type, sizeof(path_with_type), "%s/%s", path, arg_type);
     DIR* dir = opendir(path_with_type);
     if (dir == NULL) {
-        printf("Failed to populate menu, directory not found: %s\n", path_with_type);
+        ESP_LOGW(TAG, "Directory not found: %s", path_with_type);
         return false;
     }
     struct dirent* ent;
     while ((ent = readdir(dir)) != NULL) {
         if (ent->d_type == DT_REG) continue;  // Skip files, only parse directories
         populate_menu_entry_from_path(menu, path_with_type, arg_type, ent->d_name, default_icon_data, default_icon_size);
+    }
+    closedir(dir);
+    return true;
+}
+
+bool for_entity_in_path(const char* path, bool directories, path_callback_t callback, void* user) {
+    DIR* dir = opendir(path);
+    if (dir == NULL) {
+        ESP_LOGW(TAG, "Directory not found: %s", path);
+        return false;
+    }
+    struct dirent* ent;
+    while ((ent = readdir(dir)) != NULL) {
+        if ((directories) && (ent->d_type == DT_REG)) continue; // Skip files, only parse directories
+        if ((!directories) && (ent->d_type != DT_REG)) continue; // Skip directories, only parse files
+        callback(path, ent->d_name, user);
     }
     closedir(dir);
     return true;

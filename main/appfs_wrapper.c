@@ -46,7 +46,7 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title,
+void appfs_store_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title,
                      uint16_t version) {
     display_boot_screen(pax_buffer, ili9341, "Installing app...");
     esp_err_t res;
@@ -55,7 +55,7 @@ void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
         render_message(pax_buffer, "Failed to open file");
         ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to open file");
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
         return;
     }
     size_t   app_size = get_file_size(app_fd);
@@ -65,23 +65,23 @@ void appfs_store_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
         render_message(pax_buffer, "Failed to load app to RAM");
         ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to load application into RAM");
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
         return;
     }
 
     ESP_LOGI(TAG, "Application size %d", app_size);
 
-    res = appfs_store_in_memory_app(buttonQueue, pax_buffer, ili9341, name, title, version, app_size, app);
+    res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, name, title, version, app_size, app);
     if (res == ESP_OK) {
         render_message(pax_buffer, "App installed!");
         ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
     }
 
     free(app);
 }
 
-esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version,
+esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version,
                                     size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
     esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
@@ -89,7 +89,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buf
         render_message(pax_buffer, "Failed to create file");
         ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
         return res;
     }
     int roundedSize = (app_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
@@ -98,7 +98,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buf
         render_message(pax_buffer, "Failed to erase file");
         ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
         return res;
     }
     res = appfsWrite(handle, 0, app, app_size);
@@ -106,7 +106,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle buttonQueue, pax_buf_t* pax_buf
         render_message(pax_buffer, "Failed to write file");
         ili9341_write(ili9341, pax_buffer->buf);
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
-        wait_for_button(buttonQueue);
+        if (button_queue != NULL) wait_for_button(button_queue);
         return res;
     }
     ESP_LOGI(TAG, "Application is now stored in AppFS");

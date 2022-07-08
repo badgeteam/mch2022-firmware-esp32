@@ -22,25 +22,16 @@
 #include "rp2040.h"
 #include "system_wrapper.h"
 #include "wifi_connect.h"
+#include "metadata.h"
+#include "app_management.h"
 
 static const char* TAG = "Hatchery";
 
 extern const uint8_t hatchery_png_start[] asm("_binary_hatchery_png_start");
 extern const uint8_t hatchery_png_end[] asm("_binary_hatchery_png_end");
 
-static const char* sdcard_path      = "/sd";
-static const char* internal_path    = "/internal";
 static const char* esp32_type       = "esp32";
 static const char* esp32_bin_fn     = "main.bin";
-static const char* metadata_json_fn = "metadata.json";
-
-static bool create_dir(const char* path) {
-    struct stat st = {0};
-    if (stat(path, &st) == 0) {
-        return (st.st_mode & S_IFDIR) != 0;
-    }
-    return mkdir(path, 0777) == 0;
-}
 
 static menu_t* hatchery_menu_create(const char* title) {
     menu_t* menu             = menu_alloc(title, 34, 18);
@@ -268,148 +259,15 @@ static bool load_app_info(const char* type_slug, const char* category_slug, cons
     return true;
 }
 
-bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug,
-                                       const char* app_slug, bool to_sd_card) {
-    size_t ram_before      = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, bool to_sd_card) {
     cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
     cJSON* app_name_obj    = cJSON_GetObjectItem(json_app_info, "name");
-    cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
-    cJSON* license_obj     = cJSON_GetObjectItem(json_app_info, "license");
-    cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
     cJSON* version_obj     = cJSON_GetObjectItem(json_app_info, "version");
     cJSON* files_obj       = cJSON_GetObjectItem(json_app_info, "files");
-
-    char buffer[257];
-    buffer[sizeof(buffer) - 1] = '\0';
-
-    // Create folders
-    snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nCreating folders...", app_name_obj->valuestring);
-    render_message(pax_buffer, buffer);
-    ili9341_write(ili9341, pax_buffer->buf);
-
-    snprintf(buffer, sizeof(buffer) - 1, "%s/apps", to_sd_card ? sdcard_path : internal_path);
-    printf("Creating dir: %s\r\n", buffer);
-    if (!create_dir(buffer)) {
-        // Failed to create app directory
-        ESP_LOGI(TAG, "Failed to create %s", buffer);
-        render_message(pax_buffer, "Failed create folder");
-        ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(button_queue);
-        return false;
-    }
-
-    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s", to_sd_card ? sdcard_path : internal_path, type_slug);
-    printf("Creating dir: %s\r\n", buffer);
-    if (!create_dir(buffer)) {
-        // failed to create app type directory
-        ESP_LOGI(TAG, "Failed to create %s", buffer);
-        render_message(pax_buffer, "Failed create folder");
-        ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(button_queue);
-        return false;
-    }
-
-    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug);
-    printf("Creating dir: %s\r\n", buffer);
-    if (!create_dir(buffer)) {
-        // failed to create app directory
-        ESP_LOGI(TAG, "Failed to create %s", buffer);
-        render_message(pax_buffer, "Failed create folder");
-        ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(button_queue);
-        return false;
-    }
-
-    // Download files
-    cJSON* file_obj;
-    cJSON_ArrayForEach(file_obj, files_obj) {
-        cJSON* name_obj = cJSON_GetObjectItem(file_obj, "name");
-        cJSON* url_obj  = cJSON_GetObjectItem(file_obj, "url");
-        cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
-        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn) == 0)) {
-            snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s' to AppFS", app_name_obj->valuestring, name_obj->valuestring);
-            render_message(pax_buffer, buffer);
-            ili9341_write(ili9341, pax_buffer->buf);
-            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, name_obj->valuestring);
-            uint8_t* esp32_binary_data;
-            size_t   esp32_binary_size;
-            bool     success = download_ram(url_obj->valuestring, (uint8_t**) &esp32_binary_data, &esp32_binary_size);
-            if (!success) {
-                ESP_LOGI(TAG, "Failed to download %s to RAM", url_obj->valuestring);
-                render_message(pax_buffer, "Failed to download file");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(button_queue);
-                return false;
-            }
-            if (esp32_binary_data != NULL) {  // Ignore 0 bytes files
-                esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, app_slug, app_name_obj->valuestring, version_obj->valueint,
-                                                          esp32_binary_size, esp32_binary_data);
-                if (res != ESP_OK) {
-                    free(esp32_binary_data);
-                    ESP_LOGI(TAG, "Failed to store ESP32 binary");
-                    render_message(pax_buffer, "Failed to install app to AppFS");
-                    ili9341_write(ili9341, pax_buffer->buf);
-                    wait_for_button(button_queue);
-                    return false;
-                }
-                if (to_sd_card) {
-                    render_message(pax_buffer, "Storing a copy of the ESP32\nbinary to the SD card...");
-                    ili9341_write(ili9341, pax_buffer->buf);
-                    printf("Creating file: %s\r\n", buffer);
-                    FILE* binary_fd = fopen(buffer, "w");
-                    if (binary_fd == NULL) {
-                        free(esp32_binary_data);
-                        ESP_LOGI(TAG, "Failed to install ESP32 binary to %s", buffer);
-                        render_message(pax_buffer, "Failed to install app to SD card");
-                        ili9341_write(ili9341, pax_buffer->buf);
-                        wait_for_button(button_queue);
-                        return false;
-                    }
-                    fwrite(esp32_binary_data, 1, esp32_binary_size, binary_fd);
-                    fclose(binary_fd);
-                }
-                free(esp32_binary_data);
-            }
-        } else {
-            snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s'...", app_name_obj->valuestring, name_obj->valuestring);
-            render_message(pax_buffer, buffer);
-            ili9341_write(ili9341, pax_buffer->buf);
-            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, name_obj->valuestring);
-            printf("Downloading file: %s\r\n", buffer);
-            if (!download_file(url_obj->valuestring, buffer)) {
-                ESP_LOGI(TAG, "Failed to download %s to %s", url_obj->valuestring, buffer);
-                render_message(pax_buffer, "Failed to download file");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(button_queue);
-                return false;
-            }
-        }
-    }
-
-    // Install metadata.json
-    snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, app_slug, metadata_json_fn);
-    FILE* metadata_fd = fopen(buffer, "w");
-    if (metadata_fd == NULL) {
-        ESP_LOGI(TAG, "Failed to install metadata to %s", buffer);
-        render_message(pax_buffer, "Failed to install metadata");
-        ili9341_write(ili9341, pax_buffer->buf);
-        wait_for_button(button_queue);
-        return false;
-    }
-    fwrite(data_app_info, 1, size_app_info, metadata_fd);
-    fclose(metadata_fd);
-
-    ESP_LOGI(TAG, "App installed!");
-    render_message(pax_buffer, "App has been installed!");
-    ili9341_write(ili9341, pax_buffer->buf);
-    wait_for_button(button_queue);
-    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    printf("Leak in installer: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
-    return true;
+    return install_app(button_queue, pax_buffer, ili9341, type_slug, to_sd_card, data_app_info, size_app_info, json_app_info);
 }
 
-bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug,
-                               const char* app_slug) {
+bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug) {
     cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
     cJSON* name_obj        = cJSON_GetObjectItem(json_app_info, "name");
     cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
@@ -504,10 +362,10 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
                     int action = (int) menu_get_callback_args(menu, menu_get_position(menu));
                     switch (action) {
                         case 0:
-                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug, false);
+                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, false);
                             break;
                         case 1:
-                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug, true);
+                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, true);
                             break;
                         case 2:
                         default:
@@ -578,7 +436,7 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, IL
             case RP2040_INPUT_JOYSTICK_PRESS:
             case RP2040_INPUT_BUTTON_START:
                 render = true;
-                menu_hatchery_install_app(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug);
+                menu_hatchery_install_app(button_queue, pax_buffer, ili9341, type_slug);
                 break;
             case RP2040_INPUT_BUTTON_BACK:
                 quit = true;

@@ -43,7 +43,10 @@ void webusb_print_status(pax_buf_t* pax_buffer, ILI9341* ili9341) {
 }
 
 void webusb_push_status(char* buffer) {
-    if (log_lines[0] != NULL) free(log_lines[0]);
+    if (log_lines[0] != NULL) {
+        free(log_lines[0]);
+        log_lines[0] = NULL;
+    }
     for (uint8_t i = 0; i < LOG_LINES - 1; i++) {
         log_lines[i] = log_lines[i + 1];
     }

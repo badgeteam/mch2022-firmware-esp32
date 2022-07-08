@@ -21,9 +21,14 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "settings.h"
+#include "app_update.h"
+#include "wifi_ota.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
+
+extern const uint8_t tag_png_start[] asm("_binary_tag_png_start");
+extern const uint8_t tag_png_end[] asm("_binary_tag_png_end");
 
 extern const uint8_t apps_png_start[] asm("_binary_apps_png_start");
 extern const uint8_t apps_png_end[] asm("_binary_apps_png_end");
@@ -37,16 +42,10 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-extern const uint8_t tag_png_start[] asm("_binary_tag_png_start");
-extern const uint8_t tag_png_end[] asm("_binary_tag_png_end");
+extern const uint8_t update_png_start[] asm("_binary_update_png_start");
+extern const uint8_t update_png_end[] asm("_binary_update_png_end");
 
-extern const uint8_t python_png_start[] asm("_binary_python_png_start");
-extern const uint8_t python_png_end[] asm("_binary_python_png_end");
-
-extern const uint8_t bitstream_png_start[] asm("_binary_bitstream_png_start");
-extern const uint8_t bitstream_png_end[] asm("_binary_bitstream_png_end");
-
-typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_LAUNCHER, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS } menu_start_action_t;
+typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_LAUNCHER, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS, ACTION_UPDATE, ACTION_OTA } menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     float width     = 30;
@@ -74,7 +73,7 @@ void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }
 
-void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version) {
+void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version) {
     menu_t* menu = menu_alloc("Main menu", 34, 18);
 
     menu->fgColor           = 0xFF000000;
@@ -89,6 +88,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
     pax_buf_t icon_home;
     pax_decode_png_buf(&icon_home, (void*) home_png_start, home_png_end - home_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_tag;
+    pax_decode_png_buf(&icon_tag, (void*) tag_png_start, tag_png_end - tag_png_start, PAX_BUF_32_8888ARGB, 0);
     pax_buf_t icon_apps;
     pax_decode_png_buf(&icon_apps, (void*) apps_png_start, apps_png_end - apps_png_start, PAX_BUF_32_8888ARGB, 0);
     pax_buf_t icon_hatchery;
@@ -97,12 +98,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     pax_decode_png_buf(&icon_dev, (void*) dev_png_start, dev_png_end - dev_png_start, PAX_BUF_32_8888ARGB, 0);
     pax_buf_t icon_settings;
     pax_decode_png_buf(&icon_settings, (void*) settings_png_start, settings_png_end - settings_png_start, PAX_BUF_32_8888ARGB, 0);
-    pax_buf_t icon_tag;
-    pax_decode_png_buf(&icon_tag, (void*) tag_png_start, tag_png_end - tag_png_start, PAX_BUF_32_8888ARGB, 0);
-    pax_buf_t icon_python;
-    pax_decode_png_buf(&icon_python, (void*) python_png_start, python_png_end - python_png_start, PAX_BUF_32_8888ARGB, 0);
-    pax_buf_t icon_bitstream;
-    pax_decode_png_buf(&icon_bitstream, (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_update;
+    pax_decode_png_buf(&icon_update, (void*) update_png_start, update_png_end - update_png_start, PAX_BUF_32_8888ARGB, 0);
 
     menu_set_icon(menu, &icon_home);
     menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
@@ -110,6 +107,8 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     menu_insert_item_icon(menu, "Hatchery", NULL, (void*) ACTION_HATCHERY, -1, &icon_hatchery);
     menu_insert_item_icon(menu, "Tools", NULL, (void*) ACTION_DEV, -1, &icon_dev);
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
+    menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
+    menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
@@ -117,9 +116,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     uint8_t analogReadTimer = 0;
     float   battery_voltage = 0;
     float   usb_voltage     = 0;
-    // uint8_t rp2040_usb = 0;
 
-    // Calculated:
     uint8_t battery_percent  = 0;
     bool    battery_charging = false;
 
@@ -127,7 +124,7 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 100 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 100 / portTICK_PERIOD_MS) == pdTRUE) {
             if (buttonMessage.state) {
                 switch (buttonMessage.input) {
                     case RP2040_INPUT_JOYSTICK_DOWN:
@@ -194,15 +191,19 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
         if (action != ACTION_NONE) {
             if (action == ACTION_HATCHERY) {
-                menu_hatchery(buttonQueue, pax_buffer, ili9341);
+                menu_hatchery(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_NAMETAG) {
-                show_nametag(buttonQueue, pax_buffer, ili9341);
+                show_nametag(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_SETTINGS) {
-                menu_settings(buttonQueue, pax_buffer, ili9341);
+                menu_settings(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_DEV) {
-                menu_dev(buttonQueue, pax_buffer, ili9341);
+                menu_dev(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_LAUNCHER) {
-                menu_launcher(buttonQueue, pax_buffer, ili9341);
+                menu_launcher(button_queue, pax_buffer, ili9341);
+            } else if (action == ACTION_UPDATE) {
+                update_apps(button_queue, pax_buffer, ili9341);
+            } else if (action == ACTION_OTA) {
+                ota_update(pax_buffer, ili9341);
             }
             action = ACTION_NONE;
             render = true;
@@ -211,8 +212,10 @@ void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
 
     menu_free(menu);
     pax_buf_destroy(&icon_home);
+    pax_buf_destroy(&icon_tag);
     pax_buf_destroy(&icon_apps);
     pax_buf_destroy(&icon_hatchery);
     pax_buf_destroy(&icon_dev);
     pax_buf_destroy(&icon_settings);
+    pax_buf_destroy(&icon_update);
 }

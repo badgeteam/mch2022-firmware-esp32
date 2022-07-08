@@ -35,6 +35,8 @@ idf_component_register(
          "wifi_cert.c"
          "http_download.c"
          "filesystems.c"
+         "app_management.c"
+         "app_update.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"
@@ -53,4 +55,5 @@ idf_component_register(
                 ${project_dir}/resources/icons/bitstream.png
                 ${project_dir}/resources/icons/python.png
                 ${project_dir}/resources/icons/hourglass.png
+                ${project_dir}/resources/icons/update.png
 )
