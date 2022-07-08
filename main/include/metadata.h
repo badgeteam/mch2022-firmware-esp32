@@ -29,7 +29,8 @@ typedef void (*path_callback_t)(const char*, const char*, void*);
 
 void free_launcher_app(launcher_app_t* app);
 
-void parse_metadata(const char* path, char** device, char** type, char** category, char** slug, char** name, char** description, char** author, int* version, char** license);
+void parse_metadata(const char* path, char** device, char** type, char** category, char** slug, char** name, char** description, char** author, int* version,
+                    char** license);
 
 void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* arg_type, const char* arg_name, void* default_icon_data,
                                    size_t default_icon_size);

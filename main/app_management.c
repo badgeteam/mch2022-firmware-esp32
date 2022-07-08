@@ -17,12 +17,12 @@
 #include "http_download.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "system_wrapper.h"
 #include "wifi_connect.h"
-#include "metadata.h"
 
 static const char* TAG = "App management";
 
@@ -40,15 +40,16 @@ bool create_dir(const char* path) {
     return mkdir(path, 0777) == 0;
 }
 
-bool install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, bool to_sd_card, char*  data_app_info, size_t size_app_info, cJSON* json_app_info) {
-    cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
-    cJSON* name_obj        = cJSON_GetObjectItem(json_app_info, "name");
-    //cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
-    //cJSON* license_obj     = cJSON_GetObjectItem(json_app_info, "license");
-    //cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
-    cJSON* version_obj     = cJSON_GetObjectItem(json_app_info, "version");
-    cJSON* files_obj       = cJSON_GetObjectItem(json_app_info, "files");
-    
+bool install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, bool to_sd_card, char* data_app_info,
+                 size_t size_app_info, cJSON* json_app_info) {
+    cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
+    cJSON* name_obj = cJSON_GetObjectItem(json_app_info, "name");
+    // cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
+    // cJSON* license_obj     = cJSON_GetObjectItem(json_app_info, "license");
+    // cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
+    cJSON* version_obj = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON* files_obj   = cJSON_GetObjectItem(json_app_info, "files");
+
     char buffer[257];
     buffer[sizeof(buffer) - 1] = '\0';
 
@@ -95,12 +96,13 @@ bool install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
     cJSON_ArrayForEach(file_obj, files_obj) {
         cJSON* name_obj = cJSON_GetObjectItem(file_obj, "name");
         cJSON* url_obj  = cJSON_GetObjectItem(file_obj, "url");
-        //cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
+        // cJSON* size_obj = cJSON_GetObjectItem(file_obj, "size");
         if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn) == 0)) {
             snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s' to AppFS", name_obj->valuestring, name_obj->valuestring);
             render_message(pax_buffer, buffer);
             ili9341_write(ili9341, pax_buffer->buf);
-            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, slug_obj->valuestring, name_obj->valuestring);
+            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, slug_obj->valuestring,
+                     name_obj->valuestring);
             uint8_t* esp32_binary_data;
             size_t   esp32_binary_size;
             bool     success = download_ram(url_obj->valuestring, (uint8_t**) &esp32_binary_data, &esp32_binary_size);
@@ -112,8 +114,8 @@ bool install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
                 return false;
             }
             if (esp32_binary_data != NULL) {  // Ignore 0 bytes files
-                esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, slug_obj->valuestring, name_obj->valuestring, version_obj->valueint,
-                                                          esp32_binary_size, esp32_binary_data);
+                esp_err_t res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, slug_obj->valuestring, name_obj->valuestring,
+                                                          version_obj->valueint, esp32_binary_size, esp32_binary_data);
                 if (res != ESP_OK) {
                     free(esp32_binary_data);
                     ESP_LOGI(TAG, "Failed to store ESP32 binary");
@@ -144,7 +146,8 @@ bool install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
             snprintf(buffer, sizeof(buffer) - 1, "Installing %s:\nDownloading '%s'...", name_obj->valuestring, name_obj->valuestring);
             render_message(pax_buffer, buffer);
             ili9341_write(ili9341, pax_buffer->buf);
-            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, slug_obj->valuestring, name_obj->valuestring);
+            snprintf(buffer, sizeof(buffer) - 1, "%s/apps/%s/%s/%s", to_sd_card ? sdcard_path : internal_path, type_slug, slug_obj->valuestring,
+                     name_obj->valuestring);
             printf("Downloading file: %s\r\n", buffer);
             if (!download_file(url_obj->valuestring, buffer)) {
                 ESP_LOGI(TAG, "Failed to download %s to %s", url_obj->valuestring, buffer);

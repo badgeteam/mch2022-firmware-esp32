@@ -330,18 +330,19 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                         case RP2040_INPUT_BUTTON_START:
                             app_to_start = (launcher_app_t*) menu_get_callback_args(menu, menu_get_position(menu));
                             break;
-                        case RP2040_INPUT_BUTTON_MENU: {
-                            launcher_app_t* app = (launcher_app_t*) menu_get_callback_args(menu, menu_get_position(menu));
-                            if (app != NULL) {
-                                if (show_app_details(button_queue, pax_buffer, ili9341, app)) {
-                                    reload = true;
-                                    quit   = true;
-                                } else {
-                                    render = true;
+                        case RP2040_INPUT_BUTTON_MENU:
+                            {
+                                launcher_app_t* app = (launcher_app_t*) menu_get_callback_args(menu, menu_get_position(menu));
+                                if (app != NULL) {
+                                    if (show_app_details(button_queue, pax_buffer, ili9341, app)) {
+                                        reload = true;
+                                        quit   = true;
+                                    } else {
+                                        render = true;
+                                    }
                                 }
+                                break;
                             }
-                            break;
-                        }
                         case RP2040_INPUT_BUTTON_SELECT:
                             break;
                         default:

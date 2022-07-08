@@ -21,7 +21,8 @@
 
 static const char* TAG = "Metadata";
 
-void parse_metadata(const char* path, char** device, char** type, char** category, char** slug, char** name, char** description, char** author, int* version, char** license) {
+void parse_metadata(const char* path, char** device, char** type, char** category, char** slug, char** name, char** description, char** author, int* version,
+                    char** license) {
     FILE* fd = fopen(path, "r");
     if (fd == NULL) {
         ESP_LOGW(TAG, "Failed to open metadata file %s", path);
@@ -191,8 +192,8 @@ bool for_entity_in_path(const char* path, bool directories, path_callback_t call
     }
     struct dirent* ent;
     while ((ent = readdir(dir)) != NULL) {
-        if ((directories) && (ent->d_type == DT_REG)) continue; // Skip files, only parse directories
-        if ((!directories) && (ent->d_type != DT_REG)) continue; // Skip directories, only parse files
+        if ((directories) && (ent->d_type == DT_REG)) continue;   // Skip files, only parse directories
+        if ((!directories) && (ent->d_type != DT_REG)) continue;  // Skip directories, only parse files
         callback(path, ent->d_name, user);
     }
     closedir(dir);

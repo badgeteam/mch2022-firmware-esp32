@@ -9,6 +9,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
+#include "app_management.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
 #include "cJSON.h"
@@ -17,21 +18,20 @@
 #include "http_download.h"
 #include "ili9341.h"
 #include "menu.h"
+#include "metadata.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "system_wrapper.h"
 #include "wifi_connect.h"
-#include "metadata.h"
-#include "app_management.h"
 
 static const char* TAG = "Hatchery";
 
 extern const uint8_t hatchery_png_start[] asm("_binary_hatchery_png_start");
 extern const uint8_t hatchery_png_end[] asm("_binary_hatchery_png_end");
 
-static const char* esp32_type       = "esp32";
-static const char* esp32_bin_fn     = "main.bin";
+static const char* esp32_type   = "esp32";
+static const char* esp32_bin_fn = "main.bin";
 
 static menu_t* hatchery_menu_create(const char* title) {
     menu_t* menu             = menu_alloc(title, 34, 18);
@@ -260,10 +260,10 @@ static bool load_app_info(const char* type_slug, const char* category_slug, cons
 }
 
 bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, bool to_sd_card) {
-    cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
-    cJSON* app_name_obj    = cJSON_GetObjectItem(json_app_info, "name");
-    cJSON* version_obj     = cJSON_GetObjectItem(json_app_info, "version");
-    cJSON* files_obj       = cJSON_GetObjectItem(json_app_info, "files");
+    cJSON* slug_obj     = cJSON_GetObjectItem(json_app_info, "slug");
+    cJSON* app_name_obj = cJSON_GetObjectItem(json_app_info, "name");
+    cJSON* version_obj  = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON* files_obj    = cJSON_GetObjectItem(json_app_info, "files");
     return install_app(button_queue, pax_buffer, ili9341, type_slug, to_sd_card, data_app_info, size_app_info, json_app_info);
 }
 

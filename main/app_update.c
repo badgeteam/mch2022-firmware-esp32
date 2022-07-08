@@ -1,5 +1,3 @@
-#include "launcher.h"
-
 #include <cJSON.h>
 #include <esp_err.h>
 #include <esp_log.h>
@@ -13,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "app_management.h"
 #include "appfs.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
@@ -20,8 +19,10 @@
 #include "fpga_util.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
+#include "http_download.h"
 #include "ice40.h"
 #include "ili9341.h"
+#include "launcher.h"
 #include "menu.h"
 #include "metadata.h"
 #include "pax_codecs.h"
@@ -30,16 +31,14 @@
 #include "rtc_memory.h"
 #include "system_wrapper.h"
 #include "wifi_connect.h"
-#include "http_download.h"
-#include "app_management.h"
 
 static const char* TAG = "Updater";
 
 typedef struct _update_apps_callback_args {
     xQueueHandle button_queue;
-    pax_buf_t* pax_buffer;
-    ILI9341* ili9341;
-    bool sdcard;
+    pax_buf_t*   pax_buffer;
+    ILI9341*     ili9341;
+    bool         sdcard;
 } update_apps_callback_args_t;
 
 static bool connect_to_wifi(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
@@ -82,7 +81,7 @@ static void free_app_info() {
 }
 
 #define AMOUNT_OF_LINES 8
-char*  terminal_lines[AMOUNT_OF_LINES] = {NULL};
+char* terminal_lines[AMOUNT_OF_LINES] = {NULL};
 
 static void terminal_render(pax_buf_t* pax_buffer, ILI9341* ili9341) {
     pax_background(pax_buffer, 0xFFFFFF);
@@ -119,20 +118,20 @@ static void terminal_free() {
 
 static void callback(const char* path, const char* entity, void* user) {
     update_apps_callback_args_t* args = (update_apps_callback_args_t*) user;
-    char string_buffer[128];
+    char                         string_buffer[128];
     string_buffer[sizeof(string_buffer) - 1] = '\0';
     char metadata_path[128];
     metadata_path[sizeof(metadata_path) - 1] = '\0';
     snprintf(metadata_path, sizeof(metadata_path) - 1, "%s/%s/metadata.json", path, entity);
 
-    char* device = NULL;
-    char* type = NULL;
-    char* category = NULL;
-    char* slug = NULL;
-    char* name = NULL;
-    int installed_version = 0;
+    char* device            = NULL;
+    char* type              = NULL;
+    char* category          = NULL;
+    char* slug              = NULL;
+    char* name              = NULL;
+    int   installed_version = 0;
     parse_metadata(metadata_path, &device, &type, &category, &slug, &name, NULL, NULL, &installed_version, NULL);
-    
+
     if ((slug == NULL) || (strcmp(slug, entity) != 0)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s/%s: no metadata", path, entity);
         ESP_LOGW(TAG, "%s", string_buffer);
@@ -140,7 +139,7 @@ static void callback(const char* path, const char* entity, void* user) {
         terminal_render(args->pax_buffer, args->ili9341);
         goto end;
     }
-    
+
     if ((type == NULL) || (category == NULL)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: incomplete metadata", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
@@ -148,7 +147,7 @@ static void callback(const char* path, const char* entity, void* user) {
         terminal_render(args->pax_buffer, args->ili9341);
         goto end;
     }
-    
+
     if (!load_app_info(type, category, slug)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: fetching metadata failed", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
@@ -158,7 +157,7 @@ static void callback(const char* path, const char* entity, void* user) {
     }
 
     cJSON* version_obj = cJSON_GetObjectItem(json_app_info, "version");
-    
+
     if (!version_obj) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: hatchery has no version", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
@@ -166,7 +165,7 @@ static void callback(const char* path, const char* entity, void* user) {
         terminal_render(args->pax_buffer, args->ili9341);
         goto end;
     }
-    
+
     if (installed_version >= version_obj->valueint) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: up to date", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
@@ -174,12 +173,12 @@ static void callback(const char* path, const char* entity, void* user) {
         terminal_render(args->pax_buffer, args->ili9341);
         goto end;
     }
-    
+
     snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: r%d to r%d", slug, installed_version, version_obj->valueint);
     ESP_LOGI(TAG, "%s", string_buffer);
     terminal_add(strdup(string_buffer));
     terminal_render(args->pax_buffer, args->ili9341);
-    
+
     if (install_app(NULL, args->pax_buffer, args->ili9341, type, args->sdcard, data_app_info, size_app_info, json_app_info)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: installed r%d", slug, version_obj->valueint);
         ESP_LOGI(TAG, "%s", string_buffer);
@@ -191,7 +190,7 @@ static void callback(const char* path, const char* entity, void* user) {
     terminal_add(strdup(string_buffer));
     terminal_render(args->pax_buffer, args->ili9341);
 
-    end:
+end:
     free_app_info();
     if (device != NULL) free(device);
     if (type != NULL) free(type);
@@ -208,12 +207,12 @@ void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
 
     terminal_add(strdup("Connected to WiFi!"));
     terminal_render(pax_buffer, ili9341);
-    
+
     update_apps_callback_args_t args;
     args.button_queue = button_queue;
-    args.pax_buffer = pax_buffer;
-    args.ili9341 = ili9341;
-    args.sdcard = false;
+    args.pax_buffer   = pax_buffer;
+    args.ili9341      = ili9341;
+    args.sdcard       = false;
 
     for_entity_in_path("/internal/apps/esp32", true, &callback, &args);
     for_entity_in_path("/internal/apps/python", true, &callback, &args);
@@ -222,6 +221,6 @@ void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9
     for_entity_in_path("/sd/apps/esp32", true, &callback, &args);
     for_entity_in_path("/sd/apps/python", true, &callback, &args);
     for_entity_in_path("/sd/apps/ice40", true, &callback, &args);
-    
+
     terminal_free();
 }

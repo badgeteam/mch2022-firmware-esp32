@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "app_update.h"
 #include "bootscreen.h"
 #include "dev.h"
 #include "hardware.h"
@@ -21,7 +22,6 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "settings.h"
-#include "app_update.h"
 #include "wifi_ota.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
@@ -45,7 +45,17 @@ extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 extern const uint8_t update_png_start[] asm("_binary_update_png_start");
 extern const uint8_t update_png_end[] asm("_binary_update_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_APPS, ACTION_LAUNCHER, ACTION_HATCHERY, ACTION_NAMETAG, ACTION_DEV, ACTION_SETTINGS, ACTION_UPDATE, ACTION_OTA } menu_start_action_t;
+typedef enum action {
+    ACTION_NONE,
+    ACTION_APPS,
+    ACTION_LAUNCHER,
+    ACTION_HATCHERY,
+    ACTION_NAMETAG,
+    ACTION_DEV,
+    ACTION_SETTINGS,
+    ACTION_UPDATE,
+    ACTION_OTA
+} menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     float width     = 30;
