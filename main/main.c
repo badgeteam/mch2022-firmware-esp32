@@ -365,6 +365,8 @@ void app_main(void) {
         while (true) {
             fpga_download(rp2040->queue, ice40, &pax_buffer, ili9341);
         }
+    } else if (webusb_mode == 0x03) {
+        webusb_new_main(rp2040->queue, &pax_buffer, ili9341);
     } else {
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
