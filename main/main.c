@@ -356,10 +356,7 @@ void app_main(void) {
             menu_start(rp2040->queue, &pax_buffer, ili9341, app_description->version);
         }
     } else if (webusb_mode == 0x01) {
-        display_boot_screen(&pax_buffer, ili9341, "WebUSB mode");
-        while (true) {
-            webusb_main(rp2040->queue, &pax_buffer, ili9341);
-        }
+        webusb_main(rp2040->queue, &pax_buffer, ili9341);
     } else if (webusb_mode == 0x02) {
         display_boot_screen(&pax_buffer, ili9341, "FPGA download mode");
         while (true) {

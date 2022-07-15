@@ -213,7 +213,7 @@ void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili93
             } else if (action == ACTION_UPDATE) {
                 update_apps(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_OTA) {
-                ota_update(pax_buffer, ili9341);
+                ota_update(pax_buffer, ili9341, false);
             }
             action = ACTION_NONE;
             render = true;

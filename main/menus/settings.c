@@ -29,7 +29,7 @@
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_RP2040_BL, ACTION_NICKNAME, ACTION_LOCK } menu_settings_action_t;
+typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_OTA_NIGHTLY, ACTION_RP2040_BL, ACTION_NICKNAME, ACTION_LOCK } menu_settings_action_t;
 
 void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     nvs_handle_t handle;
@@ -95,6 +95,7 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Firmware flashing lock", NULL, (void*) ACTION_LOCK, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
+    menu_insert_item(menu, "Install experimental firmware", NULL, (void*) ACTION_OTA_NIGHTLY, -1);
 
     bool                   render = true;
     menu_settings_action_t action = ACTION_NONE;
@@ -149,7 +150,9 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                 display_boot_screen(pax_buffer, ili9341, "Please wait...");
                 rp2040_update_start(get_rp2040(), pax_buffer, ili9341);
             } else if (action == ACTION_OTA) {
-                ota_update(pax_buffer, ili9341);
+                ota_update(pax_buffer, ili9341, false);
+            } else if (action == ACTION_OTA_NIGHTLY) {
+                ota_update(pax_buffer, ili9341, true);
             } else if (action == ACTION_WIFI) {
                 menu_wifi(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_BACK) {
