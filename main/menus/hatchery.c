@@ -83,7 +83,7 @@ static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t* pax_buffer
             render = false;
         }
 
-        int button = wait_for_button_press(button_queue, portMAX_DELAY);
+        int button   = wait_for_button_press(button_queue, portMAX_DELAY);
         return_value = menu_get_callback_args(menu, menu_get_position(menu));
         switch (button) {
             case RP2040_INPUT_JOYSTICK_DOWN:
@@ -97,7 +97,7 @@ static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t* pax_buffer
             case RP2040_INPUT_BUTTON_ACCEPT:
             case RP2040_INPUT_JOYSTICK_PRESS:
             case RP2040_INPUT_BUTTON_START:
-                quit         = true;
+                quit = true;
                 break;
             case RP2040_INPUT_BUTTON_BACK:
                 quit = true;
@@ -298,8 +298,8 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
     get_internal_filesystem_size_and_available(NULL, &internal_fs_free);
     bool can_install_to_internal = (internal_fs_free >= size_fat);
 
-    uint64_t sdcard_fs_free = 0;
-    bool can_install_to_sdcard   = false;
+    uint64_t sdcard_fs_free        = 0;
+    bool     can_install_to_sdcard = false;
     if (get_sdcard_mounted()) {
         get_sdcard_filesystem_size_and_available(NULL, &sdcard_fs_free);
         can_install_to_sdcard = (sdcard_fs_free >= size_fat);

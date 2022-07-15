@@ -29,7 +29,16 @@
 extern const uint8_t settings_png_start[] asm("_binary_settings_png_start");
 extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 
-typedef enum action { ACTION_NONE, ACTION_BACK, ACTION_WIFI, ACTION_OTA, ACTION_OTA_NIGHTLY, ACTION_RP2040_BL, ACTION_NICKNAME, ACTION_LOCK } menu_settings_action_t;
+typedef enum action {
+    ACTION_NONE,
+    ACTION_BACK,
+    ACTION_WIFI,
+    ACTION_OTA,
+    ACTION_OTA_NIGHTLY,
+    ACTION_RP2040_BL,
+    ACTION_NICKNAME,
+    ACTION_LOCK
+} menu_settings_action_t;
 
 void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     nvs_handle_t handle;

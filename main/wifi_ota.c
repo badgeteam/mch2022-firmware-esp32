@@ -115,7 +115,8 @@ void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text
     const pax_font_t *font = pax_font_saira_regular;
     pax_background(pax_buffer, nightly ? 0x000000 : 0xFFFFFF);
     pax_vec1_t title_size = pax_text_size(font, 18, nightly ? "Experimental firmware" : "Firmware update");
-    pax_draw_text(pax_buffer, nightly ? 0xFFFF0000 : 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, nightly ? "Experimental firmware" : "Firmware update");
+    pax_draw_text(pax_buffer, nightly ? 0xFFFF0000 : 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30,
+                  nightly ? "Experimental firmware" : "Firmware update");
     pax_vec1_t size = pax_text_size(font, 18, text);
     pax_draw_text(pax_buffer, nightly ? 0xFFFFFFFF : 0xFF000000, font, 18, (320 / 2) - (size.x / 2), 120 + 10, text);
     ili9341_write(ili9341, pax_buffer->buf);
@@ -123,8 +124,8 @@ void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text
 
 void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
     display_ota_state(pax_buffer, ili9341, "Connecting to WiFi...", nightly);
-    
-    char* ota_url = nightly ? "https://mch2022.ota.bodge.team/mch2022_dev.bin" : "https://mch2022.ota.bodge.team/mch2022.bin";
+
+    char *ota_url = nightly ? "https://mch2022.ota.bodge.team/mch2022_dev.bin" : "https://mch2022.ota.bodge.team/mch2022.bin";
 
     if (!wifi_connect_to_stored()) {
         display_ota_state(pax_buffer, ili9341, "Failed to connect to WiFi", nightly);
@@ -137,8 +138,7 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
 
     ESP_LOGI(TAG, "Starting OTA update");
 
-    esp_http_client_config_t config = {
-        .url = ota_url, .use_global_ca_store = true, .event_handler = _http_event_handler, .keep_alive_enable = true};
+    esp_http_client_config_t config = {.url = ota_url, .use_global_ca_store = true, .event_handler = _http_event_handler, .keep_alive_enable = true};
 
     esp_https_ota_config_t ota_config = {
         .http_config         = &config,

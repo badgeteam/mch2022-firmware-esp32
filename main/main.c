@@ -134,54 +134,54 @@ const char*      fatal_error_str = "A fatal error occured";
 const char*      reset_board_str = "Reset the board to try again";
 static pax_buf_t pax_buffer;
 
-static void audio_player_task(void *pvParameters) {
+static void audio_player_task(void* pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(200));
     play_bootsound();
     uint8_t leds[15] = {0};
     for (uint8_t part = 0; part < 50; part++) {
         // Center of the kite: green.
-        leds[3*0 + 1] = part;
+        leds[3 * 0 + 1] = part;
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     for (uint8_t part = 0; part < 50; part++) {
         // Left of the kite: red.
-        leds[3*1 + 0] = part;
+        leds[3 * 1 + 0] = part;
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     for (uint8_t part = 0; part < 50; part++) {
         // Top of the kit: blue.
-        leds[3*2 + 2]  = part;
+        leds[3 * 2 + 2] = part;
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     for (uint8_t part = 0; part < 50; part++) {
         // Right of the kite: yellow.
-        leds[3*3 + 0] = part;
-        leds[3*3 + 1] = part;
+        leds[3 * 3 + 0] = part;
+        leds[3 * 3 + 1] = part;
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     for (uint8_t part = 0; part < 50; part++) {
         // Bottom of the kite: blue.
-        leds[3*4 + 2] = part;
+        leds[3 * 4 + 2] = part;
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
     }
     for (uint8_t part = 0; part < 50; part++) {
         // Center of the kite: green.
-        leds[3*0 + 1] = 49 - part;
+        leds[3 * 0 + 1] = 49 - part;
         // Left of the kite: red.
-        leds[3*1 + 0] = 49 - part;
+        leds[3 * 1 + 0] = 49 - part;
         // Top of the kit: blue.
-        leds[3*2 + 2]  = 49 - part;
+        leds[3 * 2 + 2] = 49 - part;
         // Right of the kite: yellow.
-        leds[3*3 + 0] = 49 - part;
-        leds[3*3 + 1] = 49 - part;
+        leds[3 * 3 + 0] = 49 - part;
+        leds[3 * 3 + 1] = 49 - part;
         // Bottom of the kite: blue.
-        leds[3*4 + 2] = 49 - part;
-        
+        leds[3 * 4 + 2] = 49 - part;
+
         // Send the LED data.
         ws2812_send_data(leds, sizeof(leds));
         vTaskDelay(pdMS_TO_TICKS(10));
@@ -305,7 +305,7 @@ void app_main(void) {
     }
 
     /* Start SD card filesystem */
-    gpio_set_level(GPIO_SD_PWR, 1); // Enable power to LEDs and SD card
+    gpio_set_level(GPIO_SD_PWR, 1);  // Enable power to LEDs and SD card
 
     bool sdcard_mounted = (mount_sdcard_filesystem() == ESP_OK);
     if (sdcard_mounted) {
@@ -386,43 +386,49 @@ void app_main(void) {
                 ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
             }
         }
-        
+
         /* Lattice check */
         uint8_t lattice;
         res = nvs_get_u8(handle, "lattice", &lattice);
         if ((res != ESP_OK) || (lattice < 1)) {
             pax_background(&pax_buffer, 0x000000);
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 uint8_t j = 254 - i;
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 uint8_t j = 254 - i;
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
-            for (uint8_t i = 0; i < 250; i+=4) {
+            for (uint8_t i = 0; i < 250; i += 4) {
                 uint8_t j = 254 - i;
                 pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 27,  "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
+                                pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
             pax_insert_png_buf(&pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
