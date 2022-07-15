@@ -51,6 +51,9 @@ extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
 extern const uint8_t logo_screen_png_start[] asm("_binary_logo_screen_png_start");
 extern const uint8_t logo_screen_png_end[] asm("_binary_logo_screen_png_end");
 
+extern const uint8_t lattice_logo_png_start[] asm("_binary_m_logo_lattice_png_start");
+extern const uint8_t lattice_logo_png_end[] asm("_binary_m_logo_lattice_png_end");
+
 static const char* TAG = "main";
 
 void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* line0, const char* line1, const char* line2, const char* line3) {
@@ -130,6 +133,62 @@ void stop() {
 const char*      fatal_error_str = "A fatal error occured";
 const char*      reset_board_str = "Reset the board to try again";
 static pax_buf_t pax_buffer;
+
+static void audio_player_task(void *pvParameters) {
+    vTaskDelay(pdMS_TO_TICKS(200));
+    play_bootsound();
+    uint8_t leds[15] = {0};
+    for (uint8_t part = 0; part < 50; part++) {
+        // Center of the kite: green.
+        leds[3*0 + 1] = part;
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    for (uint8_t part = 0; part < 50; part++) {
+        // Left of the kite: red.
+        leds[3*1 + 0] = part;
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    for (uint8_t part = 0; part < 50; part++) {
+        // Top of the kit: blue.
+        leds[3*2 + 2]  = part;
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    for (uint8_t part = 0; part < 50; part++) {
+        // Right of the kite: yellow.
+        leds[3*3 + 0] = part;
+        leds[3*3 + 1] = part;
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    for (uint8_t part = 0; part < 50; part++) {
+        // Bottom of the kite: blue.
+        leds[3*4 + 2] = part;
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    for (uint8_t part = 0; part < 50; part++) {
+        // Center of the kite: green.
+        leds[3*0 + 1] = 49 - part;
+        // Left of the kite: red.
+        leds[3*1 + 0] = 49 - part;
+        // Top of the kit: blue.
+        leds[3*2 + 2]  = 49 - part;
+        // Right of the kite: yellow.
+        leds[3*3 + 0] = 49 - part;
+        leds[3*3 + 1] = 49 - part;
+        // Bottom of the kite: blue.
+        leds[3*4 + 2] = 49 - part;
+        
+        // Send the LED data.
+        ws2812_send_data(leds, sizeof(leds));
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    vTaskDelete(NULL);
+}
 
 void app_main(void) {
     esp_err_t res;
@@ -246,16 +305,16 @@ void app_main(void) {
     }
 
     /* Start SD card filesystem */
+    gpio_set_level(GPIO_SD_PWR, 1); // Enable power to LEDs and SD card
+
     bool sdcard_mounted = (mount_sdcard_filesystem() == ESP_OK);
     if (sdcard_mounted) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
-        /* LED power is on: start LED driver and turn LEDs off */
-        ws2812_init(GPIO_LED_DATA);
-        const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-        ws2812_send_data(led_off, sizeof(led_off));
-    } else {
-        gpio_set_level(GPIO_SD_PWR, 0);  // Disable power to LEDs and SD card
     }
+
+    ws2812_init(GPIO_LED_DATA);
+    const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    ws2812_send_data(led_off, sizeof(led_off));
 
     /* Start WiFi */
     wifi_init();
@@ -327,6 +386,51 @@ void app_main(void) {
                 ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
             }
         }
+        
+        /* Lattice check */
+        uint8_t lattice;
+        res = nvs_get_u8(handle, "lattice", &lattice);
+        if ((res != ESP_OK) || (lattice < 1)) {
+            pax_background(&pax_buffer, 0x000000);
+            for (uint8_t i = 0; i < 250; i+=4) {
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            for (uint8_t i = 0; i < 250; i+=4) {
+                uint8_t j = 254 - i;
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            for (uint8_t i = 0; i < 250; i+=4) {
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            for (uint8_t i = 0; i < 250; i+=4) {
+                uint8_t j = 254 - i;
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            for (uint8_t i = 0; i < 250; i+=4) {
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            for (uint8_t i = 0; i < 250; i+=4) {
+                uint8_t j = 254 - i;
+                pax_background(&pax_buffer, 0x000000);
+                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2, pax_buffer.height / 2 - 27,  "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                ili9341_write(ili9341, pax_buffer.buf);
+            }
+            pax_insert_png_buf(&pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
+            pax_draw_text(&pax_buffer, 0xFF000000, pax_font_saira_regular, 18, 5, 240 - 18, "🅰 continue");
+            ili9341_write(ili9341, pax_buffer.buf);
+            wait_for_button(rp2040->queue);
+            nvs_set_u8(handle, "lattice", 1);
+        }
 
         /* Crash check */
         appfs_handle_t crashed_app = appfs_detect_crash();
@@ -349,7 +453,7 @@ void app_main(void) {
         }
 
         /* Rick that roll */
-        play_bootsound();
+        xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL);
 
         /* Launcher menu */
         while (true) {
