@@ -421,7 +421,7 @@ void app_main(void) {
             for (uint8_t i = 0; i < 250; i += 4) {
                 pax_background(&pax_buffer, 0x000000);
                 pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                                pax_buffer.height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
             for (uint8_t i = 0; i < 250; i += 4) {
