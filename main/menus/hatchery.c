@@ -84,6 +84,7 @@ static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t* pax_buffer
         }
 
         int button = wait_for_button_press(button_queue, portMAX_DELAY);
+        return_value = menu_get_callback_args(menu, menu_get_position(menu));
         switch (button) {
             case RP2040_INPUT_JOYSTICK_DOWN:
                 menu_navigate_next(menu);
@@ -96,7 +97,6 @@ static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t* pax_buffer
             case RP2040_INPUT_BUTTON_ACCEPT:
             case RP2040_INPUT_JOYSTICK_PRESS:
             case RP2040_INPUT_BUTTON_START:
-                return_value = menu_get_callback_args(menu, menu_get_position(menu));
                 quit         = true;
                 break;
             case RP2040_INPUT_BUTTON_BACK:
