@@ -38,43 +38,43 @@ void parse_metadata(const char* path, char** device, char** type, char** categor
     }
     if (device) {
         cJSON* device_obj = cJSON_GetObjectItem(root, "device");
-        if (device_obj) {
+        if (device_obj && (device_obj->valuestring != NULL)) {
             *device = strdup(device_obj->valuestring);
         }
     }
     if (type) {
         cJSON* type_obj = cJSON_GetObjectItem(root, "type");
-        if (type_obj) {
+        if (type_obj && (type_obj->valuestring != NULL)) {
             *type = strdup(type_obj->valuestring);
         }
     }
     if (category) {
         cJSON* category_obj = cJSON_GetObjectItem(root, "category");
-        if (category_obj) {
+        if (category_obj && (category_obj->valuestring != NULL)) {
             *category = strdup(category_obj->valuestring);
         }
     }
     if (slug) {
         cJSON* slug_obj = cJSON_GetObjectItem(root, "slug");
-        if (slug_obj) {
+        if (slug_obj && (slug_obj->valuestring != NULL)) {
             *slug = strdup(slug_obj->valuestring);
         }
     }
     if (name) {
         cJSON* name_obj = cJSON_GetObjectItem(root, "name");
-        if (name_obj) {
+        if (name_obj && (name_obj->valuestring != NULL)) {
             *name = strdup(name_obj->valuestring);
         }
     }
     if (description) {
         cJSON* description_obj = cJSON_GetObjectItem(root, "description");
-        if (description_obj) {
+        if (description_obj && (description_obj->valuestring != NULL)) {
             *description = strdup(description_obj->valuestring);
         }
     }
     if (author) {
         cJSON* author_obj = cJSON_GetObjectItem(root, "author");
-        if (author_obj) {
+        if (author_obj && (author_obj->valuestring != NULL)) {
             *author = strdup(author_obj->valuestring);
         }
     }
@@ -86,7 +86,7 @@ void parse_metadata(const char* path, char** device, char** type, char** categor
     }
     if (license) {
         cJSON* license_obj = cJSON_GetObjectItem(root, "license");
-        if (license_obj) {
+        if (license_obj && (license_obj->valuestring != NULL)) {
             *license = strdup(license_obj->valuestring);
         }
     }
