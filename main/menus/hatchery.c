@@ -284,7 +284,7 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
         cJSON*   name_obj = cJSON_GetObjectItem(file_obj, "name");
         cJSON*   size_obj = cJSON_GetObjectItem(file_obj, "size");
         uint64_t size     = size_obj->valueint;
-        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn))) {
+        if ((strcmp(type_slug, esp32_type) == 0) && (strcmp(name_obj->valuestring, esp32_bin_fn) == 0)) {
             size_appfs += size;
         } else {
             size_fat += size;
@@ -294,17 +294,22 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
     printf("App selected: %s (version %u) by %s. Size: %llu, Appfs size: %llu\r\n", name_obj->valuestring, version_obj->valueint, author_obj->valuestring,
            size_fat, size_appfs);
 
-    uint64_t fs_free;
-    get_internal_filesystem_size_and_available(NULL, &fs_free);
-    bool can_install_to_internal = (fs_free >= size_fat);
-    bool can_install_to_sdcard   = false;
+    uint64_t internal_fs_free = 0;
+    get_internal_filesystem_size_and_available(NULL, &internal_fs_free);
+    bool can_install_to_internal = (internal_fs_free >= size_fat);
 
+    uint64_t sdcard_fs_free = 0;
+    bool can_install_to_sdcard   = false;
     if (get_sdcard_mounted()) {
-        get_sdcard_filesystem_size_and_available(NULL, &fs_free);
-        can_install_to_sdcard = (fs_free >= size_fat);
+        get_sdcard_filesystem_size_and_available(NULL, &sdcard_fs_free);
+        can_install_to_sdcard = (sdcard_fs_free >= size_fat);
     }
 
     bool can_install_to_appfs = appfsGetFreeMem() >= size_appfs;
+
+    printf("Can install to internal? %s, %llu bytes needed, %llu bytes free\r\n", can_install_to_internal ? "Yes" : "No", size_fat, internal_fs_free);
+    printf("Can install to sdcard?   %s, %llu bytes needed, %llu bytes free\r\n", can_install_to_sdcard ? "Yes" : "No", size_fat, sdcard_fs_free);
+    printf("Can install to appfs?    %s, %llu bytes needed, %u bytes free\r\n", can_install_to_appfs ? "Yes" : "No", size_appfs, appfsGetFreeMem());
 
     if (!can_install_to_appfs) {
         render_message(pax_buffer, "Can not install app\nNot enough space available\non the AppFS filesystem");
@@ -391,6 +396,7 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
 
 bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug,
                             const char* app_slug) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy(pax_buffer, ili9341);
     if (!load_app_info(type_slug, category_slug, app_slug)) {
         show_communication_error(button_queue, pax_buffer, ili9341);
@@ -456,10 +462,14 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, IL
     }
 
     hatchery_free_app_info();
+
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak (app info): %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
     return true;
 }
 
 bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy(pax_buffer, ili9341);
     if (!load_apps(type_slug, category_slug)) {
         show_communication_error(button_queue, pax_buffer, ili9341);
@@ -488,10 +498,14 @@ bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
 
     hatchery_menu_destroy(menu);
     hatchery_free_apps();
+
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak (apps): %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
     return true;
 }
 
 bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug) {
+    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy(pax_buffer, ili9341);
     if (!load_categories(type_slug)) {
         show_communication_error(button_queue, pax_buffer, ili9341);
@@ -518,6 +532,9 @@ bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t* pax_buffer, 
 
     hatchery_menu_destroy(menu);
     hatchery_free_categories();
+
+    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    printf("Leak (categories): %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
     return true;
 }
 
@@ -554,5 +571,5 @@ void menu_hatchery(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
     wifi_disconnect_and_disable();
     hatchery_free();
     size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    printf("Leak: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
+    printf("Leak (hatchery): %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
 }
