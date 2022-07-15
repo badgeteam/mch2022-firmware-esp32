@@ -114,8 +114,8 @@ void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text
     pax_noclip(pax_buffer);
     const pax_font_t *font = pax_font_saira_regular;
     pax_background(pax_buffer, nightly ? 0x000000 : 0xFFFFFF);
-    pax_vec1_t title_size = pax_text_size(font, 18, "Firmware update");
-    pax_draw_text(pax_buffer, nightly ? 0xFFF0000 : 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, nightly ? "Experimental firmware" : "Firmware update");
+    pax_vec1_t title_size = pax_text_size(font, 18, nightly ? "Experimental firmware" : "Firmware update");
+    pax_draw_text(pax_buffer, nightly ? 0xFFFF0000 : 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30, nightly ? "Experimental firmware" : "Firmware update");
     pax_vec1_t size = pax_text_size(font, 18, text);
     pax_draw_text(pax_buffer, nightly ? 0xFFFFFFFF : 0xFF000000, font, 18, (320 / 2) - (size.x / 2), 120 + 10, text);
     ili9341_write(ili9341, pax_buffer->buf);
