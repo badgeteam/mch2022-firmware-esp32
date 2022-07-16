@@ -237,8 +237,22 @@ void app_main(void) {
 
     /* Initialize RP2040 co-processor */
     if (bsp_rp2040_init() != ESP_OK) {
+        // This error state happens when
+        //  - The I2C bus gets shorted out
+        //  - The RP2040 does not boot
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        const pax_font_t* font = pax_font_saira_regular;
+        pax_background(&pax_buffer, 0xa85a32);
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 23, 0, 20 * 0, "Communication error");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 1, "The ESP32 is unable to communicate");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 2, "with the RP2040 co-processor, this");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 3, "could be caused by a problem with");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 4, "the I2C bus, which in turn can be");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 5, "caused by a connected SAO board or");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 6, "a connected QWIIC / Stemma QT device");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 8, "Please check the I2C bus and power");
+        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 9, "cycle the badge to try again");
+        ili9341_write(ili9341, pax_buffer.buf);
         stop();
     }
 
