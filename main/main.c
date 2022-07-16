@@ -428,7 +428,7 @@ void app_main(void) {
                 uint8_t j = 254 - i;
                 pax_background(&pax_buffer, 0x000000);
                 pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 27, "Lattice\nthank you for sponsoring the\nICE40UP5K FPGA");
+                                pax_buffer.height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
                 ili9341_write(ili9341, pax_buffer.buf);
             }
             pax_insert_png_buf(&pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
