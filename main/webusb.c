@@ -18,6 +18,7 @@
 #include "esp32/rom/crc.h"
 #include "esp_vfs.h"
 #include "esp_vfs_fat.h"
+#include "filesystems.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ice40.h"
@@ -41,6 +42,9 @@ char* log_lines[LOG_LINES] = {NULL};
 static const uint32_t webusb_packet_magic   = 0xFEEDF00D;
 static const uint32_t webusb_response_error = 0xFFFFEE00;
 
+static FILE*    file_fd    = NULL;
+static uint32_t file_write = false;
+
 typedef enum { STATE_WAITING, STATE_RECEIVING_HEADER, STATE_RECEIVING_PAYLOAD, STATE_PROCESS } webusb_state_t;
 
 typedef struct {
@@ -58,17 +62,19 @@ typedef struct {
     uint32_t payload_crc;
 } webusb_response_header_t;
 
-#define WEBUSB_CMD_SYNC (('S' << 0) | ('Y' << 8) | ('N' << 16) | ('C' << 24))
-#define WEBUSB_CMD_PING (('P' << 0) | ('I' << 8) | ('N' << 16) | ('G' << 24))
-#define WEBUSB_CMD_FSLS (('F' << 0) | ('S' << 8) | ('L' << 16) | ('S' << 24))
-#define WEBUSB_CMD_FSEX (('F' << 0) | ('S' << 8) | ('E' << 16) | ('X' << 24))
-#define WEBUSB_CMD_FSMD (('F' << 0) | ('S' << 8) | ('M' << 16) | ('D' << 24))
-#define WEBUSB_CMD_FSRM (('F' << 0) | ('S' << 8) | ('R' << 16) | ('M' << 24))
-#define WEBUSB_CMD_FSST (('F' << 0) | ('S' << 8) | ('S' << 16) | ('T' << 24))
-#define WEBUSB_CMD_FSFW (('F' << 0) | ('S' << 8) | ('F' << 16) | ('W' << 24))
-#define WEBUSB_CMD_FSFR (('F' << 0) | ('S' << 8) | ('F' << 16) | ('R' << 24))
-#define WEBUSB_CMD_CHNK (('C' << 0) | ('H' << 8) | ('N' << 16) | ('K' << 24))
-
+#define WEBUSB_CMD_SYNC (('S' << 0) | ('Y' << 8) | ('N' << 16) | ('C' << 24))  // Echo back empty response
+#define WEBUSB_CMD_PING (('P' << 0) | ('I' << 8) | ('N' << 16) | ('G' << 24))  // Echo payload back to PC
+#define WEBUSB_CMD_FSLS (('F' << 0) | ('S' << 8) | ('L' << 16) | ('S' << 24))  // List files
+#define WEBUSB_CMD_FSEX (('F' << 0) | ('S' << 8) | ('E' << 16) | ('X' << 24))  // Check if file exists
+#define WEBUSB_CMD_FSMD (('F' << 0) | ('S' << 8) | ('M' << 16) | ('D' << 24))  // Create directory
+#define WEBUSB_CMD_FSRM (('F' << 0) | ('S' << 8) | ('R' << 16) | ('M' << 24))  // Remove tree from filesystem
+#define WEBUSB_CMD_FSST (('F' << 0) | ('S' << 8) | ('S' << 16) | ('T' << 24))  // Read filesystem state
+#define WEBUSB_CMD_FSFW (('F' << 0) | ('S' << 8) | ('F' << 16) | ('W' << 24))  // Open file for writing
+#define WEBUSB_CMD_FSFR (('F' << 0) | ('S' << 8) | ('F' << 16) | ('R' << 24))  // Open file for reading
+#define WEBUSB_CMD_FSFC (('F' << 0) | ('S' << 8) | ('F' << 16) | ('C' << 24))  // Close file
+#define WEBUSB_CMD_CHNK (('C' << 0) | ('H' << 8) | ('N' << 16) | ('K' << 24))  // Send / receive a block of data
+#define WEBUSB_CMD_APPR (('A' << 0) | ('P' << 8) | ('P' << 16) | ('R' << 24))  // Open app for reading
+#define WEBUSB_CMD_APPW (('A' << 0) | ('P' << 8) | ('P' << 16) | ('W' << 24))  // Open app for writing
 #define WEBUSB_ANS_OKOK (('O' << 0) | ('K' << 8) | ('O' << 16) | ('K' << 24))
 
 void webusb_log(char* fmt, ...) {
@@ -215,7 +221,7 @@ void webusb_fs_list(webusb_packet_header_t* header, uint8_t* payload) {
         response_position += sizeof(unsigned char);
         strcpy((char*) &response_buffer[response_position], ent->d_name);
         response_position += strlen(ent->d_name);
-        // struct stat sb;
+        // struct stat sb; // Maybe add this?
     }
 
     closedir(dir);
@@ -254,7 +260,17 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
         case WEBUSB_CMD_FSEX:
             webusb_log("Filesystem exists");
             webusb_log("%s", (char*) payload);
-            // tbd
+            uint8_t result[1] = {false};
+            FILE*   fd        = fopen((char*) payload, "rb");
+            result[0]         = (fd != NULL);
+            if (fd != NULL) fclose(fd);
+            webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                 .identifier     = header->identifier,
+                                                 .response       = header->command,
+                                                 .payload_length = 1,
+                                                 .payload_crc    = crc32_le(0, result, 1)};
+            uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+            uart_write_bytes(WEBUSB_UART, result, 1);
             break;
         case WEBUSB_CMD_FSMD:
             {
@@ -287,19 +303,116 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 break;
             }
         case WEBUSB_CMD_FSST:
-            webusb_log("Filesystem state");
-            webusb_log("%s", (char*) payload);
-            break;
+            {
+                webusb_log("Filesystem state");
+                uint8_t   result[(sizeof(uint64_t) * 4) + sizeof(uint32_t)];
+                uint64_t* internal_size = (uint64_t*) &result[sizeof(uint64_t) * 0];
+                uint64_t* internal_free = (uint64_t*) &result[sizeof(uint64_t) * 1];
+                uint64_t* sdcard_size   = (uint64_t*) &result[sizeof(uint64_t) * 2];
+                uint64_t* sdcard_free   = (uint64_t*) &result[sizeof(uint64_t) * 3];
+                uint32_t* appfs_free    = (uint32_t*) &result[sizeof(uint64_t) * 4];
+                get_internal_filesystem_size_and_available(internal_size, internal_free);
+                get_sdcard_filesystem_size_and_available(sdcard_size, sdcard_free);
+                *appfs_free                       = appfsGetFreeMem();
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = sizeof(webusb_response_header_t),
+                                                     .payload_crc    = crc32_le(0, result, sizeof(webusb_response_header_t))};
+                uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                uart_write_bytes(WEBUSB_UART, result, sizeof(result));
+                break;
+            }
         case WEBUSB_CMD_FSFW:
-            webusb_log("Filesystem write file");
-            webusb_log("%s", (char*) payload);
-            break;
+            {
+                webusb_log("Filesystem write file");
+                webusb_log("%s", (char*) payload);
+                if (file_fd != NULL) fclose(file_fd);
+                file_write = true;
+                file_fd    = fopen((char*) payload, "wb");
+
+                uint8_t result[1] = {0};
+                if (file_fd != NULL) {
+                    result[0] = 1;
+                }
+
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = 1,
+                                                     .payload_crc    = crc32_le(0, result, 1)};
+                uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                uart_write_bytes(WEBUSB_UART, result, 1);
+                break;
+            }
         case WEBUSB_CMD_FSFR:
-            webusb_log("Filesystem read file");
-            webusb_log("%s", (char*) payload);
-            break;
+            {
+                webusb_log("Filesystem read file");
+                webusb_log("%s", (char*) payload);
+                if (file_fd != NULL) fclose(file_fd);
+                file_write = false;
+                file_fd    = fopen((char*) payload, "rb");
+
+                uint8_t result[1] = {0};
+                if (file_fd != NULL) {
+                    result[0] = 1;
+                }
+
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = 1,
+                                                     .payload_crc    = crc32_le(0, result, 1)};
+                uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                uart_write_bytes(WEBUSB_UART, result, 1);
+                break;
+            }
         case WEBUSB_CMD_CHNK:
-            webusb_log("Receive data chunck");
+            {
+                webusb_log("Chunck");
+                if (file_fd == NULL) {
+                    // No file open
+                    webusb_send_error(header, 6);
+                    return;
+                }
+
+                if ((!file_write) && (header->payload_length > 0)) {
+                    // Data sent while reading
+                    webusb_send_error(header, 7);
+                    return;
+                }
+
+                if (file_write) {
+                    // Writing
+                    size_t                   length   = fwrite(payload, 1, header->payload_length, file_fd);
+                    webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                         .identifier     = header->identifier,
+                                                         .response       = header->command,
+                                                         .payload_length = sizeof(size_t),
+                                                         .payload_crc    = crc32_le(0, (uint8_t*) &length, sizeof(size_t))};
+                    uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                    uart_write_bytes(WEBUSB_UART, (uint8_t*) &length, sizeof(size_t));
+                } else {
+                    uint8_t* data = malloc(1024);
+                    if (data == NULL) {
+                        webusb_send_error(header, 4);
+                    } else {
+                        size_t                   length   = fread(data, 1, 1024, file_fd);
+                        webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                             .identifier     = header->identifier,
+                                                             .response       = header->command,
+                                                             .payload_length = length,
+                                                             .payload_crc    = crc32_le(0, data, length)};
+                        uart_write_bytes(WEBUSB_UART, &data, length);
+                        free(data);
+                    }
+                }
+
+                break;
+            }
+        case WEBUSB_CMD_APPR:
+            break;
+        case WEBUSB_CMD_APPW:
             break;
         default:
             webusb_log("Unknown command");
