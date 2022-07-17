@@ -12,6 +12,7 @@
 #include "appfs.h"
 #include "appfs_wrapper.h"
 #include "bootscreen.h"
+#include "filesystems.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
 #include "ili9341.h"
@@ -37,7 +38,9 @@ typedef enum action {
     ACTION_OTA_NIGHTLY,
     ACTION_RP2040_BL,
     ACTION_NICKNAME,
-    ACTION_LOCK
+    ACTION_LOCK,
+    ACTION_FORMAT_FAT,
+    ACTION_FORMAT_APPFS
 } menu_settings_action_t;
 
 void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
@@ -105,6 +108,8 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
     menu_insert_item(menu, "Firmware flashing lock", NULL, (void*) ACTION_LOCK, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
     menu_insert_item(menu, "Install experimental firmware", NULL, (void*) ACTION_OTA_NIGHTLY, -1);
+    menu_insert_item(menu, "Format internal FAT filesystem", NULL, (void*) ACTION_FORMAT_FAT, -1);
+    menu_insert_item(menu, "Format internal AppFS filesystem", NULL, (void*) ACTION_FORMAT_APPFS, -1);
 
     bool                   render = true;
     menu_settings_action_t action = ACTION_NONE;
@@ -170,7 +175,14 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                 edit_nickname(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_LOCK) {
                 edit_lock(button_queue, pax_buffer, ili9341);
+            } else if (action == ACTION_FORMAT_FAT) {
+                display_boot_screen(pax_buffer, ili9341, "Formatting FAT...");
+                format_internal_filesystem();
+            } else if (action == ACTION_FORMAT_APPFS) {
+                display_boot_screen(pax_buffer, ili9341, "Formatting AppFS...");
+                appfsFormat();
             }
+
             render = true;
             action = ACTION_NONE;
             render_settings_help(pax_buffer);
