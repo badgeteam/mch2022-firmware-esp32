@@ -23,11 +23,12 @@
 #include "sdkconfig.h"
 #include "soc/rtc.h"
 #include "wifi_connect.h"
+#include "ws2812.h"
 
 #define SLEEP_DELAY 10000
 static const char *TAG = "nametag";
 
-typedef enum { NICKNAME_THEME_HELLO = 0, NICKNAME_THEME_SIMPLE, NICKNAME_THEME_LAST } nickname_theme_t;
+typedef enum { NICKNAME_THEME_HELLO = 0, NICKNAME_THEME_SIMPLE, NICKNAME_THEME_GAMER, NICKNAME_THEME_LAST } nickname_theme_t;
 
 void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
     nvs_handle_t handle;
@@ -57,7 +58,7 @@ void edit_nickname(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *il
 static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *name, nickname_theme_t theme, bool instructions) {
     const pax_font_t *title_font        = pax_font_saira_condensed;
     const pax_font_t *instructions_font = pax_font_saira_regular;
-    const pax_font_t *name_font         = (theme == NICKNAME_THEME_HELLO) ? pax_font_marker : pax_font_saira_condensed;
+    const pax_font_t *name_font         = ((theme == NICKNAME_THEME_HELLO) || (theme == NICKNAME_THEME_GAMER)) ? pax_font_marker : pax_font_saira_condensed;
 
     float      scale = (theme == NICKNAME_THEME_HELLO) ? 60 : name_font->default_size;
     pax_vec1_t dims  = pax_text_size(name_font, scale, name);
@@ -73,6 +74,27 @@ static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 
         pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 30, pax_buffer->width / 2, 2, "HELLO");
         pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 24, pax_buffer->width / 2, 30, "My name is:");
         pax_center_text(pax_buffer, 0xFF000000, name_font, scale, pax_buffer->width / 2, 60 + ((pax_buffer->height - 90) - dims.y) / 2, name);
+    } else if (theme == NICKNAME_THEME_GAMER) {
+        int hue = esp_random() & 255;
+        pax_col_t color = pax_col_hsv(hue, 255 /*saturation*/, 255 /*brighness*/);
+        pax_background(pax_buffer, 0xFFFFFF);
+        pax_simple_rect(pax_buffer, color, 0, 0, pax_buffer->width, 60);
+        pax_simple_rect(pax_buffer, color, 0, pax_buffer->height - 20, pax_buffer->width, 20);
+        pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 30, pax_buffer->width / 2, 2, "HELLO");
+        pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 24, pax_buffer->width / 2, 30, "My name is:");
+        pax_center_text(pax_buffer, 0xFF000000, name_font, scale, pax_buffer->width / 2, 60 + ((pax_buffer->height - 90) - dims.y) / 2, name);
+        
+        uint8_t r = (color >> 16) & 0xFF;
+        uint8_t g = (color >>  8) & 0xFF;
+        uint8_t b = (color >>  0) & 0xFF;
+        
+        uint8_t led_buffer[50*3];
+        for (uint8_t i = 0; i < sizeof(led_buffer); i+=3) {
+            led_buffer[i] = g;
+            led_buffer[i + 1] = r;
+            led_buffer[i + 2] = b;
+        }
+        ws2812_send_data(led_buffer, sizeof(led_buffer));
     } else {
         pax_background(pax_buffer, 0x000000);
         pax_center_text(pax_buffer, 0xFFFFFFFF, name_font, scale, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, name);
@@ -151,11 +173,13 @@ void show_nametag(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili
     nickname_theme_t theme      = get_theme();
     char            *buffer     = read_nickname();
     uint64_t         sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;
-    ESP_LOGI(TAG, "Scheduled sleep in %d millis", SLEEP_DELAY);
+    if (theme != NICKNAME_THEME_GAMER) {
+        ESP_LOGI(TAG, "Scheduled sleep in %d millis", SLEEP_DELAY);
+    }
     rp2040_input_message_t msg;
     bool                   quit = false;
     while (!quit) {
-        if (esp_timer_get_time() / 1000 > sleep_time) {
+        if ((esp_timer_get_time() / 1000 > sleep_time) && (theme != NICKNAME_THEME_GAMER)) {
             show_name(button_queue, pax_buffer, ili9341, buffer, theme, false);
             place_in_sleep(button_queue, pax_buffer, ili9341);
             break;
@@ -185,6 +209,9 @@ void show_nametag(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili
             ESP_LOGI(TAG, "Recheduled sleep in %d millis", SLEEP_DELAY);
         }
     }
+    
+    uint8_t led_buffer[50*3] = {0};
+    ws2812_send_data(led_buffer, sizeof(led_buffer));
 
     free(buffer);
 }
