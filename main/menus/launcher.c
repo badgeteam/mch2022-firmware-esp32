@@ -161,7 +161,7 @@ static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341*
         start_fpga_app(button_queue, pax_buffer, ili9341, app_to_start->path);
     } else if ((strlen(app_to_start->type) == strlen("python")) && (strncmp(app_to_start->type, "python", strlen(app_to_start->type)) == 0)) {
         if (python_not_installed) {
-            render_message(pax_buffer, "BadgePython is not installed\n\nPlease install BadgePython\nusing the Hatchery.");
+            render_message(pax_buffer, "Python is not installed\n\nPlease install 'Python'\nusing the Hatchery under\n'ESP32 native binaries\\Utility'");
             ili9341_write(ili9341, pax_buffer->buf);
             wait_for_button(button_queue);
         } else {
