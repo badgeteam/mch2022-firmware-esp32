@@ -97,7 +97,7 @@ static bool download_success(esp_err_t err, http_download_info_t* info) {
     return (err == ESP_OK) && (!(info->error || info->out_of_allocated || info->out_of_memory)) && info->finished && (info->received == info->size);
 }
 
-bool download_file(const char* url, const char* path) {
+static bool _download_file(const char* url, const char* path) {
     FILE* fd = fopen(path, "w");
     if (fd == NULL) {
         ESP_LOGE(TAG, "Failed to open file");
@@ -108,7 +108,7 @@ bool download_file(const char* url, const char* path) {
     info.fd                   = fd;
 
     esp_http_client_config_t config = {
-        .url = url, .use_global_ca_store = true, .keep_alive_enable = true, .user_data = (void*) &info, .event_handler = _event_handler};
+        .url = url, .use_global_ca_store = true, .keep_alive_enable = true, .timeout_ms = 10000, .user_data = (void*) &info, .event_handler = _event_handler};
     esp_http_client_handle_t client = esp_http_client_init(&config);
     esp_err_t                err    = esp_http_client_perform(client);
     fclose(fd);
@@ -116,11 +116,21 @@ bool download_file(const char* url, const char* path) {
     return download_success(err, &info);
 }
 
-bool download_ram(const char* url, uint8_t** ptr, size_t* size) {
+bool download_file(const char* url, const char* path) {
+    int retry = 3;
+    while (retry--) {
+        if (_download_file(url, path)) return true;
+        printf("DL waiting to retry ...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    return false;
+}
+
+static bool _download_ram(const char* url, uint8_t** ptr, size_t* size) {
     http_download_info_t info       = {0};
     info.buffer                     = ptr;
     esp_http_client_config_t config = {
-        .url = url, .use_global_ca_store = true, .keep_alive_enable = true, .user_data = (void*) &info, .event_handler = _event_handler};
+        .url = url, .use_global_ca_store = true, .keep_alive_enable = true, .timeout_ms = 10000, .user_data = (void*) &info, .event_handler = _event_handler};
     esp_http_client_handle_t client  = esp_http_client_init(&config);
     esp_err_t                err     = esp_http_client_perform(client);
     bool                     success = download_success(err, &info);
@@ -128,4 +138,14 @@ bool download_ram(const char* url, uint8_t** ptr, size_t* size) {
     printf("Buffer: %p -> %p\r\n", ptr, *ptr);
     esp_http_client_cleanup(client);
     return success;
+}
+
+bool download_ram(const char* url, uint8_t** ptr, size_t* size) {
+    int retry = 3;
+    while (retry--) {
+        if (_download_ram(url, ptr, size)) return true;
+        printf("DL waiting to retry ...");
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+    return false;
 }
