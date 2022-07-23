@@ -201,7 +201,6 @@ void app_main(void) {
 
     /* Initialize GFX */
     pax_buf_init(&pax_buffer, NULL, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
-    pax_enable_multicore(1);
 
     /* Initialize hardware */
 
