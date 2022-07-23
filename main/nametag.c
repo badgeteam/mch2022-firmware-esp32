@@ -74,7 +74,6 @@ static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 
         pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 30, pax_buffer->width / 2, 2, "HELLO");
         pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 24, pax_buffer->width / 2, 30, "My name is:");
         pax_center_text(pax_buffer, 0xFF000000, name_font, scale, pax_buffer->width / 2, 60 + ((pax_buffer->height - 90) - dims.y) / 2, name);
-        ws2812_send_data(led_off, sizeof(led_off));
     } else if (theme == NICKNAME_THEME_GAMER) {
         int hue = esp_random() & 255;
         pax_col_t color = pax_col_hsv(hue, 255 /*saturation*/, 255 /*brighness*/);
@@ -99,7 +98,6 @@ static void show_name(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 
     } else {
         pax_background(pax_buffer, 0x000000);
         pax_center_text(pax_buffer, 0xFFFFFFFF, name_font, scale, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, name);
-        ws2812_send_data(led_off, sizeof(led_off));
     }
 
     if (instructions) {
@@ -169,6 +167,9 @@ static void set_theme(nickname_theme_t theme) {
     }
     nvs_set_u8(handle, "theme", (uint8_t) theme);
     nvs_close(handle);
+
+    uint8_t led_buffer[50*3] = {0};
+    ws2812_send_data(led_buffer, sizeof(led_buffer));
 }
 
 void show_nametag(xQueueHandle button_queue, pax_buf_t *pax_buffer, ILI9341 *ili9341) {
