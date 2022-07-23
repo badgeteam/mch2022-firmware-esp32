@@ -87,7 +87,7 @@ bool remove_recursive(const char* path) {
         }
 
         // determinate a full path of an entry
-        full_path = calloc(path_len + strlen(entry->d_name) + 1, sizeof(char));
+        full_path = calloc(path_len + strlen(entry->d_name) + 2, sizeof(char));
         strcpy(full_path, path);
         strcat(full_path, "/");
         strcat(full_path, entry->d_name);
