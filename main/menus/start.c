@@ -23,6 +23,7 @@
 #include "rp2040.h"
 #include "settings.h"
 #include "wifi_ota.h"
+#include "rp2040_updater.h"
 
 extern const uint8_t home_png_start[] asm("_binary_home_png_start");
 extern const uint8_t home_png_end[] asm("_binary_home_png_end");
@@ -54,7 +55,8 @@ typedef enum action {
     ACTION_DEV,
     ACTION_SETTINGS,
     ACTION_UPDATE,
-    ACTION_OTA
+    ACTION_OTA,
+    ACTION_RP2040_CUSTOM
 } menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
@@ -119,6 +121,7 @@ void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili93
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
     menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
     menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
+    menu_insert_item_icon(menu, "Test", NULL, (void*) ACTION_RP2040_CUSTOM, -1, &icon_update);
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
@@ -214,6 +217,8 @@ void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili93
                 update_apps(button_queue, pax_buffer, ili9341);
             } else if (action == ACTION_OTA) {
                 ota_update(pax_buffer, ili9341, false);
+            } else if (action == ACTION_RP2040_CUSTOM) {
+                rp2040_custom_start(get_rp2040(), pax_buffer, ili9341);
             }
             action = ACTION_NONE;
             render = true;

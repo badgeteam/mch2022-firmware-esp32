@@ -57,4 +57,5 @@ idf_component_register(
                 ${project_dir}/resources/icons/hourglass.png
                 ${project_dir}/resources/icons/update.png
                 ${project_dir}/resources/m_logo_lattice.png
+                ${project_dir}/resources/rp2040_custom.bin
 )

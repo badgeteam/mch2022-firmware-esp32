@@ -12,3 +12,4 @@
 
 void rp2040_update_start(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341);
 void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341);
+void rp2040_custom_start(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341);
