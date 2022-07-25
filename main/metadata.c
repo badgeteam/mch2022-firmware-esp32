@@ -91,18 +91,47 @@ void parse_metadata(const char* path, char** device, char** type, char** categor
         }
     }
     cJSON_Delete(root);
+    free(json_data);
 }
 
 void free_launcher_app(launcher_app_t* app) {
-    if (app->path) free(app->path);
-    if (app->type) free(app->type);
-    if (app->slug) free(app->slug);
-    if (app->title) free(app->title);
-    if (app->description) free(app->description);
-    if (app->category) free(app->category);
-    if (app->author) free(app->author);
-    if (app->license) free(app->license);
-    if (app->icon) pax_buf_destroy(app->icon);
+    if (app->path) {
+        free(app->path);
+        app->path = NULL;
+    }
+    if (app->type) {
+        free(app->type);
+        app->type = NULL;
+    }
+    if (app->slug) {
+        free(app->slug);
+        app->slug = NULL;
+    }
+    if (app->title) {
+        free(app->title);
+        app->title = NULL;
+    }
+    if (app->description) {
+        free(app->description);
+        app->description = NULL;
+    }
+    if (app->category) {
+        free(app->category);
+        app->category = NULL;
+    }
+    if (app->author) {
+        free(app->author);
+        app->author = NULL;
+    }
+    if (app->license) {
+        free(app->license);
+        app->license = NULL;
+    }
+    if (app->icon) {
+        pax_buf_destroy(app->icon);
+        free(app->icon);
+        app->icon = NULL;
+    }
     free(app);
 }
 
@@ -148,7 +177,10 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* t
         if (icon_data != NULL) {
             app->icon = malloc(sizeof(pax_buf_t));
             if (app->icon != NULL) {
-                pax_decode_png_buf(app->icon, (void*) icon_data, icon_size, PAX_BUF_32_8888ARGB, 0);
+                if (!pax_decode_png_buf(app->icon, (void*) icon_data, icon_size, PAX_BUF_32_8888ARGB, 0)) {
+                    free(app->icon);
+                    app->icon = NULL;
+                }
             }
             free(icon_data);
         }
@@ -158,7 +190,10 @@ void populate_menu_entry_from_path(menu_t* menu, const char* path, const char* t
     if ((app->icon == NULL) && (default_icon_data != NULL)) {
         app->icon = malloc(sizeof(pax_buf_t));
         if (app->icon != NULL) {
-            pax_decode_png_buf(app->icon, default_icon_data, default_icon_size, PAX_BUF_32_8888ARGB, 0);
+            if (!pax_decode_png_buf(app->icon, default_icon_data, default_icon_size, PAX_BUF_32_8888ARGB, 0)) {
+                free(app->icon);
+                app->icon = NULL;
+            }
         }
     }
 

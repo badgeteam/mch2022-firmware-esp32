@@ -146,7 +146,7 @@ static bool populate_menu_from_other_appfs_entries(menu_t* menu) {
 static bool populate_menu(menu_t* menu) {
     bool internal_result_esp32 = populate_menu_from_path(menu, "/internal/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
     bool sdcard_result_esp32   = populate_menu_from_path(menu, "/sd/apps", "esp32", (void*) apps_png_start, apps_png_end - apps_png_start);
-    bool other_result_esp32    = populate_menu_from_other_appfs_entries(menu);  // Keep this one last!
+    bool other_result_esp32    = populate_menu_from_other_appfs_entries(menu);
     bool internal_result_ice40 = populate_menu_from_path(menu, "/internal/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
     bool sdcard_result_ice40   = populate_menu_from_path(menu, "/sd/apps", "ice40", (void*) bitstream_png_start, bitstream_png_end - bitstream_png_start);
     bool internal_result_python = populate_menu_from_path(menu, "/internal/apps", "python", (void*) python_png_start, python_png_end - python_png_start);
@@ -268,7 +268,7 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
 }
 
 void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    //size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     bool   reload     = true;
     while (reload) {
         reload = false;
@@ -361,10 +361,9 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
         for (size_t index = 0; index < menu_get_length(menu); index++) {
             free_launcher_app(menu_get_callback_args(menu, index));
         }
-
         menu_free(menu);
         pax_buf_destroy(&menu_icon);
     }
-    size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    printf("Leak in launcher: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
+    //size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    //printf("Leak in launcher: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
 }
