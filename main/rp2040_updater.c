@@ -233,7 +233,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         restart();
     }
 
-    if (fw_version < 0x08) {  // Update required
+    if (fw_version < 0x09) {  // Update required
         rp2040_update_start(rp2040, pax_buffer, ili9341);
     }
 
