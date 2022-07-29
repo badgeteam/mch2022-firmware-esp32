@@ -403,6 +403,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                                                              .response       = header->command,
                                                              .payload_length = length,
                                                              .payload_crc    = crc32_le(0, data, length)};
+                        uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                         uart_write_bytes(WEBUSB_UART, &data, length);
                         free(data);
                     }

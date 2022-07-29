@@ -7,10 +7,6 @@
 #include "esp_log.h"
 #include "esp_tls.h"
 
-#define HASH_LEN 32
-
-static const char *TAG = "WiFi certificates";
-
 extern const uint8_t custom_ota_cert_pem_start[] asm("_binary_custom_ota_cert_pem_start");
 extern const uint8_t custom_ota_cert_cert_pem_end[] asm("_binary_custom_ota_cert_pem_end");
 

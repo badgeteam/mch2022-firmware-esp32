@@ -13,7 +13,6 @@
 #include "dev.h"
 #include "hardware.h"
 #include "hatchery.h"
-#include "ili9341.h"
 #include "launcher.h"
 #include "math.h"
 #include "menu.h"
@@ -83,8 +82,9 @@ void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }
 
-void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version) {
-    menu_t* menu = menu_alloc("Main menu", 34, 18);
+void menu_start(xQueueHandle button_queue, const char* version) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Main menu", 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -195,25 +195,25 @@ void menu_start(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili93
             render_start_help(pax_buffer, textBuffer);
             menu_render_grid(pax_buffer, menu, 0, 0, 320, 220);
             render_battery(pax_buffer, battery_percent, battery_charging);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
         if (action != ACTION_NONE) {
             if (action == ACTION_HATCHERY) {
-                menu_hatchery(button_queue, pax_buffer, ili9341);
+                menu_hatchery(button_queue);
             } else if (action == ACTION_NAMETAG) {
-                show_nametag(button_queue, pax_buffer, ili9341);
+                show_nametag(button_queue);
             } else if (action == ACTION_SETTINGS) {
-                menu_settings(button_queue, pax_buffer, ili9341);
+                menu_settings(button_queue);
             } else if (action == ACTION_DEV) {
-                menu_dev(button_queue, pax_buffer, ili9341);
+                menu_dev(button_queue);
             } else if (action == ACTION_LAUNCHER) {
-                menu_launcher(button_queue, pax_buffer, ili9341);
+                menu_launcher(button_queue);
             } else if (action == ACTION_UPDATE) {
-                update_apps(button_queue, pax_buffer, ili9341);
+                update_apps(button_queue);
             } else if (action == ACTION_OTA) {
-                ota_update(pax_buffer, ili9341, false);
+                ota_update(false);
             }
             action = ACTION_NONE;
             render = true;

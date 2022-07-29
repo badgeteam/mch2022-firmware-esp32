@@ -15,7 +15,6 @@
 #include "filesystems.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "menu.h"
 #include "nametag.h"
 #include "pax_codecs.h"
@@ -43,7 +42,8 @@ typedef enum action {
     ACTION_FORMAT_APPFS
 } menu_settings_action_t;
 
-void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void edit_lock(xQueueHandle button_queue) {
+    pax_buf_t*   pax_buffer = get_pax_buffer();
     nvs_handle_t handle;
     esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
     if (res != ESP_OK) {
@@ -65,7 +65,7 @@ void edit_lock(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili934
         snprintf(state_str, sizeof(state_str), "State: %s\n", state ? "active" : "disabled");
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, state_str);
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 toggle state  🅱 back");
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_flush();
         if (wait_for_button(button_queue)) {
             state = (~state) & 0x01;
             nvs_set_u8(handle, "flash_lock", state);
@@ -84,8 +84,9 @@ void render_settings_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Settings", 34, 18);
+void menu_settings(xQueueHandle button_queue) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Settings", 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -155,31 +156,31 @@ void menu_settings(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
 
         if (render) {
             menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
         if (action != ACTION_NONE) {
             if (action == ACTION_RP2040_BL) {
-                display_boot_screen(pax_buffer, ili9341, "Please wait...");
-                rp2040_update_start(get_rp2040(), pax_buffer, ili9341);
+                display_boot_screen("Please wait...");
+                rp2040_update_start(get_rp2040());
             } else if (action == ACTION_OTA) {
-                ota_update(pax_buffer, ili9341, false);
+                ota_update(false);
             } else if (action == ACTION_OTA_NIGHTLY) {
-                ota_update(pax_buffer, ili9341, true);
+                ota_update(true);
             } else if (action == ACTION_WIFI) {
-                menu_wifi(button_queue, pax_buffer, ili9341);
+                menu_wifi(button_queue);
             } else if (action == ACTION_BACK) {
                 break;
             } else if (action == ACTION_NICKNAME) {
-                edit_nickname(button_queue, pax_buffer, ili9341);
+                edit_nickname(button_queue);
             } else if (action == ACTION_LOCK) {
-                edit_lock(button_queue, pax_buffer, ili9341);
+                edit_lock(button_queue);
             } else if (action == ACTION_FORMAT_FAT) {
-                display_boot_screen(pax_buffer, ili9341, "Formatting FAT...");
+                display_boot_screen("Formatting FAT...");
                 format_internal_filesystem();
             } else if (action == ACTION_FORMAT_APPFS) {
-                display_boot_screen(pax_buffer, ili9341, "Formatting AppFS...");
+                display_boot_screen("Formatting AppFS...");
                 appfsFormat();
             }
 

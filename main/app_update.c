@@ -18,6 +18,7 @@
 #include "fpga_download.h"
 #include "fpga_util.h"
 #include "graphics_wrapper.h"
+#include "gui_element_header.h"
 #include "hardware.h"
 #include "http_download.h"
 #include "ice40.h"
@@ -41,11 +42,11 @@ typedef struct _update_apps_callback_args {
     bool         sdcard;
 } update_apps_callback_args_t;
 
-static bool connect_to_wifi(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static bool connect_to_wifi(xQueueHandle button_queue) {
     if (!wifi_connect_to_stored()) {
         wifi_disconnect_and_disable();
-        render_message(pax_buffer, "Unable to connect to\nthe WiFi network");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Unable to connect to\nthe WiFi network");
+        display_flush();
         wait_for_button(button_queue);
         return false;
     }
@@ -83,7 +84,8 @@ static void free_app_info() {
 #define AMOUNT_OF_LINES 8
 char* terminal_lines[AMOUNT_OF_LINES] = {NULL};
 
-static void terminal_render(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static void terminal_render() {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     pax_background(pax_buffer, 0xFFFFFF);
     render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "Updating apps...");
     uint8_t printed_lines = 0;
@@ -93,7 +95,7 @@ static void terminal_render(pax_buf_t* pax_buffer, ILI9341* ili9341) {
             printed_lines++;
         }
     }
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
 static void terminal_add(char* buffer) {
@@ -179,7 +181,7 @@ static void callback(const char* path, const char* entity, void* user) {
     terminal_add(strdup(string_buffer));
     terminal_render(args->pax_buffer, args->ili9341);
 
-    if (install_app(NULL, args->pax_buffer, args->ili9341, type, args->sdcard, data_app_info, size_app_info, json_app_info)) {
+    if (install_app(NULL, type, args->sdcard, data_app_info, size_app_info, json_app_info)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: installed r%d", slug, version_obj->valueint);
         ESP_LOGI(TAG, "%s", string_buffer);
     } else {
@@ -202,12 +204,12 @@ end:
 void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     terminal_add(strdup("Connecting to WiFi..."));
-    terminal_render(pax_buffer, ili9341);
+    terminal_render();
 
-    if (!connect_to_wifi(button_queue, pax_buffer, ili9341)) return;
+    if (!connect_to_wifi(button_queue)) return;
 
     terminal_add(strdup("Connected to WiFi!"));
-    terminal_render(pax_buffer, ili9341);
+    terminal_render();
 
     update_apps_callback_args_t args;
     args.button_queue = button_queue;

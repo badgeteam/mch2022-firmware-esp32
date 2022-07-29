@@ -4,7 +4,4 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 
-#include "ili9341.h"
-#include "pax_gfx.h"
-
-void test_adc(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
+void test_adc(xQueueHandle button_queue);

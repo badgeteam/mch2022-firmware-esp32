@@ -7,10 +7,6 @@
 #include <string.h>
 
 #include "hardware.h"
-#include "ice40.h"
-#include "ili9341.h"
-
-static const char* TAG = "settings";
 
 esp_err_t nvs_init() {
     const esp_partition_t* nvs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_NVS, NULL);

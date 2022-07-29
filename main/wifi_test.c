@@ -15,6 +15,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
+#include "hardware.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "string.h"
@@ -31,9 +32,10 @@ static const char* wifi_phase2_names[] = {
     "EAP", "MSCHAPv2", "MSCHAP", "PAP", "CHAP",
 };
 
-static void display_test_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text, const char* ssid, const char* password, wifi_auth_mode_t authmode,
-                               esp_eap_ttls_phase2_types phase2, const char* username, const char* anon_ident, esp_netif_ip_info_t* ip_info, bool buttons) {
-    const pax_font_t* font = pax_font_saira_regular;
+static void display_test_state(const char* text, const char* ssid, const char* password, wifi_auth_mode_t authmode, esp_eap_ttls_phase2_types phase2,
+                               const char* username, const char* anon_ident, esp_netif_ip_info_t* ip_info, bool buttons) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     char              buffer[512];
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
@@ -49,10 +51,10 @@ static void display_test_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const ch
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 5, buffer);
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 3 * 18, text);
     if (buttons) pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 test 🅱 back");
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-void wifi_connection_test(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void wifi_connection_test(xQueueHandle button_queue) {
     nvs_handle_t handle;
 
     nvs_open("system", NVS_READWRITE, &handle);
@@ -100,17 +102,17 @@ void wifi_connection_test(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
     while (!quit) {
         esp_netif_ip_info_t* ip_info = wifi_get_ip_info();
         wifi_disconnect_and_disable();
-        display_test_state(pax_buffer, ili9341, test_result, ssid, password, authmode, phase2, username, anon_ident, ip_info, true);
+        display_test_state(test_result, ssid, password, authmode, phase2, username, anon_ident, ip_info, true);
         quit = !wait_for_button(button_queue);
         if (quit) break;
-        display_test_state(pax_buffer, ili9341, "Connecting...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
+        display_test_state("Connecting...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
 
         if (!wifi_connect_to_stored()) {
             sprintf(test_result, "Failed to connect to network!");
             continue;
         }
 
-        display_test_state(pax_buffer, ili9341, "Testing...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
+        display_test_state("Testing...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
 
         esp_wifi_set_ps(WIFI_PS_NONE);  // Disable any WiFi power save mode
 

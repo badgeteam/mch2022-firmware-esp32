@@ -4,12 +4,13 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 
-#include "ili9341.h"
+#include "hardware.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 
-void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_font_saira_regular;
+void test_buttons(xQueueHandle button_queue) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
 
     bool render = true;
     bool quit   = false;
@@ -40,7 +41,7 @@ void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
 
     while (!quit) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             render        = true;
@@ -120,7 +121,7 @@ void test_buttons(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
             pax_draw_text(pax_buffer, btn_accept_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20 * 10, buffer);
             snprintf(buffer, sizeof(buffer), "BTN B      %s", btn_back ? "PRESSED" : "released");
             pax_draw_text(pax_buffer, btn_back_green ? 0xFF00FF00 : 0xFFFFFFFF, font, 18, 0, 20 * 11, buffer);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 

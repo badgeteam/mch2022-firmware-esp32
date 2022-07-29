@@ -13,6 +13,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "hardware.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "string.h"
@@ -85,7 +86,7 @@ static esp_err_t _http_client_init_cb(esp_http_client_handle_t http_client) {
     return ESP_OK;
 }
 
-static void print_sha256(const uint8_t *image_hash, const char *label) {
+/*static void print_sha256(const uint8_t *image_hash, const char *label) {
     char hash_print[HASH_LEN * 2 + 1];
     hash_print[HASH_LEN * 2] = 0;
     for (int i = 0; i < HASH_LEN; ++i) {
@@ -108,9 +109,10 @@ static void get_sha256_of_partitions(void) {
     // get sha256 digest for running partition
     esp_partition_get_sha256(esp_ota_get_running_partition(), sha_256);
     print_sha256(sha_256, "SHA-256 for current firmware: ");
-}
+}*/
 
-void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text, bool nightly) {
+void display_ota_state(const char *text, bool nightly) {
+    pax_buf_t *pax_buffer = get_pax_buffer();
     pax_noclip(pax_buffer);
     const pax_font_t *font = pax_font_saira_regular;
     pax_background(pax_buffer, nightly ? 0x000000 : 0xFFFFFF);
@@ -119,21 +121,21 @@ void display_ota_state(pax_buf_t *pax_buffer, ILI9341 *ili9341, const char *text
                   nightly ? "Experimental firmware" : "Firmware update");
     pax_vec1_t size = pax_text_size(font, 18, text);
     pax_draw_text(pax_buffer, nightly ? 0xFFFFFFFF : 0xFF000000, font, 18, (320 / 2) - (size.x / 2), 120 + 10, text);
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
-    display_ota_state(pax_buffer, ili9341, "Connecting to WiFi...", nightly);
+void ota_update(bool nightly) {
+    display_ota_state("Connecting to WiFi...", nightly);
 
     char *ota_url = nightly ? "https://mch2022.ota.bodge.team/mch2022_dev.bin" : "https://mch2022.ota.bodge.team/mch2022.bin";
 
     if (!wifi_connect_to_stored()) {
-        display_ota_state(pax_buffer, ili9341, "Failed to connect to WiFi", nightly);
+        display_ota_state("Failed to connect to WiFi", nightly);
         vTaskDelay(500 / portTICK_PERIOD_MS);
         return;
     }
 
-    display_ota_state(pax_buffer, ili9341, "Starting update...", nightly);
+    display_ota_state("Starting update...", nightly);
     esp_wifi_set_ps(WIFI_PS_NONE);  // Disable any WiFi power save mode
 
     ESP_LOGI(TAG, "Starting OTA update");
@@ -153,14 +155,14 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
 
     ESP_LOGI(TAG, "Attempting to download update from %s", config.url);
 
-    display_ota_state(pax_buffer, ili9341, "Starting download...", nightly);
+    display_ota_state("Starting download...", nightly);
 
     esp_https_ota_handle_t https_ota_handle = NULL;
     esp_err_t              err              = esp_https_ota_begin(&ota_config, &https_ota_handle);
     if (err != ESP_OK) {
         wifi_disconnect_and_disable();
         ESP_LOGE(TAG, "ESP HTTPS OTA Begin failed");
-        display_ota_state(pax_buffer, ili9341, "Failed to start download", nightly);
+        display_ota_state("Failed to start download", nightly);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         return;
     }
@@ -171,7 +173,7 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
         ESP_LOGE(TAG, "esp_https_ota_read_img_desc failed");
         esp_https_ota_abort(https_ota_handle);
         wifi_disconnect_and_disable();
-        display_ota_state(pax_buffer, ili9341, "Failed to read image desc", nightly);
+        display_ota_state("Failed to read image desc", nightly);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         return;
     }
@@ -179,7 +181,7 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
     if (err != ESP_OK) {
         esp_https_ota_abort(https_ota_handle);
         wifi_disconnect_and_disable();
-        display_ota_state(pax_buffer, ili9341, "Already up-to-date!", nightly);
+        display_ota_state("Already up-to-date!", nightly);
         vTaskDelay(2000 / portTICK_PERIOD_MS);
         return;
     }
@@ -201,29 +203,29 @@ void ota_update(pax_buf_t *pax_buffer, ILI9341 *ili9341, bool nightly) {
             percent_shown = percent;
             char buffer[128];
             snprintf(buffer, sizeof(buffer), "Updating... %d%%", percent);
-            display_ota_state(pax_buffer, ili9341, buffer, nightly);
+            display_ota_state(buffer, nightly);
         }
     }
 
     if (esp_https_ota_is_complete_data_received(https_ota_handle) != true) {
         // the OTA image was not completely received and user can customise the response to this situation.
         ESP_LOGE(TAG, "Complete data was not received.");
-        display_ota_state(pax_buffer, ili9341, "Download failed", nightly);
+        display_ota_state("Download failed", nightly);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         esp_restart();
     } else {
         ota_finish_err = esp_https_ota_finish(https_ota_handle);
         if ((err == ESP_OK) && (ota_finish_err == ESP_OK)) {
             ESP_LOGI(TAG, "ESP_HTTPS_OTA upgrade successful. Rebooting ...");
-            display_ota_state(pax_buffer, ili9341, "Update installed", nightly);
+            display_ota_state("Update installed", nightly);
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
         } else {
             if (ota_finish_err == ESP_ERR_OTA_VALIDATE_FAILED) {
                 ESP_LOGE(TAG, "Image validation failed, image is corrupted");
-                display_ota_state(pax_buffer, ili9341, "Image validation failed", nightly);
+                display_ota_state("Image validation failed", nightly);
             } else {
-                display_ota_state(pax_buffer, ili9341, "Update failed", nightly);
+                display_ota_state("Update failed", nightly);
             }
             ESP_LOGE(TAG, "ESP_HTTPS_OTA upgrade failed 0x%x", ota_finish_err);
             vTaskDelay(5000 / portTICK_PERIOD_MS);

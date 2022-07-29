@@ -6,6 +6,7 @@
 #include "graphics_wrapper.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
+#include "gui_element_header.h"
 
 menu_t* menu_alloc(const char* title, float entry_height, float text_height) {
     if (title == NULL) return NULL;
@@ -256,7 +257,7 @@ void menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float po
 
     pax_noclip(pax_buffer);
 
-    render_outline(pax_buffer, position_x, position_y, width, height, menu->borderColor, menu->bgColor);
+    render_outline(position_x, position_y, width, height, menu->borderColor, menu->bgColor);
 
     if ((max_items > 1) && (strlen(menu->title) > 0)) {
         render_header(pax_buffer, position_x, position_y, width, entry_height, text_height, menu->titleColor, menu->titleBgColor, menu->icon, menu->title);
@@ -336,16 +337,8 @@ void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, flo
     size_t max_items = entry_count_x * entry_count_y;
 
     pax_noclip(pax_buffer);
-
-    pax_simple_rect(pax_buffer, menu->titleBgColor, position_x, position_y, width, header_height);
-    pax_clip(pax_buffer, position_x + 1, position_y + ((header_height - text_height) / 2) + 1, width - 2, text_height);
-    pax_draw_text(pax_buffer, menu->titleColor, font, text_height, position_x + ((menu->icon != NULL) ? 32 : 0) + 1,
-                  position_y + ((header_height - text_height) / 2) + 1, menu->title);
-    if (menu->icon != NULL) {
-        pax_clip(pax_buffer, position_x, position_y, 32, 32);
-        pax_draw_image(pax_buffer, menu->icon, position_x, position_y);
-    }
-    pax_noclip(pax_buffer);
+    
+    render_header(pax_buffer, position_x, position_y, width, header_height, text_height, menu->titleColor, menu->titleBgColor, menu->icon, menu->title);
 
     pax_outline_rect(pax_buffer, menu->borderColor, position_x, position_y, width, height);
 

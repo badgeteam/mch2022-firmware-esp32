@@ -15,8 +15,9 @@
 #include "cJSON.h"
 #include "filesystems.h"
 #include "graphics_wrapper.h"
+#include "gui_element_header.h"
+#include "hardware.h"
 #include "http_download.h"
-#include "ili9341.h"
 #include "menu.h"
 #include "metadata.h"
 #include "pax_codecs.h"
@@ -24,8 +25,6 @@
 #include "rp2040.h"
 #include "system_wrapper.h"
 #include "wifi_connect.h"
-
-static const char* TAG = "Hatchery";
 
 extern const uint8_t hatchery_png_start[] asm("_binary_hatchery_png_start");
 extern const uint8_t hatchery_png_end[] asm("_binary_hatchery_png_end");
@@ -69,17 +68,17 @@ int wait_for_button_press(xQueueHandle button_queue, TickType_t timeout) {
     return button;
 }
 
-static void* hatchery_menu_show(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, menu_t* menu, const char* prompt, bool* back_btn,
-                                bool* select_btn, bool* menu_btn, bool* home_btn) {
-    bool  quit         = false;
-    bool  render       = true;
-    void* return_value = NULL;
+static void* hatchery_menu_show(xQueueHandle button_queue, menu_t* menu, const char* prompt, bool* back_btn, bool* select_btn, bool* menu_btn, bool* home_btn) {
+    pax_buf_t* pax_buffer   = get_pax_buffer();
+    bool       quit         = false;
+    bool       render       = true;
+    void*      return_value = NULL;
     while (!quit) {
         if (render) {
             pax_background(pax_buffer, 0xFFFFFF);
             menu_render(pax_buffer, menu, 0, 0, 320, 220);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, prompt);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
@@ -139,11 +138,11 @@ static char*  data_app_info = NULL;
 static size_t size_app_info = 0;
 static cJSON* json_app_info = NULL;
 
-static bool connect_to_wifi(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static bool connect_to_wifi(xQueueHandle button_queue) {
     if (!wifi_connect_to_stored()) {
         wifi_disconnect_and_disable();
-        render_message(pax_buffer, "Unable to connect to\nthe WiFi network");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Unable to connect to\nthe WiFi network");
+        display_flush();
         wait_for_button(button_queue);
         return false;
     }
@@ -209,9 +208,9 @@ static void hatchery_free() {
     hatchery_free_app_info();
 }
 
-static void show_communication_error(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    render_message(pax_buffer, "Unable to communicate with\nthe Hatchery server");
-    ili9341_write(ili9341, pax_buffer->buf);
+static void show_communication_error(xQueueHandle button_queue) {
+    render_message("Unable to communicate with\nthe Hatchery server");
+    display_flush();
     wait_for_button(button_queue);
 }
 
@@ -259,22 +258,16 @@ static bool load_app_info(const char* type_slug, const char* category_slug, cons
     return true;
 }
 
-bool menu_hatchery_install_app_execute(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, bool to_sd_card) {
-    cJSON* slug_obj     = cJSON_GetObjectItem(json_app_info, "slug");
-    cJSON* app_name_obj = cJSON_GetObjectItem(json_app_info, "name");
-    cJSON* version_obj  = cJSON_GetObjectItem(json_app_info, "version");
-    cJSON* files_obj    = cJSON_GetObjectItem(json_app_info, "files");
-    return install_app(button_queue, pax_buffer, ili9341, type_slug, to_sd_card, data_app_info, size_app_info, json_app_info);
+bool menu_hatchery_install_app_execute(xQueueHandle button_queue, const char* type_slug, bool to_sd_card) {
+    return install_app(button_queue, type_slug, to_sd_card, data_app_info, size_app_info, json_app_info);
 }
 
-bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug) {
-    cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
-    cJSON* name_obj        = cJSON_GetObjectItem(json_app_info, "name");
-    cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
-    cJSON* license_obj     = cJSON_GetObjectItem(json_app_info, "license");
-    cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
-    cJSON* version_obj     = cJSON_GetObjectItem(json_app_info, "version");
-    cJSON* files_obj       = cJSON_GetObjectItem(json_app_info, "files");
+bool menu_hatchery_install_app(xQueueHandle button_queue, const char* type_slug) {
+    pax_buf_t* pax_buffer  = get_pax_buffer();
+    cJSON*     name_obj    = cJSON_GetObjectItem(json_app_info, "name");
+    cJSON*     author_obj  = cJSON_GetObjectItem(json_app_info, "author");
+    cJSON*     version_obj = cJSON_GetObjectItem(json_app_info, "version");
+    cJSON*     files_obj   = cJSON_GetObjectItem(json_app_info, "files");
 
     uint64_t size_fat   = 0;
     uint64_t size_appfs = 0;
@@ -312,15 +305,15 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
     printf("Can install to appfs?    %s, %llu bytes needed, %u bytes free\r\n", can_install_to_appfs ? "Yes" : "No", size_appfs, appfsGetFreeMem());
 
     if (!can_install_to_appfs) {
-        render_message(pax_buffer, "Can not install app\nNot enough space available\non the AppFS filesystem");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Can not install app\nNot enough space available\non the AppFS filesystem");
+        display_flush();
         wait_for_button(button_queue);
         return false;
     }
 
     if ((!can_install_to_internal) && (!can_install_to_sdcard)) {
-        render_message(pax_buffer, "Can not install app\nNot enough space available\non the FAT filesystem");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Can not install app\nNot enough space available\non the FAT filesystem");
+        display_flush();
         wait_for_button(button_queue);
         return false;
     }
@@ -346,7 +339,7 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
     while (!quit) {
         if (render) {
             menu_render(pax_buffer, menu, (pax_buffer->width / 2) - 10, (pax_buffer->height / 2) - 10, (pax_buffer->width / 2), (pax_buffer->height / 2));
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
@@ -367,10 +360,10 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
                     int action = (int) menu_get_callback_args(menu, menu_get_position(menu));
                     switch (action) {
                         case 0:
-                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, false);
+                            result = menu_hatchery_install_app_execute(button_queue, type_slug, false);
                             break;
                         case 1:
-                            result = menu_hatchery_install_app_execute(button_queue, pax_buffer, ili9341, type_slug, true);
+                            result = menu_hatchery_install_app_execute(button_queue, type_slug, true);
                             break;
                         case 2:
                         default:
@@ -394,22 +387,20 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, pax_buf_t* pax_buffer,
     return result;
 }
 
-bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug,
-                            const char* app_slug) {
-    size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    display_busy(pax_buffer, ili9341);
+bool menu_hatchery_app_info(xQueueHandle button_queue, const char* type_slug, const char* category_slug, const char* app_slug) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    size_t     ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    display_busy();
     if (!load_app_info(type_slug, category_slug, app_slug)) {
-        show_communication_error(button_queue, pax_buffer, ili9341);
+        show_communication_error(button_queue);
         return false;
     }
 
-    cJSON* slug_obj        = cJSON_GetObjectItem(json_app_info, "slug");
     cJSON* name_obj        = cJSON_GetObjectItem(json_app_info, "name");
     cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");
     cJSON* license_obj     = cJSON_GetObjectItem(json_app_info, "license");
     cJSON* description_obj = cJSON_GetObjectItem(json_app_info, "description");
     cJSON* version_obj     = cJSON_GetObjectItem(json_app_info, "version");
-    cJSON* files_obj       = cJSON_GetObjectItem(json_app_info, "files");
 
     bool render = true;
     bool quit   = false;
@@ -426,7 +417,7 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, IL
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 2, buffer);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 3, description_obj->valuestring);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 install app  🅱 back");
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
@@ -442,7 +433,7 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, IL
             case RP2040_INPUT_JOYSTICK_PRESS:
             case RP2040_INPUT_BUTTON_START:
                 render = true;
-                menu_hatchery_install_app(button_queue, pax_buffer, ili9341, type_slug);
+                menu_hatchery_install_app(button_queue, type_slug);
                 break;
             case RP2040_INPUT_BUTTON_BACK:
                 quit = true;
@@ -468,11 +459,11 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, pax_buf_t* pax_buffer, IL
     return true;
 }
 
-bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug, const char* category_slug) {
+bool menu_hatchery_apps(xQueueHandle button_queue, const char* type_slug, const char* category_slug) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    display_busy(pax_buffer, ili9341);
+    display_busy();
     if (!load_apps(type_slug, category_slug)) {
-        show_communication_error(button_queue, pax_buffer, ili9341);
+        show_communication_error(button_queue);
         return false;
     }
 
@@ -480,20 +471,16 @@ bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
 
     cJSON* app_obj;
     cJSON_ArrayForEach(app_obj, json_apps) {
-        cJSON* slug_obj        = cJSON_GetObjectItem(app_obj, "slug");
-        cJSON* name_obj        = cJSON_GetObjectItem(app_obj, "name");
-        cJSON* author_obj      = cJSON_GetObjectItem(app_obj, "author");
-        cJSON* license_obj     = cJSON_GetObjectItem(app_obj, "license");
-        cJSON* description_obj = cJSON_GetObjectItem(app_obj, "description");
-        cJSON* version_obj     = cJSON_GetObjectItem(app_obj, "version");
+        cJSON* slug_obj = cJSON_GetObjectItem(app_obj, "slug");
+        cJSON* name_obj = cJSON_GetObjectItem(app_obj, "name");
         menu_insert_item(menu, name_obj->valuestring, NULL, (void*) slug_obj->valuestring, -1);
     }
 
     bool quit = false;
     while (!quit) {
-        const char* app_slug = (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select app  🅱 back", &quit, NULL, NULL, &quit);
+        const char* app_slug = (const char*) hatchery_menu_show(button_queue, menu, "🅰 select app  🅱 back", &quit, NULL, NULL, &quit);
         if (quit) break;
-        quit = !menu_hatchery_app_info(button_queue, pax_buffer, ili9341, type_slug, category_slug, app_slug);
+        quit = !menu_hatchery_app_info(button_queue, type_slug, category_slug, app_slug);
     }
 
     hatchery_menu_destroy(menu);
@@ -504,11 +491,11 @@ bool menu_hatchery_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI934
     return true;
 }
 
-bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* type_slug) {
+bool menu_hatchery_categories(xQueueHandle button_queue, const char* type_slug) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    display_busy(pax_buffer, ili9341);
+    display_busy();
     if (!load_categories(type_slug)) {
-        show_communication_error(button_queue, pax_buffer, ili9341);
+        show_communication_error(button_queue);
         return false;
     }
 
@@ -518,16 +505,14 @@ bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t* pax_buffer, 
     cJSON_ArrayForEach(category_obj, json_categories) {
         cJSON* slug_obj = cJSON_GetObjectItem(category_obj, "slug");
         cJSON* name_obj = cJSON_GetObjectItem(category_obj, "name");
-        cJSON* apps_obj = cJSON_GetObjectItem(category_obj, "apps");
         menu_insert_item(menu, name_obj->valuestring, NULL, (void*) slug_obj->valuestring, -1);
     }
 
     bool quit = false;
     while (!quit) {
-        const char* category_slug =
-            (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select category  🅱 back", &quit, NULL, NULL, &quit);
+        const char* category_slug = (const char*) hatchery_menu_show(button_queue, menu, "🅰 select category  🅱 back", &quit, NULL, NULL, &quit);
         if (quit) break;
-        quit = !menu_hatchery_apps(button_queue, pax_buffer, ili9341, type_slug, category_slug);
+        quit = !menu_hatchery_apps(button_queue, type_slug, category_slug);
     }
 
     hatchery_menu_destroy(menu);
@@ -538,16 +523,16 @@ bool menu_hatchery_categories(xQueueHandle button_queue, pax_buf_t* pax_buffer, 
     return true;
 }
 
-void menu_hatchery(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void menu_hatchery(xQueueHandle button_queue) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    display_busy(pax_buffer, ili9341);
+    display_busy();
 
-    if (!connect_to_wifi(button_queue, pax_buffer, ili9341)) return;
+    if (!connect_to_wifi(button_queue)) return;
 
     if (!load_types()) {
         wifi_disconnect_and_disable();
         hatchery_free();
-        show_communication_error(button_queue, pax_buffer, ili9341);
+        show_communication_error(button_queue);
         return;
     }
 
@@ -562,9 +547,9 @@ void menu_hatchery(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
 
     bool quit = false;
     while (!quit) {
-        const char* type_slug = (const char*) hatchery_menu_show(button_queue, pax_buffer, ili9341, menu, "🅰 select type  🅱 back", &quit, NULL, NULL, &quit);
+        const char* type_slug = (const char*) hatchery_menu_show(button_queue, menu, "🅰 select type  🅱 back", &quit, NULL, NULL, &quit);
         if (quit) break;
-        quit = !menu_hatchery_categories(button_queue, pax_buffer, ili9341, type_slug);
+        quit = !menu_hatchery_categories(button_queue, type_slug);
     }
 
     hatchery_menu_destroy(menu);

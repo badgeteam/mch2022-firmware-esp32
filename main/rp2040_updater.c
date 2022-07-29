@@ -27,7 +27,8 @@ static void draw_text_centered(pax_buf_t* pax_buffer, const pax_font_t* font, pa
     pax_center_text(pax_buffer, color, font, 18, pax_buffer->width / 2, pax_buffer->height / 2 + offset, text);
 }
 
-static void display_rp2040_update_state(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text1, const char* text2) {
+static void display_rp2040_update_state(const char* text1, const char* text2) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     pax_noclip(pax_buffer);
     const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
@@ -36,19 +37,21 @@ static void display_rp2040_update_state(pax_buf_t* pax_buffer, ILI9341* ili9341,
     if (text2 != NULL) {
         draw_text_centered(pax_buffer, font, 0xFF000000, 32, text2);
     }
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-static void display_rp2040_update_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* text) {
+static void display_rp2040_update_error(const char* text) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     pax_noclip(pax_buffer);
     const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xa85a32);
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, -8, "ERROR");
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, 8, text);
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-static void display_rp2040_update_old_bootloader(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static void display_rp2040_update_old_bootloader() {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     pax_noclip(pax_buffer);
     const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xa85a32);
@@ -67,35 +70,35 @@ static void display_rp2040_update_old_bootloader(pax_buf_t* pax_buffer, ILI9341*
 
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height * 3, "ota.bodge.team/mch2022.uf2");
     draw_text_centered(pax_buffer, font, 0xFFFFFFFF, line_height * 4, "(that's bodge, with an o)");
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static void rp2040_updater_execute(RP2040* rp2040) {
     size_t firmware_size = rp2040_firmware_bin_end - rp2040_firmware_bin_start;
 
     uint8_t fw_version;
     if (rp2040_get_firmware_version(rp2040, &fw_version) != ESP_OK) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Failed to read firmware version");
+        display_rp2040_update_error("Failed to read firmware version");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         restart();
     }
 
     if (fw_version != 0xFF) {
-        display_rp2040_update_error(pax_buffer, ili9341, "RP2040 didn't reboot into bootloader");
+        display_rp2040_update_error("RP2040 didn't reboot into bootloader");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         esp_restart();
     }
 
-    display_rp2040_update_state(pax_buffer, ili9341, "Starting update...", NULL);
+    display_rp2040_update_state("Starting update...", NULL);
 
     uint8_t bl_version;
     if (rp2040_get_bootloader_version(rp2040, &bl_version) != ESP_OK) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Failed to read bootloader version");
+        display_rp2040_update_error("Failed to read bootloader version");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         restart();
     }
     if (bl_version != 0x02) {
-        display_rp2040_update_old_bootloader(pax_buffer, ili9341);
+        display_rp2040_update_old_bootloader();
         while (true) {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
         }
@@ -103,13 +106,13 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
 
     rp2040_bl_install_uart();
 
-    display_rp2040_update_state(pax_buffer, ili9341, "Preparing...", NULL);
+    display_rp2040_update_state("Preparing...", NULL);
 
     while (true) {
         vTaskDelay(1 / portTICK_PERIOD_MS);
         uint8_t bl_state;
         if (rp2040_get_bootloader_state(rp2040, &bl_state) != ESP_OK) {
-            display_rp2040_update_error(pax_buffer, ili9341, "Failed to read state");
+            display_rp2040_update_error("Failed to read state");
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             restart();
         }
@@ -117,13 +120,13 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
             break;
         }
         if (bl_state > 0xB0) {
-            display_rp2040_update_error(pax_buffer, ili9341, "Unknown state");
+            display_rp2040_update_error("Unknown state");
             vTaskDelay(5000 / portTICK_PERIOD_MS);
             restart();
         }
     }
 
-    display_rp2040_update_state(pax_buffer, ili9341, "Synchronizing...", NULL);
+    display_rp2040_update_state("Synchronizing...", NULL);
 
     while (true) {
         if (rp2040_bl_sync()) break;
@@ -135,22 +138,22 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
     bool success = rp2040_bl_get_info(&flash_start, &flash_size, &erase_size, &write_size, &max_data_len);
 
     if (!success) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Failed to read information");
+        display_rp2040_update_error("Failed to read information");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         restart();
     }
 
-    display_rp2040_update_state(pax_buffer, ili9341, "Erasing...", NULL);
+    display_rp2040_update_state("Erasing...", NULL);
 
     if (!rp2040_bl_erase(flash_start, RP2040_SECTOR_SIZE)) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Failed to erase header");
+        display_rp2040_update_error("Failed to erase header");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         restart();
     }
 
     size_t firmware_size_erase = firmware_size + erase_size - (firmware_size % erase_size);
     if (!rp2040_bl_erase(RP2040_FIRMWARE_ADDR, firmware_size_erase)) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Flash erase failed");
+        display_rp2040_update_error("Flash erase failed");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         restart();
     }
@@ -177,7 +180,7 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
             prev_percentage = percentage;
             char percentage_str[64];
             snprintf(percentage_str, sizeof(percentage_str), "%u%%", percentage);
-            display_rp2040_update_state(pax_buffer, ili9341, "Writing...", percentage_str);
+            display_rp2040_update_state("Writing...", percentage_str);
         }
 
         uint32_t checkCrc = 0;
@@ -190,7 +193,7 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
         if (writeSuccess && (blockCrc == checkCrc)) {
             position += txSize;
         } else {
-            display_rp2040_update_error(pax_buffer, ili9341, "CRC check failed");
+            display_rp2040_update_error("CRC check failed");
             prev_percentage = 0;
             while (!rp2040_bl_sync()) {
                 vTaskDelay(20 / portTICK_PERIOD_MS);
@@ -200,15 +203,15 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
 
     free(txBuffer);
 
-    display_rp2040_update_state(pax_buffer, ili9341, "Sealing...", NULL);
+    display_rp2040_update_state("Sealing...", NULL);
 
     bool sealRes = rp2040_bl_seal(RP2040_FIRMWARE_ADDR, totalLength, totalCrc);
 
     if (sealRes) {
-        display_rp2040_update_state(pax_buffer, ili9341, "Update completed", NULL);
+        display_rp2040_update_state("Update completed", NULL);
         rp2040_bl_go(RP2040_FIRMWARE_ADDR);
     } else {
-        display_rp2040_update_error(pax_buffer, ili9341, "Sealing failed");
+        display_rp2040_update_error("Sealing failed");
         vTaskDelay(5000 / portTICK_PERIOD_MS);
         restart();
     }
@@ -218,26 +221,26 @@ static void rp2040_updater_execute(RP2040* rp2040, pax_buf_t* pax_buffer, ILI934
     }
 }
 
-void rp2040_update_start(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    display_rp2040_update_state(pax_buffer, ili9341, "Starting bootloader...", NULL);
+void rp2040_update_start(RP2040* rp2040) {
+    display_rp2040_update_state("Starting bootloader...", NULL);
     rp2040_reboot_to_bootloader(rp2040);
     vTaskDelay(500 / portTICK_PERIOD_MS);
-    rp2040_updater_execute(rp2040, pax_buffer, ili9341);
+    rp2040_updater_execute(rp2040);
 }
 
 void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
     uint8_t fw_version;
     if (rp2040_get_firmware_version(rp2040, &fw_version) != ESP_OK) {
-        display_rp2040_update_error(pax_buffer, ili9341, "Failed to read firmware version");
+        display_rp2040_update_error("Failed to read firmware version");
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         restart();
     }
 
-    if (fw_version < 0x09) {  // Update required
-        rp2040_update_start(rp2040, pax_buffer, ili9341);
+    if (fw_version < 0x0A) {  // Update required
+        rp2040_update_start(rp2040);
     }
 
     if (fw_version >= 0xFF) {  // Already in bootloader mode, start update
-        rp2040_updater_execute(rp2040, pax_buffer, ili9341);
+        rp2040_updater_execute(rp2040);
     }
 }

@@ -98,12 +98,13 @@ static void fpga_uart_mess(const char* fmt, ...) {
     uart_write_bytes(0, message, l);
 }
 
-static void fpga_display_message(pax_buf_t* pax_buffer, ILI9341* ili9341, uint32_t bg, uint32_t fg, const char* fmt, ...) {
-    char    message[256];
-    va_list va;
-    char *  c, *m;
-    int     line;
-    bool    done;
+static void fpga_display_message(uint32_t bg, uint32_t fg, const char* fmt, ...) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    char       message[256];
+    va_list    va;
+    char *     c, *m;
+    int        line;
+    bool       done;
 
     // Print message in internal buffer
     va_start(va, fmt);
@@ -137,10 +138,10 @@ static void fpga_display_message(pax_buf_t* pax_buffer, ILI9341* ili9341, uint32
     }
 
     // Send to screen
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+static bool fpga_uart_download(ICE40* ice40) {
     TickType_t timeout = 1000 / portTICK_PERIOD_MS;
     uint8_t*   buffer  = NULL;
     bool       done    = false;
@@ -164,21 +165,21 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
             // Alloc zone to store content
             buffer = malloc(header.len);
             if (buffer == NULL) {
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nMalloc failed");
+                fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nMalloc failed");
                 return false;
             }
 
             // Read data in
             if (!fpga_uart_load(buffer, header.len)) {
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nTimeout while loading");
+                fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nTimeout while loading");
                 return false;
             }
 
             // Validate CRC
             uint32_t checkCrc = crc32_le(0, buffer, header.len);
             if (checkCrc != header.crc) {
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X",
-                                     header.crc, checkCrc);
+                fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X", header.crc,
+                                     checkCrc);
                 return false;
             }
         } else {
@@ -215,7 +216,7 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
                 }
 
             default:
-                fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "Invalid packet type");
+                fpga_display_message(0xa85a32, 0xFFFFFFFF, "Invalid packet type");
                 return false;
         }
 
@@ -223,6 +224,7 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
     }
 
     // Bitstream ready, load it
+    ILI9341* ili9341 = get_ili9341();
     ili9341_deinit(ili9341);
     ili9341_select(ili9341, false);
     vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -233,7 +235,7 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
     if (res != ESP_OK) {
         ice40_disable(ice40);
         ili9341_init(ili9341);
-        fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nUpload failed: %d", res);
+        fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nUpload failed: %d", res);
         fpga_uart_mess("uploading bitstream failed with %d\n", res);
         return false;
     }
@@ -242,7 +244,8 @@ static bool fpga_uart_download(ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili
     return true;
 }
 
-bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341, bool enable_uart, const char* prefix) {
+bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, bool enable_uart, const char* prefix) {
+    ILI9341* ili9341 = get_ili9341();
     while (true) {
         bool work_done = false;
 
@@ -258,7 +261,7 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, IL
         if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nBTN error: %d", res);
+            fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nBTN error: %d", res);
             if (enable_uart) fpga_uart_mess("processing buttons events failed with %d\n", res);
             return false;
         }
@@ -267,15 +270,17 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, IL
         if (res != ESP_OK) {
             ice40_disable(ice40);
             ili9341_init(ili9341);
-            fpga_display_message(pax_buffer, ili9341, 0xa85a32, 0xFFFFFFFF, "FPGA download mode\nREQ error: %d", res);
+            fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nREQ error: %d", res);
             if (enable_uart) fpga_uart_mess("processing fpga requests failed with %d\n", res);
             return false;
         }
     }
 }
 
-void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF, "FPGA download mode\nPreparing...");
+void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
+    fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nPreparing...");
+
+    ILI9341* ili9341 = get_ili9341();
 
     fpga_install_uart();
     fpga_irq_setup(ice40);
@@ -291,7 +296,7 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
         const char* dots[]      = {"", ".", "..", "..."};
         uint8_t     counter_new = (esp_timer_get_time() >> 19) & 0x3;
         if (counter != counter_new) {
-            fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF, "FPGA download mode\nWaiting for bitstream%s", dots[counter]);
+            fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nWaiting for bitstream%s", dots[counter]);
             counter = counter_new;
         } else {
             vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -299,12 +304,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40, pax_buf_t* pax_buffer
     }
 
     while (true) {
-        fpga_display_message(pax_buffer, ili9341, 0x325aa8, 0xFFFFFFFF, "FPGA download mode\nReceiving bitstream...");
+        fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nReceiving bitstream...");
 
-        if (!fpga_uart_download(ice40, pax_buffer, ili9341)) goto error;
+        if (!fpga_uart_download(ice40)) goto error;
 
         // Waiting for next download and sending key strokes to FPGA
-        bool uart_triggered = fpga_host(buttonQueue, ice40, pax_buffer, ili9341, true, "/sd");
+        bool uart_triggered = fpga_host(buttonQueue, ice40, true, "/sd");
         if (!uart_triggered) goto error;
         ice40_disable(ice40);
         ili9341_init(ili9341);

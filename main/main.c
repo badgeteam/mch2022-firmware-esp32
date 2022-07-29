@@ -1,4 +1,4 @@
-#include <esp_err.h>
+// #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
 #include <freertos/FreeRTOS.h>
@@ -26,6 +26,7 @@
 #include "fpga_download.h"
 #include "fpga_test.h"
 #include "graphics_wrapper.h"
+#include "gui_element_header.h"
 #include "hardware.h"
 #include "managed_i2c.h"
 #include "menu.h"
@@ -56,19 +57,21 @@ extern const uint8_t lattice_logo_png_end[] asm("_binary_m_logo_lattice_png_end"
 
 static const char* TAG = "main";
 
-void display_fatal_error(pax_buf_t* pax_buffer, ILI9341* ili9341, const char* line0, const char* line1, const char* line2, const char* line3) {
-    const pax_font_t* font = pax_font_saira_regular;
+void display_fatal_error(const char* line0, const char* line1, const char* line2, const char* line3) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xa85a32);
     if (line0 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 23, 0, 20 * 0, line0);
     if (line1 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20 * 1, line1);
     if (line2 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20 * 2, line2);
     if (line3 != NULL) pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 18, 0, 20 * 3, line3);
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 }
 
-void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_font_saira_regular;
+void display_rp2040_crashed_message(xQueueHandle button_queue) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Oops...");
@@ -79,12 +82,13 @@ void display_rp2040_crashed_message(xQueueHandle buttonQueue, pax_buf_t* pax_buf
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 7, "explaining what caused the crash.");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 9, "You can find the repository at:");
     pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10, "https://github.com/badgeteam\n/mch2022-firmware-rp2040    Press A to continue.");
-    ili9341_write(ili9341, pax_buffer->buf);
-    wait_for_button(buttonQueue);
+    display_flush();
+    wait_for_button(button_queue);
 }
 
-bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_font_saira_regular;
+bool display_rp2040_flash_lock_warning(xQueueHandle button_queue) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Flashing attempt detected");
@@ -98,17 +102,18 @@ bool display_rp2040_flash_lock_warning(xQueueHandle buttonQueue, pax_buf_t* pax_
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 8, "for more information.");
     pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10,
                   "You can disable this protection by pressing A\nTo continue starting without disabling the protection\npress B.");
-    ili9341_write(ili9341, pax_buffer->buf);
-    return wait_for_button(buttonQueue);
+    display_flush();
+    return wait_for_button(button_queue);
 }
 
-void display_rp2040_debug_message(pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    const pax_font_t* font = pax_font_saira_regular;
+void display_rp2040_debug_message() {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xf5ec42);
     pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Debug mode");
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 2, "Co-processor is in debug mode");
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
     vTaskDelay(pdMS_TO_TICKS(500));
 }
 
@@ -130,12 +135,11 @@ void stop() {
     }
 }
 
-const char*      fatal_error_str = "A fatal error occured";
-const char*      reset_board_str = "Reset the board to try again";
-static pax_buf_t pax_buffer;
+const char* fatal_error_str = "A fatal error occured";
+const char* reset_board_str = "Reset the board to try again";
 
 static void audio_player_task(void* pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(200));
+    vTaskDelay(pdMS_TO_TICKS(300));
     play_bootsound();
     uint8_t leds[15] = {0};
     for (uint8_t part = 0; part < 50; part++) {
@@ -199,9 +203,6 @@ void app_main(void) {
     ESP_LOGI(TAG, "App version: %s", app_description->version);
     // ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
 
-    /* Initialize GFX */
-    pax_buf_init(&pax_buffer, NULL, ILI9341_WIDTH, ILI9341_HEIGHT, PAX_BUF_16_565RGB);
-
     /* Initialize hardware */
 
     efuse_protect();
@@ -211,17 +212,11 @@ void app_main(void) {
         esp_restart();
     }
 
-    ILI9341* ili9341 = get_ili9341();
-    if (ili9341 == NULL) {
-        ESP_LOGE(TAG, "ili9341 is NULL");
-        esp_restart();
-    }
-
     /* Start NVS */
     res = nvs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "NVS init failed: %d", res);
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
+        display_fatal_error(fatal_error_str, "NVS failed to initialize", "Flash may be corrupted", NULL);
         stop();
     }
 
@@ -229,11 +224,13 @@ void app_main(void) {
     res = nvs_open("system", NVS_READWRITE, &handle);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "NVS open failed: %d", res);
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
         stop();
     }
 
-    display_boot_screen(&pax_buffer, ili9341, "Starting...");
+    pax_buf_t* pax_buffer = get_pax_buffer();
+
+    display_boot_screen("Starting...");
 
     /* Initialize RP2040 co-processor */
     if (bsp_rp2040_init() != ESP_OK) {
@@ -242,28 +239,28 @@ void app_main(void) {
         //  - The RP2040 does not boot
         ESP_LOGE(TAG, "Failed to initialize the RP2040 co-processor");
         const pax_font_t* font = pax_font_saira_regular;
-        pax_background(&pax_buffer, 0xa85a32);
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 23, 0, 20 * 0, "Communication error");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 1, "The ESP32 is unable to communicate");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 2, "with the RP2040 co-processor, this");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 3, "could be caused by a problem with");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 4, "the I2C bus, which in turn can be");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 5, "caused by a connected SAO board or");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 6, "a connected QWIIC / Stemma QT device");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 8, "Please check the I2C bus and power");
-        pax_draw_text(&pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 9, "cycle the badge to try again");
-        ili9341_write(ili9341, pax_buffer.buf);
+        pax_background(pax_buffer, 0xa85a32);
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 23, 0, 20 * 0, "Communication error");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 1, "The ESP32 is unable to communicate");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 2, "with the RP2040 co-processor, this");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 3, "could be caused by a problem with");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 4, "the I2C bus, which in turn can be");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 5, "caused by a connected SAO board or");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 6, "a connected QWIIC / Stemma QT device");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 8, "Please check the I2C bus and power");
+        pax_draw_text(pax_buffer, 0xFFFFFFFF, font, 16, 0, 20 * 9, "cycle the badge to try again");
+        display_flush();
         stop();
     }
 
     RP2040* rp2040 = get_rp2040();
 
-    rp2040_updater(rp2040, &pax_buffer, ili9341);  // Handle RP2040 firmware update & bootloader mode
+    rp2040_updater(rp2040);  // Handle RP2040 firmware update & bootloader mode
 
     uint8_t crash_debug;
     if (rp2040_get_crash_state(rp2040, &crash_debug) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read RP2040 crash & debug state");
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
         stop();
     }
 
@@ -271,14 +268,14 @@ void app_main(void) {
     bool rp2040_debug   = crash_debug & 0x02;
 
     if (rp2040_crashed) {
-        display_rp2040_crashed_message(rp2040->queue, &pax_buffer, ili9341);
+        display_rp2040_crashed_message(rp2040->queue);
     }
 
     if (rp2040_debug) {
-        display_rp2040_debug_message(&pax_buffer, ili9341);
+        display_rp2040_debug_message();
     }
 
-    factory_test(&pax_buffer, ili9341);
+    factory_test(get_pax_buffer(), get_ili9341());
 
     /* Apply flashing lock */
 
@@ -290,7 +287,7 @@ void app_main(void) {
 
     if (rp2040_set_reset_lock(rp2040, prevent_flashing) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to write RP2040 flashing lock state");
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to communicate with", "the RP2040 co-processor", reset_board_str);
         stop();
     }
 
@@ -298,7 +295,7 @@ void app_main(void) {
 
     if (bsp_ice40_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize the ICE40 FPGA");
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "A hardware failure occured", "while initializing the FPGA", reset_board_str);
+        display_fatal_error(fatal_error_str, "A hardware failure occured", "while initializing the FPGA", reset_board_str);
         stop();
     }
 
@@ -308,13 +305,13 @@ void app_main(void) {
     res = appfs_init();
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "AppFS init failed: %d", res);
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize AppFS", "Flash may be corrupted", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to initialize AppFS", "Flash may be corrupted", reset_board_str);
         stop();
     }
 
     /* Start internal filesystem */
     if (mount_internal_filesystem() != ESP_OK) {
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to initialize flash FS", "Flash may be corrupted", reset_board_str);
         stop();
     }
 
@@ -336,20 +333,20 @@ void app_main(void) {
     if (!wifi_check_configured()) {
         if (wifi_set_defaults()) {
             const pax_font_t* font = pax_font_saira_regular;
-            pax_background(&pax_buffer, 0xFFFFFF);
-            pax_draw_text(&pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 continue");
-            render_message(&pax_buffer, "Default WiFi settings\nhave been restored!\nPress A to continue...");
-            ili9341_write(ili9341, pax_buffer.buf);
+            pax_background(pax_buffer, 0xFFFFFF);
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 continue");
+            render_message("Default WiFi settings\nhave been restored!\nPress A to continue...");
+            display_flush();
             wait_for_button(rp2040->queue);
         } else {
-            display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to configure WiFi", "Flash may be corrupted", reset_board_str);
+            display_fatal_error(fatal_error_str, "Failed to configure WiFi", "Flash may be corrupted", reset_board_str);
             stop();
         }
     }
 
     res = init_ca_store();
     if (res != ESP_OK) {
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to initialize", "TLS certificate storage", reset_board_str);
+        display_fatal_error(fatal_error_str, "Failed to initialize", "TLS certificate storage", reset_board_str);
         stop();
     }
 
@@ -362,7 +359,7 @@ void app_main(void) {
     res = rp2040_get_webusb_mode(rp2040, &webusb_mode);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read WebUSB mode: %d", res);
-        display_fatal_error(&pax_buffer, ili9341, fatal_error_str, "Failed to read WebUSB mode", NULL, NULL);
+        display_fatal_error(fatal_error_str, "Failed to read WebUSB mode", NULL, NULL);
         stop();
     }
 
@@ -375,7 +372,7 @@ void app_main(void) {
                 if (attempted) {
                     rp2040_set_reset_attempted(rp2040, false);
                     ESP_LOGE(TAG, "Detected esptool.py style reset while flash lock is active");
-                    bool disable_lock = display_rp2040_flash_lock_warning(rp2040->queue, &pax_buffer, ili9341);
+                    bool disable_lock = display_rp2040_flash_lock_warning(rp2040->queue);
                     if (disable_lock) {
                         nvs_set_u8(handle, "flash_lock", 0);
                         nvs_commit(handle);
@@ -405,49 +402,49 @@ void app_main(void) {
         uint8_t lattice;
         res = nvs_get_u8(handle, "lattice", &lattice);
         if ((res != ESP_OK) || (lattice < 1)) {
-            pax_background(&pax_buffer, 0x000000);
+            pax_background(pax_buffer, 0x000000);
             for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
-                ili9341_write(ili9341, pax_buffer.buf);
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                display_flush();
             }
             for (uint8_t i = 0; i < 250; i += 4) {
                 uint8_t j = 254 - i;
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
-                ili9341_write(ili9341, pax_buffer.buf);
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
+                display_flush();
             }
             for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
-                ili9341_write(ili9341, pax_buffer.buf);
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                uint8_t j = 254 - i;
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 18, "This time we managed to\ninclude the wrong company...");
-                ili9341_write(ili9341, pax_buffer.buf);
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
-                ili9341_write(ili9341, pax_buffer.buf);
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                display_flush();
             }
             for (uint8_t i = 0; i < 250; i += 4) {
                 uint8_t j = 254 - i;
-                pax_background(&pax_buffer, 0x000000);
-                pax_center_text(&pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer.width / 2,
-                                pax_buffer.height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
-                ili9341_write(ili9341, pax_buffer.buf);
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 18, "This time we managed to\ninclude the wrong company...");
+                display_flush();
             }
-            pax_insert_png_buf(&pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
-            pax_draw_text(&pax_buffer, 0xFF000000, pax_font_saira_regular, 18, 5, 240 - 18, "🅰 continue");
-            ili9341_write(ili9341, pax_buffer.buf);
+            for (uint8_t i = 0; i < 250; i += 4) {
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
+                display_flush();
+            }
+            for (uint8_t i = 0; i < 250; i += 4) {
+                uint8_t j = 254 - i;
+                pax_background(pax_buffer, 0x000000);
+                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
+                                pax_buffer->height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
+                display_flush();
+            }
+            pax_insert_png_buf(pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
+            pax_draw_text(pax_buffer, 0xFF000000, pax_font_saira_regular, 18, 5, 240 - 18, "🅰 continue");
+            display_flush();
             wait_for_button(rp2040->queue);
             nvs_set_u8(handle, "lattice", 1);
         }
@@ -457,18 +454,18 @@ void app_main(void) {
         if (crashed_app != APPFS_INVALID_FD) {
             const char* app_name = NULL;
             appfsEntryInfo(crashed_app, &app_name, NULL);
-            pax_background(&pax_buffer, 0xFFFFFF);
-            render_header(&pax_buffer, 0, 0, pax_buffer.width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
-            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
-            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
+            pax_background(pax_buffer, 0xFFFFFF);
+            render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
             if (app_name != NULL) {
                 char buffer[64];
                 buffer[sizeof(buffer) - 1] = '\0';
                 snprintf(buffer, sizeof(buffer) - 1, "App: %s", app_name);
-                pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
+                pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
             }
-            pax_draw_text(&pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer.height - 18, "🅰 continue");
-            ili9341_write(ili9341, pax_buffer.buf);
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 continue");
+            display_flush();
             wait_for_button(rp2040->queue);
         }
 
@@ -477,21 +474,21 @@ void app_main(void) {
 
         /* Launcher menu */
         while (true) {
-            menu_start(rp2040->queue, &pax_buffer, ili9341, app_description->version);
+            menu_start(rp2040->queue, app_description->version);
         }
     } else if (webusb_mode == 0x01) {
-        webusb_main(rp2040->queue, &pax_buffer, ili9341);
+        webusb_main(rp2040->queue, pax_buffer, get_ili9341());
     } else if (webusb_mode == 0x02) {
-        display_boot_screen(&pax_buffer, ili9341, "FPGA download mode");
+        display_boot_screen("FPGA download mode");
         while (true) {
-            fpga_download(rp2040->queue, ice40, &pax_buffer, ili9341);
+            fpga_download(rp2040->queue, ice40);
         }
     } else if (webusb_mode == 0x03) {
-        webusb_new_main(rp2040->queue, &pax_buffer, ili9341);
+        webusb_new_main(rp2040->queue, pax_buffer, get_ili9341());
     } else {
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
-        display_boot_screen(&pax_buffer, ili9341, buffer);
+        display_boot_screen(buffer);
     }
 
     nvs_close(handle);

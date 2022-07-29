@@ -135,14 +135,15 @@ static bool is_bitstream(FILE* fd) {
     return (memcmp(expected_value, file_contents, sizeof(expected_value)) == 0);
 }
 
-static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* filename, const char* label) {
-    const pax_font_t* font = pax_font_saira_regular;
+static void file_browser_open_file(xQueueHandle button_queue, const char* filename, const char* label) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0xFFFFFF);
 
     char* path = strdup(filename);
     if (path == NULL) return;
-    for (size_t position = strlen(path) - 1; position >= 0; position--) {
+    for (ssize_t position = strlen(path) - 1; position >= 0; position--) {
         if (path[position] == '/') {
             path[position] = '\0';
             break;
@@ -152,9 +153,9 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
     FILE* fd = fopen(filename, "rb");
     if (fd == NULL) {
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to open file\n\nPress A or B to go back");
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_flush();
         ESP_LOGE(TAG, "Failed to open file");
-        wait_for_button(buttonQueue);
+        wait_for_button(button_queue);
         free(path);
         return;
     }
@@ -165,9 +166,9 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
         size_t appfs_free = appfsGetFreeMem();
         if (file_size <= appfs_free) {
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0, "ESP32 application\n\nPress A to install\nPress B to go back");
-            ili9341_write(ili9341, pax_buffer->buf);
-            if (wait_for_button(buttonQueue)) {
-                appfs_store_app(buttonQueue, pax_buffer, ili9341, filename, label, label, 0xFFFF);
+            display_flush();
+            if (wait_for_button(button_queue)) {
+                appfs_store_app(button_queue, filename, label, label, 0xFFFF);
             }
         } else {
             char buffer[128];
@@ -175,18 +176,19 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
                      "ESP32 application\nSize: %u KB\nFree: %u KB\nNot enough free space\nplease free up space\n\nPress A or B to go back", file_size / 1024,
                      appfs_free / 1024);
             pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, buffer);
-            ili9341_write(ili9341, pax_buffer->buf);
-            wait_for_button(buttonQueue);
+            display_flush();
+            wait_for_button(button_queue);
         }
         free(path);
         return;
     } else if (is_bitstream(fd)) {
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0, "FPGA bitstream\n\nPress A to run\nPress B to go back");
-        ili9341_write(ili9341, pax_buffer->buf);
-        if (wait_for_button(buttonQueue)) {
+        display_flush();
+        if (wait_for_button(button_queue)) {
             size_t   bitstream_length = get_file_size(fd);
             uint8_t* bitstream        = load_file_to_ram(fd);
             ICE40*   ice40            = get_ice40();
+            ILI9341* ili9341          = get_ili9341();
             ili9341_deinit(ili9341);
             ili9341_select(ili9341, false);
             vTaskDelay(200 / portTICK_PERIOD_MS);
@@ -196,7 +198,7 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
             fclose(fd);
             if (res == ESP_OK) {
                 fpga_irq_setup(ice40);
-                fpga_host(buttonQueue, ice40, pax_buffer, ili9341, false, path);
+                fpga_host(button_queue, ice40, false, path);
                 fpga_irq_cleanup(ice40);
                 ice40_disable(ice40);
                 ili9341_init(ili9341);
@@ -205,8 +207,8 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
                 ili9341_init(ili9341);
                 pax_background(pax_buffer, 0xFFFFFF);
                 pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to load bitstream\n\nPress A or B to go back");
-                ili9341_write(ili9341, pax_buffer->buf);
-                wait_for_button(buttonQueue);
+                display_flush();
+                wait_for_button(button_queue);
             }
         } else {
             fclose(fd);
@@ -214,16 +216,17 @@ static void file_browser_open_file(xQueueHandle buttonQueue, pax_buf_t* pax_buff
     } else {
         fclose(fd);
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Unsupported file type\n\nPress A or B to go back");
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_flush();
         ESP_LOGE(TAG, "Failed to open file");
-        wait_for_button(buttonQueue);
+        wait_for_button(button_queue);
     }
     free(path);
     return;
 }
 
-void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* initial_path) {
-    display_boot_screen(pax_buffer, ili9341, "Please wait...");
+void file_browser(xQueueHandle button_queue, const char* initial_path) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    display_boot_screen("Please wait...");
     char path[512] = {0};
     strncpy(path, initial_path, sizeof(path));
     while (true) {
@@ -232,7 +235,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
         if (dir == NULL) {
             if (path[0] != 0) {
                 ESP_LOGE(TAG, "Failed to open directory %s", path);
-                display_boot_screen(pax_buffer, ili9341, "Failed to open directory");
+                display_boot_screen("Failed to open directory");
                 vTaskDelay(200 / portTICK_PERIOD_MS);
             }
             return;
@@ -269,7 +272,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
 
         while (1) {
             rp2040_input_message_t buttonMessage = {0};
-            if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
                 uint8_t pin   = buttonMessage.input;
                 bool    value = buttonMessage.state;
                 switch (pin) {
@@ -314,7 +317,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
 
             if (render) {
                 menu_render(pax_buffer, menu, 0, 0, 320, 220);
-                ili9341_write(ili9341, pax_buffer->buf);
+                display_flush();
                 render = false;
             }
 
@@ -324,8 +327,7 @@ void file_browser(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9
                     break;
                 } else {
                     printf("File selected: %s\n", menuArgs->path);
-                    file_browser_open_file(buttonQueue, pax_buffer, ili9341, menuArgs->path, menuArgs->label);
-                    // appfs_store_app(pax_buffer, ili9341, menuArgs->path, menuArgs->label, menuArgs->label, 0xFFFF);
+                    file_browser_open_file(button_queue, menuArgs->path, menuArgs->label);
                 }
                 menuArgs = NULL;
                 render   = true;

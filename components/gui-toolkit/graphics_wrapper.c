@@ -6,25 +6,14 @@
 #include "pax_keyboard.h"
 #include "rp2040.h"
 
-void render_header(pax_buf_t* pax_buffer, float position_x, float position_y, float width, float height, float text_height, pax_col_t text_color,
-                   pax_col_t bg_color, pax_buf_t* icon, const char* label) {
-    const pax_font_t* font = pax_font_saira_regular;
-    pax_simple_rect(pax_buffer, bg_color, position_x, position_y, width, height);
-    pax_clip(pax_buffer, position_x + 1, position_y + ((height - text_height) / 2) + 1, width - 2, text_height);
-    pax_draw_text(pax_buffer, text_color, font, text_height, position_x + ((icon != NULL) ? 32 : 0) + 1, position_y + ((height - text_height) / 2) + 1, label);
-    if (icon != NULL) {
-        pax_clip(pax_buffer, position_x, position_y, 32, 32);
-        pax_draw_image(pax_buffer, icon, position_x, position_y);
-    }
-    pax_noclip(pax_buffer);
-}
-
-void render_outline(pax_buf_t* pax_buffer, float position_x, float position_y, float width, float height, pax_col_t border_color, pax_col_t background_color) {
+void render_outline(float position_x, float position_y, float width, float height, pax_col_t border_color, pax_col_t background_color) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     pax_simple_rect(pax_buffer, background_color, position_x, position_y, width, height);
     pax_outline_rect(pax_buffer, border_color, position_x, position_y, width, height);
 }
 
-void render_message(pax_buf_t* pax_buffer, char* message) {
+void render_message(char* message) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     const pax_font_t* font    = pax_font_saira_regular;
     pax_vec1_t        size    = pax_text_size(font, 18, message);
     float             margin  = 4;
@@ -41,8 +30,9 @@ void render_message(pax_buf_t* pax_buffer, char* message) {
     pax_noclip(pax_buffer);
 }
 
-bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle,
+bool keyboard(xQueueHandle buttonQueue, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle,
               const char* aHint, char* aOutput, size_t aOutputSize) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
     const pax_font_t* font     = pax_font_saira_regular;
     bool              accepted = false;
     pkb_ctx_t         kb_ctx;
@@ -160,7 +150,7 @@ bool keyboard(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341,
         pkb_loop(&kb_ctx);
         if (kb_ctx.dirty) {
             pkb_redraw(pax_buffer, &kb_ctx);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
         }
         if (kb_ctx.input_accepted) {
             memset(aOutput, 0, aOutputSize);

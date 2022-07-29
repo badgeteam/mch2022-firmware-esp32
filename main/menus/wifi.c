@@ -16,7 +16,6 @@
 #include "esp_wpa2.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "menu.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
@@ -63,14 +62,6 @@ typedef enum action {
     ACTION_PHASE2_CHAP,
 } menu_wifi_action_t;
 
-static const char* wifi_auth_names[] = {
-    "None", "WEP", "WPA1", "WPA2", "WPA1/2", "WPA2 Ent", "WPA3", "WPA2/3", "WAPI",
-};
-
-static const char* wifi_phase2_names[] = {
-    "EAP", "MSCHAPv2", "MSCHAP", "PAP", "CHAP",
-};
-
 void render_wifi_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
@@ -78,14 +69,15 @@ void render_wifi_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void              wifi_show(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341);
-void              wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, bool scan);
-wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, size_t num_aps, wifi_ap_record_t* aps);
-int               wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, wifi_auth_mode_t default_mode);
-int               wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, esp_eap_ttls_phase2_types default_mode);
+void              wifi_show(xQueueHandle button_queue);
+void              wifi_setup(xQueueHandle button_queue, bool scan);
+wifi_ap_record_t* wifi_scan_results(xQueueHandle button_queue, size_t num_aps, wifi_ap_record_t* aps);
+int               wifi_auth_menu(xQueueHandle button_queue, wifi_auth_mode_t default_mode);
+int               wifi_phase2_menu(xQueueHandle button_queue, esp_eap_ttls_phase2_types default_mode);
 
-void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("WiFi configuration", 34, 18);
+void menu_wifi(xQueueHandle button_queue) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("WiFi configuration", 34, 18);
     menu_insert_item(menu, "Show current settings", NULL, (void*) ACTION_SHOW, -1);
     menu_insert_item(menu, "Scan for networks", NULL, (void*) ACTION_SCAN, -1);
     menu_insert_item(menu, "Configure manually", NULL, (void*) ACTION_MANUAL, -1);
@@ -98,7 +90,7 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             switch (pin) {
@@ -135,24 +127,24 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
 
         if (render) {
             menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
         if (action != ACTION_NONE) {
             if (action == ACTION_SHOW) {
                 // Show the current WiFi settings.
-                wifi_connection_test(buttonQueue, pax_buffer, ili9341);
+                wifi_connection_test(button_queue);
             } else if (action == ACTION_SCAN) {
                 // Set network by scanning for it.
-                wifi_setup(buttonQueue, pax_buffer, ili9341, true);
+                wifi_setup(button_queue, true);
             } else if (action == ACTION_MANUAL) {
                 // Set network manually.
-                wifi_setup(buttonQueue, pax_buffer, ili9341, false);
+                wifi_setup(button_queue, false);
             } else if (action == ACTION_DEFAULTS) {
                 // Set network to default settings.
                 wifi_set_defaults();
-                display_boot_screen(pax_buffer, ili9341, "WiFi reset to default!");
+                display_boot_screen("WiFi reset to default!");
                 vTaskDelay(pdMS_TO_TICKS(750));
             } else if (action == ACTION_BACK) {
                 break;
@@ -166,9 +158,10 @@ void menu_wifi(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341
     menu_free(menu);
 }
 
-wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, size_t num_aps, wifi_ap_record_t* aps) {
-    menu_t*           menu   = menu_alloc("Select network", 20, 18);
-    wifi_ap_record_t* picked = NULL;
+wifi_ap_record_t* wifi_scan_results(xQueueHandle button_queue, size_t num_aps, wifi_ap_record_t* aps) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    menu_t*           menu       = menu_alloc("Select network", 20, 18);
+    wifi_ap_record_t* picked     = NULL;
 
     render_wifi_help(pax_buffer);
 
@@ -181,7 +174,7 @@ wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buf
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
         selection                            = -1;
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             switch (pin) {
@@ -217,8 +210,8 @@ wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buf
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            menu_render(pax_buffer, menu, 0, 0, pax_buffer->width, 220);
+            display_flush();
             render = false;
         }
 
@@ -240,8 +233,9 @@ wifi_ap_record_t* wifi_scan_results(xQueueHandle buttonQueue, pax_buf_t* pax_buf
     return picked;
 }
 
-int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, wifi_auth_mode_t default_mode) {
-    menu_t* menu = menu_alloc("Authentication mode", 20, 18);
+int wifi_auth_menu(xQueueHandle button_queue, wifi_auth_mode_t default_mode) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Authentication mode", 20, 18);
     menu_insert_item(menu, "Insecure", NULL, (void*) ACTION_AUTH_OPEN, -1);
     menu_insert_item(menu, "WEP", NULL, (void*) ACTION_AUTH_WEP, -1);
     menu_insert_item(menu, "WPA PSK", NULL, (void*) ACTION_AUTH_WPA_PSK, -1);
@@ -267,7 +261,7 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             switch (pin) {
@@ -303,8 +297,8 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            menu_render(pax_buffer, menu, 0, 0, pax_buffer->width, 220);
+            display_flush();
             render = false;
         }
 
@@ -326,8 +320,9 @@ int wifi_auth_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili
     return pick;
 }
 
-int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, esp_eap_ttls_phase2_types default_mode) {
-    menu_t* menu = menu_alloc("Phase 2 authentication mode", 20, 18);
+int wifi_phase2_menu(xQueueHandle button_queue, esp_eap_ttls_phase2_types default_mode) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Phase 2 authentication mode", 20, 18);
     menu_insert_item(menu, "ESP", NULL, (void*) ACTION_PHASE2_EAP, -1);
     menu_insert_item(menu, "MSCHAPv2", NULL, (void*) ACTION_PHASE2_MSCHAPV2, -1);
     menu_insert_item(menu, "MSCHAP", NULL, (void*) ACTION_PHASE2_MSCHAP, -1);
@@ -349,7 +344,7 @@ int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             switch (pin) {
@@ -385,8 +380,8 @@ int wifi_phase2_menu(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* i
         }
 
         if (render) {
-            menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            menu_render(pax_buffer, menu, 0, 0, pax_buffer->width, 220);
+            display_flush();
             render = false;
         }
 
@@ -414,7 +409,8 @@ static int wifi_ap_sorter(const void* a0, const void* b0) {
     return b->rssi - a->rssi;
 }
 
-void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, bool scan) {
+void wifi_setup(xQueueHandle button_queue, bool scan) {
+    pax_buf_t*   pax_buffer   = get_pax_buffer();
     char         ssid[33]     = {0};
     char         username[33] = {0};
     char         password[65] = {0};
@@ -427,7 +423,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
     /* ==== scanning phase ==== */
     if (scan) {
         // Show a little bit of text.
-        display_boot_screen(pax_buffer, ili9341, "Scanning WiFi networks...");
+        display_boot_screen("Scanning WiFi networks...");
 
         // Scan for networks.
         wifi_ap_record_t* aps;
@@ -450,7 +446,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         // Open a little menu for picking a network.
-        wifi_ap_record_t* pick = wifi_scan_results(buttonQueue, pax_buffer, ili9341, n_dedup, dedup);
+        wifi_ap_record_t* pick = wifi_scan_results(button_queue, n_dedup, dedup);
         if (!pick) {
             nvs_close(handle);
             return;
@@ -490,14 +486,13 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
         }
 
         // Select SSID.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel", ssid,
-                            sizeof(ssid));
+        accepted = keyboard(button_queue, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi SSID", "Press 🅷 to cancel", ssid, sizeof(ssid));
 
         // Select auth mode.
         if (accepted) {
             uint8_t default_auth = authmode;
             nvs_get_u8(handle, "wifi.authmode", &default_auth);
-            authmode = wifi_auth_menu(buttonQueue, pax_buffer, ili9341, default_auth);
+            authmode = wifi_auth_menu(button_queue, default_auth);
             accepted = authmode != -1;
         }
     }
@@ -508,19 +503,19 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             // Phase2 method.
             uint8_t default_auth = authmode;
             nvs_get_u8(handle, "wifi.phase2", &default_auth);
-            phase2   = wifi_phase2_menu(buttonQueue, pax_buffer, ili9341, default_auth);
+            phase2   = wifi_phase2_menu(button_queue, default_auth);
             accepted = phase2 != -1;
         }
         if (accepted) {
             // Username.
-            accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username", "Press 🅷 to cancel",
-                                username, sizeof(username));
+            accepted = keyboard(button_queue, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi username", "Press 🅷 to cancel", username,
+                                sizeof(username));
         }
     }
     if (accepted) {
         // Password.
-        accepted = keyboard(buttonQueue, pax_buffer, ili9341, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press 🅷 to cancel",
-                            password, sizeof(password));
+        accepted =
+            keyboard(button_queue, 30, 30, pax_buffer->width - 60, pax_buffer->height - 60, "WiFi password", "Press 🅷 to cancel", password, sizeof(password));
     }
     if (accepted) {
         nvs_set_str(handle, "wifi.ssid", ssid);
@@ -530,7 +525,7 @@ void wifi_setup(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili934
             nvs_set_str(handle, "wifi.username", username);
             nvs_set_u8(handle, "wifi.phase2", phase2);
         }
-        display_boot_screen(pax_buffer, ili9341, "WiFi settings stored");
+        display_boot_screen("WiFi settings stored");
         vTaskDelay(pdMS_TO_TICKS(500));
     }
     nvs_close(handle);

@@ -8,7 +8,6 @@
 
 #include "hardware.h"
 #include "ice40.h"
-#include "ili9341.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 
@@ -38,15 +37,16 @@ bool test_wait_for_response(uint32_t *rc) {
     }
 }
 
-bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, int line, const char *test_name, test_fn fn) {
-    bool     test_result;
-    uint32_t rc;
+bool run_test(const pax_font_t *font, int line, const char *test_name, test_fn fn) {
+    pax_buf_t *pax_buffer = get_pax_buffer();
+    bool       test_result;
+    uint32_t   rc;
 
     printf("Starting test %s...\r\n", test_name);
 
     /* Test name */
     pax_draw_text(pax_buffer, 0xffffffff, font, 18, 0, 20 * line, test_name);
-    if (ili9341) ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 
     /* Run the test */
     test_result = fn(&rc);
@@ -62,7 +62,7 @@ bool run_test(pax_buf_t *pax_buffer, const pax_font_t *font, ILI9341 *ili9341, i
         pax_draw_text(pax_buffer, 0xff00ff00, font, 18, 200, 20 * line, "      OK");
     }
 
-    if (ili9341) ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 
     printf("    Test %s result: %s\r\n", test_name, test_result ? "OK" : "FAIL");
 

@@ -6,4 +6,4 @@
 #include "ili9341.h"
 #include "pax_gfx.h"
 
-void menu_start(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* version);
+void menu_start(xQueueHandle button_queue, const char* version);

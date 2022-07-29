@@ -10,7 +10,6 @@
 #include "fpga_test.h"
 #include "hardware.h"
 #include "ice40.h"
-#include "ili9341.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "settings.h"
@@ -117,7 +116,8 @@ bool test_sd_power(uint32_t* rc) {
     return true;
 }
 
-bool run_basic_tests(pax_buf_t* pax_buffer, ILI9341* ili9341) {
+bool run_basic_tests() {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font;
     int               line = 0;
     bool              ok   = true;
@@ -127,7 +127,7 @@ bool run_basic_tests(pax_buf_t* pax_buffer, ILI9341* ili9341) {
 
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0x8060f0);
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 
     /* Run mandatory tests */
     RUN_TEST_MANDATORY("RP2040", test_rp2040_init);
@@ -144,7 +144,7 @@ bool run_basic_tests(pax_buf_t* pax_buffer, ILI9341* ili9341) {
 error:
     /* Fail result on screen */
     if (!ok) pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20 * line, "FAIL");
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
     return ok;
 }
 
@@ -152,14 +152,15 @@ const uint8_t led_green[15] = {50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0}
 const uint8_t led_red[15]   = {0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0};
 const uint8_t led_blue[15]  = {0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50};
 
-void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    uint8_t factory_test_done = nvs_get_u8_default("system", "factory_test", 0);
+void factory_test() {
+    pax_buf_t* pax_buffer        = get_pax_buffer();
+    uint8_t    factory_test_done = nvs_get_u8_default("system", "factory_test", 0);
     if (!factory_test_done) {
         bool result;
 
         ESP_LOGI(TAG, "Factory test start");
 
-        result = run_basic_tests(pax_buffer, ili9341);
+        result = run_basic_tests();
 
         gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_SD_PWR, 1);
@@ -174,7 +175,7 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
 
         RP2040* rp2040 = get_rp2040();
 
-        result = run_fpga_tests(rp2040->queue, pax_buffer, ili9341);
+        result = run_fpga_tests(rp2040->queue);
         if (!result) {
             ws2812_send_data(led_red, sizeof(led_red));
             goto test_end;
@@ -191,13 +192,13 @@ void factory_test(pax_buf_t* pax_buffer, ILI9341* ili9341) {
                 ws2812_send_data(led_red, sizeof(led_red));
                 pax_noclip(pax_buffer);
                 pax_background(pax_buffer, 0xa85a32);
-                ili9341_write(ili9341, pax_buffer->buf);
+                display_flush();
             }
             nvs_set_u8_fixed("system", "force_sponsors", 0x01);  // Force showing sponsors on first boot
             wifi_set_defaults();
             pax_noclip(pax_buffer);
             pax_background(pax_buffer, 0x00FF00);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             ws2812_send_data(led_green, sizeof(led_green));
         }
 

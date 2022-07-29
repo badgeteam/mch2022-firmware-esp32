@@ -14,7 +14,7 @@ void _audio_init(int i2s_num) {
                                .sample_rate          = 8000,
                                .bits_per_sample      = I2S_BITS_PER_SAMPLE_16BIT,
                                .channel_format       = I2S_CHANNEL_FMT_RIGHT_LEFT,
-                               .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
+                               .communication_format = I2S_COMM_FORMAT_STAND_I2S,
                                .dma_buf_count        = 8,
                                .dma_buf_len          = 256,
                                .intr_alloc_flags     = 0,
@@ -29,15 +29,15 @@ void _audio_init(int i2s_num) {
 }
 
 typedef struct _audio_player_cfg {
-    uint8_t* buffer;
-    size_t   size;
-    bool     free_buffer;
+    const uint8_t* buffer;
+    size_t         size;
+    bool           free_buffer;
 } audio_player_cfg_t;
 
 void audio_player_task(void* arg) {
     audio_player_cfg_t* config        = (audio_player_cfg_t*) arg;
     size_t              sample_length = config->size;
-    uint8_t*            sample_buffer = config->buffer;
+    const uint8_t*      sample_buffer = config->buffer;
 
     size_t count;
     size_t position = 0;
@@ -49,7 +49,7 @@ void audio_player_task(void* arg) {
         memcpy(buffer, &sample_buffer[position], length);
         for (size_t l = 0; l < length; l += 2) {
             int16_t* sample = (int16_t*) &buffer[l];
-            *sample *= 0.50;
+            *sample *= 0.60;
         }
         i2s_write(0, buffer, length, &count, portMAX_DELAY);
         if (count != length) {

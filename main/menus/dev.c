@@ -17,7 +17,6 @@
 #include "fpga_download.h"
 #include "fpga_test.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "ir.h"
 #include "menu.h"
 #include "pax_codecs.h"
@@ -49,8 +48,9 @@ static void render_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    menu_t* menu = menu_alloc("Tools", 34, 18);
+void menu_dev(xQueueHandle button_queue) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Tools", 34, 18);
 
     menu->fgColor           = 0xFF000000;
     menu->bgColor           = 0xFFFFFFFF;
@@ -83,7 +83,7 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
 
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
-        if (xQueueReceive(buttonQueue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             switch (pin) {
@@ -120,27 +120,27 @@ void menu_dev(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341)
 
         if (render) {
             menu_render(pax_buffer, menu, 0, 0, 320, 220);
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
 
         if (action != ACTION_NONE) {
             if (action == ACTION_FPGA_TEST) {
-                fpga_test(buttonQueue, pax_buffer, ili9341);
+                fpga_test(button_queue);
             } else if (action == ACTION_FILE_BROWSER) {
-                file_browser(buttonQueue, pax_buffer, ili9341, "/sd");
+                file_browser(button_queue, "/sd");
             } else if (action == ACTION_FILE_BROWSER_INT) {
-                file_browser(buttonQueue, pax_buffer, ili9341, "/internal");
+                file_browser(button_queue, "/internal");
             } else if (action == ACTION_BUTTON_TEST) {
-                test_buttons(buttonQueue, pax_buffer, ili9341);
+                test_buttons(button_queue);
             } else if (action == ACTION_ADC_TEST) {
-                test_adc(buttonQueue, pax_buffer, ili9341);
+                test_adc(button_queue);
             } else if (action == ACTION_SAO) {
-                menu_sao(buttonQueue, pax_buffer, ili9341);
+                menu_sao(button_queue);
             } else if (action == ACTION_IR) {
-                menu_ir(buttonQueue, pax_buffer, ili9341, false);
+                menu_ir(button_queue, false);
             } else if (action == ACTION_IR_RENZE) {
-                menu_ir(buttonQueue, pax_buffer, ili9341, true);
+                menu_ir(button_queue, true);
             } else if (action == ACTION_BACK) {
                 break;
             }

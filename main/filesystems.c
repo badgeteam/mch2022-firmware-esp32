@@ -79,8 +79,13 @@ void get_internal_filesystem_size_and_available(uint64_t* fs_size, uint64_t* fs_
     /* Get volume information and free clusters of drive 0 */
     FRESULT res = f_getfree("0:", &fre_clust, &fs);
     /* Get total sectors and free sectors */
-    tot_sect = (fs->n_fatent - 2) * fs->csize;
-    fre_sect = fre_clust * fs->csize;
+    if (res == FR_OK) {
+        tot_sect = (fs->n_fatent - 2) * fs->csize;
+        fre_sect = fre_clust * fs->csize;
+    } else {
+        tot_sect = 0;
+        fre_sect = 0;
+    }
 
     if (fs_size != NULL) *fs_size = tot_sect * CONFIG_WL_SECTOR_SIZE;
     if (fs_free != NULL) *fs_free = fre_sect * CONFIG_WL_SECTOR_SIZE;
@@ -98,8 +103,13 @@ void get_sdcard_filesystem_size_and_available(uint64_t* fs_size, uint64_t* fs_fr
     /* Get volume information and free clusters of drive 1 */
     FRESULT res = f_getfree("1:", &fre_clust, &fs);
     /* Get total sectors and free sectors */
-    tot_sect = (fs->n_fatent - 2) * fs->csize;
-    fre_sect = fre_clust * fs->csize;
+    if (res == FR_OK) {
+        tot_sect = (fs->n_fatent - 2) * fs->csize;
+        fre_sect = fre_clust * fs->csize;
+    } else {
+        tot_sect = 0;
+        fre_sect = 0;
+    }
 
     if (fs_size != NULL) *fs_size = tot_sect * 512;
     if (fs_free != NULL) *fs_free = fre_sect * 512;

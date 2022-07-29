@@ -15,7 +15,6 @@
 #include "esp_sleep.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "menu.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
@@ -46,14 +45,13 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path, const char* name, const char* title,
-                     uint16_t version) {
-    display_boot_screen(pax_buffer, ili9341, "Installing app...");
+void appfs_store_app(xQueueHandle button_queue, const char* path, const char* name, const char* title, uint16_t version) {
+    display_boot_screen("Installing app...");
     esp_err_t res;
     FILE*     app_fd = fopen(path, "rb");
     if (app_fd == NULL) {
-        render_message(pax_buffer, "Failed to open file");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Failed to open file");
+        display_flush();
         ESP_LOGE(TAG, "Failed to open file");
         if (button_queue != NULL) wait_for_button(button_queue);
         return;
@@ -62,8 +60,8 @@ void appfs_store_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* 
     uint8_t* app      = load_file_to_ram(app_fd);
     fclose(app_fd);
     if (app == NULL) {
-        render_message(pax_buffer, "Failed to load app to RAM");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Failed to load app to RAM");
+        display_flush();
         ESP_LOGE(TAG, "Failed to load application into RAM");
         if (button_queue != NULL) wait_for_button(button_queue);
         return;
@@ -71,23 +69,22 @@ void appfs_store_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* 
 
     ESP_LOGI(TAG, "Application size %d", app_size);
 
-    res = appfs_store_in_memory_app(button_queue, pax_buffer, ili9341, name, title, version, app_size, app);
+    res = appfs_store_in_memory_app(button_queue, name, title, version, app_size, app);
     if (res == ESP_OK) {
-        render_message(pax_buffer, "App installed!");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("App installed!");
+        display_flush();
         if (button_queue != NULL) wait_for_button(button_queue);
     }
 
     free(app);
 }
 
-esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* name, const char* title, uint16_t version,
-                                    size_t app_size, uint8_t* app) {
+esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
     esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {
-        render_message(pax_buffer, "Failed to create file");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Failed to create file");
+        display_flush();
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
         if (button_queue != NULL) wait_for_button(button_queue);
         return res;
@@ -95,16 +92,16 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, pax_buf_t* pax_bu
     int roundedSize = (app_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
     res             = appfsErase(handle, 0, roundedSize);
     if (res != ESP_OK) {
-        render_message(pax_buffer, "Failed to erase file");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Failed to erase file");
+        display_flush();
         ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
         if (button_queue != NULL) wait_for_button(button_queue);
         return res;
     }
     res = appfsWrite(handle, 0, app, app_size);
     if (res != ESP_OK) {
-        render_message(pax_buffer, "Failed to write file");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Failed to write file");
+        display_flush();
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
         if (button_queue != NULL) wait_for_button(button_queue);
         return res;

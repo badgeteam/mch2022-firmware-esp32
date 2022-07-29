@@ -383,18 +383,16 @@ static bool test_pmod_open(uint32_t* rc) {
     return *rc == SOC_RESP_OK;
 }
 
-static bool test_pmod_plug(uint32_t* rc) {
+/*static bool test_pmod_plug(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
 
-    /* Execute command */
     if (!soc_message(ice40, SOC_CMD_PMOD_PLUG_TEST, 0, rc, 0)) {
         *rc = -1;
         return false;
     }
 
-    /* Check response */
     return *rc == SOC_RESP_OK;
-}
+}*/
 
 static bool test_lcd_init(uint32_t* rc) {
     ICE40* ice40 = get_ice40();
@@ -409,8 +407,10 @@ static bool test_lcd_init(uint32_t* rc) {
     return *rc == SOC_RESP_OK;
 }
 
-bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    ICE40*            ice40 = get_ice40();
+bool run_fpga_tests(xQueueHandle button_queue) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    ICE40*            ice40      = get_ice40();
+    ILI9341*          ili9341    = get_ili9341();
     const pax_font_t* font;
     int               line = 0;
     bool              ok   = true;
@@ -420,7 +420,7 @@ bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* il
 
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0x8060f0);
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 
     /* Run mandatory tests */
     RUN_TEST_MANDATORY("Bitstream load", test_bitstream_load);
@@ -442,10 +442,10 @@ bool run_fpga_tests(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* il
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+10, "Then press button for interactive test");
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+20, " - Check LCD color bars");
     pax_draw_text(pax_buffer, 0xffc0c0c0, font, 9, 25, 20*line+30, " - Then LCD & RGB led color cycling");
-    ili9341_write(ili9341, pax_buffer->buf);*/
+    display_flush();*/
 
     /* Wait for button */
-    // wait_button(buttonQueue);
+    // wait_button(button_queue);
 
     /* Clear the instructions from buffer */
     // pax_draw_rect(pax_buffer, 0xff8060f0, 0, 20*line, 320, 240-20*line);
@@ -482,7 +482,7 @@ error:
     else
         pax_draw_text(pax_buffer, 0xffff0000, font, 36, 0, 20 * line, "FAIL");
 
-    ili9341_write(ili9341, pax_buffer->buf);
+    display_flush();
 
     /* Cleanup */
     ice40_disable(ice40);
@@ -490,7 +490,7 @@ error:
     return ok;
 }
 
-void fpga_test(xQueueHandle buttonQueue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    run_fpga_tests(buttonQueue, pax_buffer, ili9341);
+void fpga_test(xQueueHandle button_queue) {
+    run_fpga_tests(button_queue);
     test_wait_for_response(NULL);
 }

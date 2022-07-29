@@ -19,6 +19,7 @@
 #include "fpga_download.h"
 #include "fpga_util.h"
 #include "graphics_wrapper.h"
+#include "gui_element_header.h"
 #include "hardware.h"
 #include "ice40.h"
 #include "ili9341.h"
@@ -47,15 +48,17 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 static appfs_handle_t python_appfs_fd      = APPFS_INVALID_FD;
 static bool           python_not_installed = false;
 
-static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, const char* path) {
-    const pax_font_t* font = pax_font_saira_regular;
+static void start_fpga_app(xQueueHandle button_queue, const char* path) {
+    ILI9341*          ili9341    = get_ili9341();
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
     char              filename[128];
     snprintf(filename, sizeof(filename), "%s/bitstream.bin", path);
     FILE* fd = fopen(filename, "rb");
     if (fd == NULL) {
         pax_background(pax_buffer, 0xFFFFFF);
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to open file\n\nPress A or B to go back");
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_flush();
         wait_for_button(button_queue);
         return;
     }
@@ -71,7 +74,7 @@ static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI
     fclose(fd);
     if (res == ESP_OK) {
         fpga_irq_setup(ice40);
-        fpga_host(button_queue, ice40, pax_buffer, ili9341, false, path);
+        fpga_host(button_queue, ice40, false, path);
         fpga_irq_cleanup(ice40);
         ice40_disable(ice40);
         ili9341_init(ili9341);
@@ -80,7 +83,7 @@ static void start_fpga_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI
         ili9341_init(ili9341);
         pax_background(pax_buffer, 0xFFFFFF);
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to load bitstream\n\nPress A or B to go back");
-        ili9341_write(ili9341, pax_buffer->buf);
+        display_flush();
         wait_for_button(button_queue);
     }
 }
@@ -155,14 +158,14 @@ static bool populate_menu(menu_t* menu) {
            sdcard_result_python;
 }
 
-static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app_to_start) {
-    display_boot_screen(pax_buffer, ili9341, "Starting app...");
+static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
+    display_boot_screen("Starting app...");
     if ((strlen(app_to_start->type) == strlen("ice40")) && (strncmp(app_to_start->type, "ice40", strlen(app_to_start->type)) == 0)) {
-        start_fpga_app(button_queue, pax_buffer, ili9341, app_to_start->path);
+        start_fpga_app(button_queue, app_to_start->path);
     } else if ((strlen(app_to_start->type) == strlen("python")) && (strncmp(app_to_start->type, "python", strlen(app_to_start->type)) == 0)) {
         if (python_not_installed) {
-            render_message(pax_buffer, "Python is not installed\n\nPlease install 'Python'\nusing the Hatchery under\n'ESP32 native binaries\\Utility'");
-            ili9341_write(ili9341, pax_buffer->buf);
+            render_message("Python is not installed\n\nPlease install 'Python'\nusing the Hatchery under\n'ESP32 native binaries\\Utility'");
+            display_flush();
             wait_for_button(button_queue);
         } else {
             start_python_app(app_to_start->path);
@@ -174,29 +177,29 @@ static void start_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341*
         if (app_to_start->version != version_in_appfs) {
             // TO DO: update the AppFS entry from FAT if possible
             ESP_LOGE(TAG, "Revision in AppFS: %u, version in metadata: %u", version_in_appfs, app_to_start->version);
-            render_message(pax_buffer, "Warning:\nAppFS entry version does not\nmatch version in app metadata");
-            ili9341_write(ili9341, pax_buffer->buf);
+            render_message("Warning:\nAppFS entry version does not\nmatch version in app metadata");
+            display_flush();
             wait_for_button(button_queue);
             appfs_boot_app(appfs_fd_to_start);  // Start anyway
         } else if (appfs_fd_to_start != APPFS_INVALID_FD) {
             appfs_boot_app(appfs_fd_to_start);
         } else {
             // TO DO: install the AppFS entry from FAT if possible
-            render_message(pax_buffer, "AppFS entry not found");
-            ili9341_write(ili9341, pax_buffer->buf);
+            render_message("AppFS entry not found");
+            display_flush();
             wait_for_button(button_queue);
         }
     } else {
-        render_message(pax_buffer, "Unknown application type!");
-        ili9341_write(ili9341, pax_buffer->buf);
+        render_message("Unknown application type!");
+        display_flush();
         ESP_LOGE(TAG, "Unknown application type: %s", app_to_start->type);
         wait_for_button(button_queue);
     }
 }
 
-static bool uninstall_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app) {
-    render_message(pax_buffer, "Uninstalling...");
-    ili9341_write(ili9341, pax_buffer->buf);
+static bool uninstall_app(xQueueHandle button_queue, launcher_app_t* app) {
+    render_message("Uninstalling...");
+    display_flush();
 
     // 1) Remove AppFS entry
     if (app->appfs_fd != APPFS_INVALID_FD) {
@@ -215,15 +218,16 @@ static bool uninstall_app(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9
     return true;
 }
 
-static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341, launcher_app_t* app) {
-    bool return_value = false;
-    bool render       = true;
-    bool quit         = false;
+static bool show_app_details(xQueueHandle button_queue, launcher_app_t* app) {
+    pax_buf_t* pax_buffer   = get_pax_buffer();
+    bool       return_value = false;
+    bool       render       = true;
+    bool       quit         = false;
     while (!quit) {
         if (render) {
             pax_simple_rect(pax_buffer, 0xFFFFFFFF, 0, pax_buffer->height - 20, pax_buffer->width, 20);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 start  🅱 back  🅴 uninstall");
-            render_outline(pax_buffer, 0, 0, pax_buffer->width, pax_buffer->height - 20, 0xFFfa448c, 0xFFFFFFFF);
+            render_outline(0, 0, pax_buffer->width, pax_buffer->height - 20, 0xFFfa448c, 0xFFFFFFFF);
             render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfec859, 0xFFfa448c, app->icon, app->title);
             char buffer[128];
             snprintf(buffer, sizeof(buffer) - 1, "Type: %s", (app->type != NULL) ? app->type : "Unknown");
@@ -235,7 +239,7 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
             snprintf(buffer, sizeof(buffer) - 1, "Version: %u", app->version);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 48 + 20 * 3, buffer);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 48 + 20 * 4, (app->description != NULL) ? app->description : "Unknown");
-            ili9341_write(ili9341, pax_buffer->buf);
+            display_flush();
             render = false;
         }
         rp2040_input_message_t buttonMessage = {0};
@@ -249,11 +253,11 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
                     case RP2040_INPUT_JOYSTICK_PRESS:
                     case RP2040_INPUT_BUTTON_ACCEPT:
                     case RP2040_INPUT_BUTTON_START:
-                        start_app(button_queue, pax_buffer, ili9341, app);
+                        start_app(button_queue, app);
                         render = true;
                         break;
                     case RP2040_INPUT_BUTTON_SELECT:
-                        if (uninstall_app(button_queue, pax_buffer, ili9341, app)) {
+                        if (uninstall_app(button_queue, app)) {
                             return_value = true;
                             quit         = true;
                         }
@@ -267,12 +271,13 @@ static bool show_app_details(xQueueHandle button_queue, pax_buf_t* pax_buffer, I
     return return_value;
 }
 
-void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    //size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    bool   reload     = true;
+void menu_launcher(xQueueHandle button_queue) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    // size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    bool reload = true;
     while (reload) {
         reload = false;
-        display_busy(pax_buffer, ili9341);
+        display_busy();
         python_appfs_fd      = appfsOpen("python");
         python_not_installed = (python_appfs_fd == APPFS_INVALID_FD);
 
@@ -304,8 +309,8 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                 pax_noclip(pax_buffer);
                 pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 start  🅱 back  🅼 options");
                 menu_render(pax_buffer, menu, 0, 0, 320, 220);
-                if (empty) render_message(pax_buffer, "No apps installed");
-                ili9341_write(ili9341, pax_buffer->buf);
+                if (empty) render_message("No apps installed");
+                display_flush();
                 render = false;
             }
 
@@ -334,7 +339,7 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
                             {
                                 launcher_app_t* app = (launcher_app_t*) menu_get_callback_args(menu, menu_get_position(menu));
                                 if (app != NULL) {
-                                    if (show_app_details(button_queue, pax_buffer, ili9341, app)) {
+                                    if (show_app_details(button_queue, app)) {
                                         reload = true;
                                         quit   = true;
                                     } else {
@@ -352,7 +357,7 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
             }
 
             if (app_to_start != NULL) {
-                start_app(button_queue, pax_buffer, ili9341, app_to_start);
+                start_app(button_queue, app_to_start);
                 app_to_start = NULL;
                 render       = true;
             }
@@ -364,6 +369,6 @@ void menu_launcher(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* il
         menu_free(menu);
         pax_buf_destroy(&menu_icon);
     }
-    //size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
-    //printf("Leak in launcher: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
+    // size_t ram_after = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
+    // printf("Leak in launcher: %d (%u to %u)\r\n", ram_before - ram_after, ram_before, ram_after);
 }
