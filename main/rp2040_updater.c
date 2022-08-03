@@ -228,7 +228,7 @@ void rp2040_update_start(RP2040* rp2040) {
     rp2040_updater_execute(rp2040);
 }
 
-void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void rp2040_updater(RP2040* rp2040) {
     uint8_t fw_version;
     if (rp2040_get_firmware_version(rp2040, &fw_version) != ESP_OK) {
         display_rp2040_update_error("Failed to read firmware version");
@@ -236,7 +236,7 @@ void rp2040_updater(RP2040* rp2040, pax_buf_t* pax_buffer, ILI9341* ili9341) {
         restart();
     }
 
-    if (fw_version < 0x0A) {  // Update required
+    if (fw_version < 0x0B) {  // Update required
         rp2040_update_start(rp2040);
     }
 

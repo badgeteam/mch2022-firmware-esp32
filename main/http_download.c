@@ -7,7 +7,6 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "pax_codecs.h"

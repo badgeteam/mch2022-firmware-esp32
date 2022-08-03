@@ -49,7 +49,7 @@ void audio_player_task(void* arg) {
         memcpy(buffer, &sample_buffer[position], length);
         for (size_t l = 0; l < length; l += 2) {
             int16_t* sample = (int16_t*) &buffer[l];
-            *sample *= 0.60;
+            *sample *= 0.55;
         }
         i2s_write(0, buffer, length, &count, portMAX_DELAY);
         if (count != length) {

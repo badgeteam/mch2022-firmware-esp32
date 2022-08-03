@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ili9341.h"
 #include "menu.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"

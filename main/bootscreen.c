@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "hardware.h"
-#include "ili9341.h"
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 

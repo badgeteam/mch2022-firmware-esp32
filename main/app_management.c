@@ -64,7 +64,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
         ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message("Failed create folder");
         display_flush();
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return false;
     }
 
@@ -75,7 +75,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
         ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message("Failed create folder");
         display_flush();
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return false;
     }
 
@@ -86,7 +86,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
         ESP_LOGI(TAG, "Failed to create %s", buffer);
         render_message("Failed create folder");
         display_flush();
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return false;
     }
 
@@ -109,7 +109,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
                 ESP_LOGI(TAG, "Failed to download %s to RAM", url_obj->valuestring);
                 render_message("Failed to download file");
                 display_flush();
-                if (button_queue != NULL) wait_for_button(button_queue);
+                if (button_queue != NULL) wait_for_button();
                 return false;
             }
             if (esp32_binary_data != NULL) {  // Ignore 0 bytes files
@@ -120,7 +120,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
                     ESP_LOGI(TAG, "Failed to store ESP32 binary");
                     render_message("Failed to install app to AppFS");
                     display_flush();
-                    if (button_queue != NULL) wait_for_button(button_queue);
+                    if (button_queue != NULL) wait_for_button();
                     return false;
                 }
                 if (to_sd_card) {
@@ -133,7 +133,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
                         ESP_LOGI(TAG, "Failed to install ESP32 binary to %s", buffer);
                         render_message("Failed to install app to SD card");
                         display_flush();
-                        if (button_queue != NULL) wait_for_button(button_queue);
+                        if (button_queue != NULL) wait_for_button();
                         return false;
                     }
                     fwrite(esp32_binary_data, 1, esp32_binary_size, binary_fd);
@@ -152,7 +152,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
                 ESP_LOGI(TAG, "Failed to download %s to %s", url_obj->valuestring, buffer);
                 render_message("Failed to download file");
                 display_flush();
-                if (button_queue != NULL) wait_for_button(button_queue);
+                if (button_queue != NULL) wait_for_button();
                 return false;
             }
         }
@@ -165,7 +165,7 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
         ESP_LOGI(TAG, "Failed to install metadata to %s", buffer);
         render_message("Failed to install metadata");
         display_flush();
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return false;
     }
     fwrite(data_app_info, 1, size_app_info, metadata_fd);
@@ -174,6 +174,6 @@ bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_ca
     ESP_LOGI(TAG, "App installed!");
     render_message("App has been installed!");
     display_flush();
-    if (button_queue != NULL) wait_for_button(button_queue);
+    if (button_queue != NULL) wait_for_button();
     return true;
 }

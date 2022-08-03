@@ -90,15 +90,14 @@ void webusb_log(char* fmt, ...) {
 
 typedef struct _log_task_args {
     xQueueHandle  button_queue;
-    pax_buf_t*    pax_buffer;
-    ILI9341*      ili9341;
     char*         lines[LOG_LINES];
     QueueHandle_t queue;
 } log_task_args_t;
 
 static void log_event_task(void* pvParameters) {
-    log_task_args_t* args = (log_task_args_t*) pvParameters;
-    pax_noclip(args->pax_buffer);
+    pax_buf_t*       pax_buffer = get_pax_buffer();
+    log_task_args_t* args       = (log_task_args_t*) pvParameters;
+    pax_noclip(pax_buffer);
     for (;;) {
         char* buffer = NULL;
         if (xQueueReceive(args->queue, &buffer, portMAX_DELAY) == pdTRUE) {
@@ -113,33 +112,19 @@ static void log_event_task(void* pvParameters) {
                 args->lines[LOG_LINES - 1] = buffer;
             }
             const pax_font_t* font = pax_font_sky_mono;
-            pax_background(args->pax_buffer, 0xFFFFFF);
+            pax_background(pax_buffer, 0xFFFFFF);
             for (uint8_t i = 0; i < LOG_LINES; i++) {
                 if (args->lines[i] != NULL) {
-                    pax_draw_text(args->pax_buffer, 0xFF000000, font, 18, 0, 20 * i, args->lines[i]);
+                    pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * i, args->lines[i]);
                 }
             }
-            ili9341_write(args->ili9341, args->pax_buffer->buf);
+            display_flush();
         }
     }
     vTaskDelete(NULL);
 }
 
 void webusb_print_status_wrapped(char* buffer) { xQueueSend(log_queue, &buffer, portMAX_DELAY); }
-
-void webusb_main(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
-    log_task_args_t* log_task_args = malloc(sizeof(log_task_args_t));
-    memset(log_task_args, 0, sizeof(log_task_args_t));
-    log_task_args->button_queue = button_queue;
-    log_task_args->pax_buffer   = pax_buffer;
-    log_task_args->ili9341      = ili9341;
-    log_task_args->queue        = xQueueCreate(8, sizeof(char*));
-    xTaskCreate(log_event_task, "log_event_task", 2048, (void*) log_task_args, 12, NULL);
-    log_queue = log_task_args->queue;
-    webusb_log("Starting FS over bus...");
-    driver_fsoverbus_init(&webusb_print_status_wrapped);
-    webusb_enable_uart();
-}
 
 void webusb_enable_uart() {
     fflush(stdout);
@@ -177,6 +162,18 @@ void webusb_new_enable_uart() {
 }
 
 void webusb_new_disable_uart() { uart_driver_delete(WEBUSB_UART); }
+
+void webusb_main(xQueueHandle button_queue) {
+    log_task_args_t* log_task_args = malloc(sizeof(log_task_args_t));
+    memset(log_task_args, 0, sizeof(log_task_args_t));
+    log_task_args->button_queue = button_queue;
+    log_task_args->queue        = xQueueCreate(8, sizeof(char*));
+    xTaskCreate(log_event_task, "log_event_task", 2048, (void*) log_task_args, 12, NULL);
+    log_queue = log_task_args->queue;
+    webusb_log("Starting FS over bus...");
+    driver_fsoverbus_init(&webusb_print_status_wrapped);
+    webusb_enable_uart();
+}
 
 void webusb_send_error(webusb_packet_header_t* header, uint8_t error) {
     webusb_response_header_t response = {
@@ -590,12 +587,10 @@ static void uart_event_task(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-void webusb_new_main(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void webusb_new_main(xQueueHandle button_queue) {
     log_task_args_t* log_task_args = malloc(sizeof(log_task_args_t));
     memset(log_task_args, 0, sizeof(log_task_args_t));
     log_task_args->button_queue = button_queue;
-    log_task_args->pax_buffer   = pax_buffer;
-    log_task_args->ili9341      = ili9341;
     log_task_args->queue        = xQueueCreate(8, sizeof(char*));
     xTaskCreate(log_event_task, "log_event_task", 2048, (void*) log_task_args, 12, NULL);
     log_queue = log_task_args->queue;

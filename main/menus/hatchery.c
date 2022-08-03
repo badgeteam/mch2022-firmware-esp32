@@ -138,12 +138,12 @@ static char*  data_app_info = NULL;
 static size_t size_app_info = 0;
 static cJSON* json_app_info = NULL;
 
-static bool connect_to_wifi(xQueueHandle button_queue) {
+static bool connect_to_wifi() {
     if (!wifi_connect_to_stored()) {
         wifi_disconnect_and_disable();
         render_message("Unable to connect to\nthe WiFi network");
         display_flush();
-        wait_for_button(button_queue);
+        wait_for_button();
         return false;
     }
     return true;
@@ -527,7 +527,7 @@ void menu_hatchery(xQueueHandle button_queue) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy();
 
-    if (!connect_to_wifi(button_queue)) return;
+    if (!connect_to_wifi()) return;
 
     if (!load_types()) {
         wifi_disconnect_and_disable();

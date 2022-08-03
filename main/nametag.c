@@ -16,7 +16,6 @@
 #include "freertos/task.h"
 #include "graphics_wrapper.h"
 #include "hardware.h"
-#include "ili9341.h"
 #include "nvs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
@@ -29,6 +28,8 @@
 static const char *TAG = "nametag";
 
 typedef enum { NICKNAME_THEME_HELLO = 0, NICKNAME_THEME_SIMPLE, NICKNAME_THEME_GAMER, NICKNAME_THEME_LAST } nickname_theme_t;
+
+static int hue = 0;
 
 void edit_nickname(xQueueHandle button_queue) {
     pax_buf_t   *pax_buffer = get_pax_buffer();
@@ -77,7 +78,6 @@ static void show_name(xQueueHandle button_queue, const char *name, nickname_them
         pax_center_text(pax_buffer, 0xFFFFFFFF, title_font, 24, pax_buffer->width / 2, 30, "My name is:");
         pax_center_text(pax_buffer, 0xFF000000, name_font, scale, pax_buffer->width / 2, 60 + ((pax_buffer->height - 90) - dims.y) / 2, name);
     } else if (theme == NICKNAME_THEME_GAMER) {
-        int       hue   = esp_random() & 255;
         pax_col_t color = pax_col_hsv(hue, 255 /*saturation*/, 255 /*brighness*/);
         pax_background(pax_buffer, 0xFFFFFF);
         pax_simple_rect(pax_buffer, color, 0, 0, pax_buffer->width, 60);
@@ -184,15 +184,25 @@ void show_nametag(xQueueHandle button_queue) {
     rp2040_input_message_t msg;
     bool                   quit = false;
     while (!quit) {
-        if ((esp_timer_get_time() / 1000 > sleep_time) && (theme != NICKNAME_THEME_GAMER)) {
-            show_name(button_queue, buffer, theme, false);
-            place_in_sleep(button_queue);
-            break;
+        if (esp_timer_get_time() / 1000 > sleep_time) {
+            if (theme != NICKNAME_THEME_GAMER) {
+                show_name(button_queue, buffer, theme, false);
+                place_in_sleep(button_queue);
+                break;
+            } else {
+                hue = esp_random() & 255;
+            }
         }
         show_name(button_queue, buffer, theme, true);
         if (xQueueReceive(button_queue, &msg, pdMS_TO_TICKS(SLEEP_DELAY + 10))) {
             if (msg.state) {
                 switch (msg.input) {
+                    case RP2040_INPUT_JOYSTICK_LEFT:
+                    case RP2040_INPUT_JOYSTICK_RIGHT:
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        hue = esp_random() & 255;
+                        break;
                     case RP2040_INPUT_BUTTON_BACK:
                     case RP2040_INPUT_BUTTON_HOME:
                         quit = true;

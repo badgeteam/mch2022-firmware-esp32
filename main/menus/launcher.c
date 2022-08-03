@@ -59,7 +59,7 @@ static void start_fpga_app(xQueueHandle button_queue, const char* path) {
         pax_background(pax_buffer, 0xFFFFFF);
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to open file\n\nPress A or B to go back");
         display_flush();
-        wait_for_button(button_queue);
+        wait_for_button();
         return;
     }
     size_t   bitstream_length = get_file_size(fd);
@@ -84,7 +84,7 @@ static void start_fpga_app(xQueueHandle button_queue, const char* path) {
         pax_background(pax_buffer, 0xFFFFFF);
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to load bitstream\n\nPress A or B to go back");
         display_flush();
-        wait_for_button(button_queue);
+        wait_for_button();
     }
 }
 
@@ -166,7 +166,7 @@ static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
         if (python_not_installed) {
             render_message("Python is not installed\n\nPlease install 'Python'\nusing the Hatchery under\n'ESP32 native binaries\\Utility'");
             display_flush();
-            wait_for_button(button_queue);
+            wait_for_button();
         } else {
             start_python_app(app_to_start->path);
         }
@@ -179,7 +179,7 @@ static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
             ESP_LOGE(TAG, "Revision in AppFS: %u, version in metadata: %u", version_in_appfs, app_to_start->version);
             render_message("Warning:\nAppFS entry version does not\nmatch version in app metadata");
             display_flush();
-            wait_for_button(button_queue);
+            wait_for_button();
             appfs_boot_app(appfs_fd_to_start);  // Start anyway
         } else if (appfs_fd_to_start != APPFS_INVALID_FD) {
             appfs_boot_app(appfs_fd_to_start);
@@ -187,13 +187,13 @@ static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
             // TO DO: install the AppFS entry from FAT if possible
             render_message("AppFS entry not found");
             display_flush();
-            wait_for_button(button_queue);
+            wait_for_button();
         }
     } else {
         render_message("Unknown application type!");
         display_flush();
         ESP_LOGE(TAG, "Unknown application type: %s", app_to_start->type);
-        wait_for_button(button_queue);
+        wait_for_button();
     }
 }
 

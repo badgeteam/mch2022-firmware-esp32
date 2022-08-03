@@ -53,7 +53,7 @@ void appfs_store_app(xQueueHandle button_queue, const char* path, const char* na
         render_message("Failed to open file");
         display_flush();
         ESP_LOGE(TAG, "Failed to open file");
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return;
     }
     size_t   app_size = get_file_size(app_fd);
@@ -63,7 +63,7 @@ void appfs_store_app(xQueueHandle button_queue, const char* path, const char* na
         render_message("Failed to load app to RAM");
         display_flush();
         ESP_LOGE(TAG, "Failed to load application into RAM");
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return;
     }
 
@@ -73,7 +73,7 @@ void appfs_store_app(xQueueHandle button_queue, const char* path, const char* na
     if (res == ESP_OK) {
         render_message("App installed!");
         display_flush();
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
     }
 
     free(app);
@@ -86,7 +86,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, const char* name,
         render_message("Failed to create file");
         display_flush();
         ESP_LOGE(TAG, "Failed to create file on AppFS (%d)", res);
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return res;
     }
     int roundedSize = (app_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
@@ -95,7 +95,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, const char* name,
         render_message("Failed to erase file");
         display_flush();
         ESP_LOGE(TAG, "Failed to erase file on AppFS (%d)", res);
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return res;
     }
     res = appfsWrite(handle, 0, app, app_size);
@@ -103,7 +103,7 @@ esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, const char* name,
         render_message("Failed to write file");
         display_flush();
         ESP_LOGE(TAG, "Failed to write to file on AppFS (%d)", res);
-        if (button_queue != NULL) wait_for_button(button_queue);
+        if (button_queue != NULL) wait_for_button();
         return res;
     }
     ESP_LOGI(TAG, "Application is now stored in AppFS");

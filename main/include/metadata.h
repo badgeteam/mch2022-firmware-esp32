@@ -3,13 +3,10 @@
 #include <cJSON.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <freertos/task.h>
 #include <stdbool.h>
 
 #include "appfs.h"
-#include "ili9341.h"
 #include "menu.h"
-#include "pax_gfx.h"
 
 typedef struct {
     char*          path;

@@ -155,7 +155,7 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to open file\n\nPress A or B to go back");
         display_flush();
         ESP_LOGE(TAG, "Failed to open file");
-        wait_for_button(button_queue);
+        wait_for_button();
         free(path);
         return;
     }
@@ -167,7 +167,7 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
         if (file_size <= appfs_free) {
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0, "ESP32 application\n\nPress A to install\nPress B to go back");
             display_flush();
-            if (wait_for_button(button_queue)) {
+            if (wait_for_button()) {
                 appfs_store_app(button_queue, filename, label, label, 0xFFFF);
             }
         } else {
@@ -177,14 +177,14 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
                      appfs_free / 1024);
             pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, buffer);
             display_flush();
-            wait_for_button(button_queue);
+            wait_for_button();
         }
         free(path);
         return;
     } else if (is_bitstream(fd)) {
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 0, "FPGA bitstream\n\nPress A to run\nPress B to go back");
         display_flush();
-        if (wait_for_button(button_queue)) {
+        if (wait_for_button()) {
             size_t   bitstream_length = get_file_size(fd);
             uint8_t* bitstream        = load_file_to_ram(fd);
             ICE40*   ice40            = get_ice40();
@@ -208,7 +208,7 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
                 pax_background(pax_buffer, 0xFFFFFF);
                 pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Failed to load bitstream\n\nPress A or B to go back");
                 display_flush();
-                wait_for_button(button_queue);
+                wait_for_button();
             }
         } else {
             fclose(fd);
@@ -218,7 +218,7 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
         pax_draw_text(pax_buffer, 0xFFFF0000, font, 18, 0, 0, "Unsupported file type\n\nPress A or B to go back");
         display_flush();
         ESP_LOGE(TAG, "Failed to open file");
-        wait_for_button(button_queue);
+        wait_for_button();
     }
     free(path);
     return;

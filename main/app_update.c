@@ -21,8 +21,6 @@
 #include "gui_element_header.h"
 #include "hardware.h"
 #include "http_download.h"
-#include "ice40.h"
-#include "ili9341.h"
 #include "launcher.h"
 #include "menu.h"
 #include "metadata.h"
@@ -37,8 +35,6 @@ static const char* TAG = "Updater";
 
 typedef struct _update_apps_callback_args {
     xQueueHandle button_queue;
-    pax_buf_t*   pax_buffer;
-    ILI9341*     ili9341;
     bool         sdcard;
 } update_apps_callback_args_t;
 
@@ -47,7 +43,7 @@ static bool connect_to_wifi(xQueueHandle button_queue) {
         wifi_disconnect_and_disable();
         render_message("Unable to connect to\nthe WiFi network");
         display_flush();
-        wait_for_button(button_queue);
+        wait_for_button();
         return false;
     }
     return true;
@@ -138,7 +134,7 @@ static void callback(const char* path, const char* entity, void* user) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s/%s: no metadata", path, entity);
         ESP_LOGW(TAG, "%s", string_buffer);
         terminal_add(strdup(string_buffer));
-        terminal_render(args->pax_buffer, args->ili9341);
+        terminal_render();
         goto end;
     }
 
@@ -146,7 +142,7 @@ static void callback(const char* path, const char* entity, void* user) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: incomplete metadata", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
         terminal_add(strdup(string_buffer));
-        terminal_render(args->pax_buffer, args->ili9341);
+        terminal_render();
         goto end;
     }
 
@@ -154,7 +150,7 @@ static void callback(const char* path, const char* entity, void* user) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: fetching metadata failed", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
         terminal_add(strdup(string_buffer));
-        terminal_render(args->pax_buffer, args->ili9341);
+        terminal_render();
         goto end;
     }
 
@@ -164,7 +160,7 @@ static void callback(const char* path, const char* entity, void* user) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: hatchery has no version", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
         terminal_add(strdup(string_buffer));
-        terminal_render(args->pax_buffer, args->ili9341);
+        terminal_render();
         goto end;
     }
 
@@ -172,14 +168,14 @@ static void callback(const char* path, const char* entity, void* user) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: up to date", slug);
         ESP_LOGW(TAG, "%s", string_buffer);
         terminal_add(strdup(string_buffer));
-        terminal_render(args->pax_buffer, args->ili9341);
+        terminal_render();
         goto end;
     }
 
     snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: r%d to r%d", slug, installed_version, version_obj->valueint);
     ESP_LOGI(TAG, "%s", string_buffer);
     terminal_add(strdup(string_buffer));
-    terminal_render(args->pax_buffer, args->ili9341);
+    terminal_render();
 
     if (install_app(NULL, type, args->sdcard, data_app_info, size_app_info, json_app_info)) {
         snprintf(string_buffer, sizeof(string_buffer) - 1, "%s: installed r%d", slug, version_obj->valueint);
@@ -190,7 +186,7 @@ static void callback(const char* path, const char* entity, void* user) {
     }
 
     terminal_add(strdup(string_buffer));
-    terminal_render(args->pax_buffer, args->ili9341);
+    terminal_render();
 
 end:
     free_app_info();
@@ -201,20 +197,23 @@ end:
     if (name != NULL) free(name);
 }
 
-void update_apps(xQueueHandle button_queue, pax_buf_t* pax_buffer, ILI9341* ili9341) {
+void update_apps(xQueueHandle button_queue) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     terminal_add(strdup("Connecting to WiFi..."));
     terminal_render();
 
-    if (!connect_to_wifi(button_queue)) return;
+    if (!connect_to_wifi(button_queue)) {
+        terminal_add(strdup("Failed to connect to WiFi"));
+        terminal_render();
+        terminal_free();
+        return;
+    }
 
-    terminal_add(strdup("Connected to WiFi!"));
+    terminal_add(strdup("Connected to WiFi"));
     terminal_render();
 
     update_apps_callback_args_t args;
     args.button_queue = button_queue;
-    args.pax_buffer   = pax_buffer;
-    args.ili9341      = ili9341;
     args.sdcard       = false;
 
     for_entity_in_path("/internal/apps/esp32", true, &callback, &args);

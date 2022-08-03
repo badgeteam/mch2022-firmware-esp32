@@ -103,7 +103,7 @@ void wifi_connection_test(xQueueHandle button_queue) {
         esp_netif_ip_info_t* ip_info = wifi_get_ip_info();
         wifi_disconnect_and_disable();
         display_test_state(test_result, ssid, password, authmode, phase2, username, anon_ident, ip_info, true);
-        quit = !wait_for_button(button_queue);
+        quit = !wait_for_button();
         if (quit) break;
         display_test_state("Connecting...", ssid, password, authmode, phase2, username, anon_ident, ip_info, false);
 

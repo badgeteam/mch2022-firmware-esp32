@@ -69,7 +69,7 @@ void display_fatal_error(const char* line0, const char* line1, const char* line2
     display_flush();
 }
 
-void display_rp2040_crashed_message(xQueueHandle button_queue) {
+void display_rp2040_crashed_message() {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
@@ -83,10 +83,10 @@ void display_rp2040_crashed_message(xQueueHandle button_queue) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 9, "You can find the repository at:");
     pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10, "https://github.com/badgeteam\n/mch2022-firmware-rp2040    Press A to continue.");
     display_flush();
-    wait_for_button(button_queue);
+    wait_for_button();
 }
 
-bool display_rp2040_flash_lock_warning(xQueueHandle button_queue) {
+bool display_rp2040_flash_lock_warning() {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
@@ -103,7 +103,7 @@ bool display_rp2040_flash_lock_warning(xQueueHandle button_queue) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 12, 0, 20 * 10,
                   "You can disable this protection by pressing A\nTo continue starting without disabling the protection\npress B.");
     display_flush();
-    return wait_for_button(button_queue);
+    return wait_for_button();
 }
 
 void display_rp2040_debug_message() {
@@ -268,14 +268,14 @@ void app_main(void) {
     bool rp2040_debug   = crash_debug & 0x02;
 
     if (rp2040_crashed) {
-        display_rp2040_crashed_message(rp2040->queue);
+        display_rp2040_crashed_message();
     }
 
     if (rp2040_debug) {
         display_rp2040_debug_message();
     }
 
-    factory_test(get_pax_buffer(), get_ili9341());
+    factory_test();
 
     /* Apply flashing lock */
 
@@ -337,7 +337,7 @@ void app_main(void) {
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 continue");
             render_message("Default WiFi settings\nhave been restored!\nPress A to continue...");
             display_flush();
-            wait_for_button(rp2040->queue);
+            wait_for_button();
         } else {
             display_fatal_error(fatal_error_str, "Failed to configure WiFi", "Flash may be corrupted", reset_board_str);
             stop();
@@ -372,7 +372,7 @@ void app_main(void) {
                 if (attempted) {
                     rp2040_set_reset_attempted(rp2040, false);
                     ESP_LOGE(TAG, "Detected esptool.py style reset while flash lock is active");
-                    bool disable_lock = display_rp2040_flash_lock_warning(rp2040->queue);
+                    bool disable_lock = display_rp2040_flash_lock_warning();
                     if (disable_lock) {
                         nvs_set_u8(handle, "flash_lock", 0);
                         nvs_commit(handle);
@@ -445,7 +445,7 @@ void app_main(void) {
             pax_insert_png_buf(pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
             pax_draw_text(pax_buffer, 0xFF000000, pax_font_saira_regular, 18, 5, 240 - 18, "🅰 continue");
             display_flush();
-            wait_for_button(rp2040->queue);
+            wait_for_button();
             nvs_set_u8(handle, "lattice", 1);
         }
 
@@ -466,7 +466,7 @@ void app_main(void) {
             }
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 continue");
             display_flush();
-            wait_for_button(rp2040->queue);
+            wait_for_button();
         }
 
         /* Rick that roll */
@@ -477,14 +477,14 @@ void app_main(void) {
             menu_start(rp2040->queue, app_description->version);
         }
     } else if (webusb_mode == 0x01) {
-        webusb_main(rp2040->queue, pax_buffer, get_ili9341());
+        webusb_main(rp2040->queue);
     } else if (webusb_mode == 0x02) {
         display_boot_screen("FPGA download mode");
         while (true) {
             fpga_download(rp2040->queue, ice40);
         }
     } else if (webusb_mode == 0x03) {
-        webusb_new_main(rp2040->queue, pax_buffer, get_ili9341());
+        webusb_new_main(rp2040->queue);
     } else {
         char buffer[64];
         snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);

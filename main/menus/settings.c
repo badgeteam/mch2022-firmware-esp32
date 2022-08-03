@@ -66,7 +66,7 @@ void edit_lock(xQueueHandle button_queue) {
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, state_str);
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 toggle state  🅱 back");
         display_flush();
-        if (wait_for_button(button_queue)) {
+        if (wait_for_button()) {
             state = (~state) & 0x01;
             nvs_set_u8(handle, "flash_lock", state);
             nvs_commit(handle);

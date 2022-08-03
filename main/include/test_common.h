@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ili9341.h"
-#include "pax_gfx.h"
-
 typedef bool (*test_fn)(uint32_t *rc);
 
 bool test_wait_for_response(uint32_t *rc);

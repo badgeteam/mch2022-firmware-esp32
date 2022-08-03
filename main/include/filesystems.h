@@ -1,8 +1,8 @@
+#pragma once
+
 #include <stdint.h>
 
 #include "esp_err.h"
-#include "esp_vfs.h"
-#include "esp_vfs_fat.h"
 
 esp_err_t mount_internal_filesystem();
 esp_err_t format_internal_filesystem();
