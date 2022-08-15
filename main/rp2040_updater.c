@@ -236,7 +236,7 @@ void rp2040_updater(RP2040* rp2040) {
         restart();
     }
 
-    if (fw_version < 0x0B) {  // Update required
+    if (fw_version < 0x0C) {  // Update required
         rp2040_update_start(rp2040);
     }
 
