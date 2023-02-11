@@ -63,23 +63,21 @@ void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
     float y         = (34 - height) / 2;
     float margin    = 3;
     float bar_width = width - (margin * 2);
-    pax_simple_rect(pax_buffer, (percentage > 10) ? 0xff40eb34 : 0xffeb4034, x, y, width, height);
-    pax_simple_rect(pax_buffer, (percentage > 10) ? 0xff40eb34 : 0xffeb4034, x + width, y + 5, 3, height - 10);
+    uint32_t color = (charging) ? 0xffffe700 : ((percentage > 10) ? 0xff40eb34 : 0xffeb4034);
+    pax_simple_rect(pax_buffer, color, x, y, width, height);
+    pax_simple_rect(pax_buffer, color, x + width, y + 5, 3, height - 10);
     pax_simple_rect(pax_buffer, 0xFF491d88, x + margin + ((percentage * bar_width) / 100), y + margin, bar_width - ((percentage * bar_width) / 100),
                     height - (margin * 2));
-    if (charging) {
-        const pax_font_t* font = pax_font_saira_regular;
-        pax_draw_text(pax_buffer, 0xffffffff, font, 18, x + width - 6, y + 2, "+");
-    }
 }
 
 void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     const pax_font_t* font = pax_font_saira_regular;
-    pax_background(pax_buffer, 0xFFFFFF);
+    pax_background(pax_buffer, 0xffffffff);
     pax_noclip(pax_buffer);
-    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept");
+    pax_simple_rect(pax_buffer, 0xff491d88, 0, 220, 320, 20);
+    pax_draw_text(pax_buffer, 0xffffffff, font, 18, 5, 240 - 18, "🅰 accept");
     pax_vec1_t version_size = pax_text_size(font, 18, text);
-    pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
+    pax_draw_text(pax_buffer, 0xffffffff, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }
 
 void menu_start(xQueueHandle button_queue, const char* version) {
