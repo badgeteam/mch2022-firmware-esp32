@@ -46,14 +46,8 @@
 #include "wifi_ota.h"
 #include "ws2812.h"
 
-extern const uint8_t wallpaper_png_start[] asm("_binary_wallpaper_png_start");
-extern const uint8_t wallpaper_png_end[] asm("_binary_wallpaper_png_end");
-
 extern const uint8_t logo_screen_png_start[] asm("_binary_logo_screen_png_start");
 extern const uint8_t logo_screen_png_end[] asm("_binary_logo_screen_png_end");
-
-extern const uint8_t lattice_logo_png_start[] asm("_binary_m_logo_lattice_png_start");
-extern const uint8_t lattice_logo_png_end[] asm("_binary_m_logo_lattice_png_end");
 
 static const char* TAG = "main";
 
@@ -383,70 +377,6 @@ void app_main(void) {
             }
         } else {
             ESP_LOGW(TAG, "Flashing using esptool.py is allowed");
-        }
-
-        /* Sponsors check */
-        uint8_t sponsors;
-        res = nvs_get_u8(handle, "sponsors", &sponsors);
-        if ((res != ESP_OK) || (sponsors < 1)) {
-            appfs_handle_t appfs_fd = appfsOpen("sponsors");
-            if (appfs_fd != APPFS_INVALID_FD) {
-                appfs_boot_app(appfs_fd);
-                stop();
-            } else {
-                ESP_LOGW(TAG, "Sponsors app not installed while sponsors should have been shown");
-            }
-        }
-
-        /* Lattice check */
-        uint8_t lattice;
-        res = nvs_get_u8(handle, "lattice", &lattice);
-        if ((res != ESP_OK) || (lattice < 1)) {
-            pax_background(pax_buffer, 0x000000);
-            for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
-                display_flush();
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                uint8_t j = 254 - i;
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 18, "In 2017 we managed to\nforget a sponsor...");
-                display_flush();
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 18, "This time we managed to\ninclude the wrong company...");
-                display_flush();
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                uint8_t j = 254 - i;
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 18, "This time we managed to\ninclude the wrong company...");
-                display_flush();
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (i << 16) | (i << 8) | (i), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
-                display_flush();
-            }
-            for (uint8_t i = 0; i < 250; i += 4) {
-                uint8_t j = 254 - i;
-                pax_background(pax_buffer, 0x000000);
-                pax_center_text(pax_buffer, 0xFF000000 | (j << 16) | (j << 8) | (j), pax_font_saira_regular, 18, pax_buffer->width / 2,
-                                pax_buffer->height / 2 - 27, "Lattice Semiconductor\nthank you for sponsoring the\nICE40UP5K FPGA");
-                display_flush();
-            }
-            pax_insert_png_buf(pax_buffer, lattice_logo_png_start, lattice_logo_png_end - lattice_logo_png_start, 0, 0, 0);
-            pax_draw_text(pax_buffer, 0xFF000000, pax_font_saira_regular, 18, 5, 240 - 18, "🅰 continue");
-            display_flush();
-            wait_for_button();
-            nvs_set_u8(handle, "lattice", 1);
         }
 
         /* Crash check */
