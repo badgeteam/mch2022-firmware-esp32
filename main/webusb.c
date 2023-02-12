@@ -40,7 +40,7 @@ static QueueHandle_t log_queue   = NULL;
 char* log_lines[LOG_LINES] = {NULL};
 
 static const uint32_t webusb_packet_magic   = 0xFEEDF00D;
-static const uint32_t webusb_response_error = 0xFFFFEE00;
+static const uint32_t webusb_response_error = (('E' << 0) | ('R' << 8) | ('R' << 16) | ('0' << 24));
 
 static FILE*    file_fd    = NULL;
 static uint32_t file_write = false;
@@ -177,7 +177,7 @@ void webusb_main(xQueueHandle button_queue) {
 
 void webusb_send_error(webusb_packet_header_t* header, uint8_t error) {
     webusb_response_header_t response = {
-        .magic = webusb_packet_magic, .identifier = header->identifier, .response = webusb_response_error & 3, .payload_length = 0, .payload_crc = 0};
+        .magic = webusb_packet_magic, .identifier = header->identifier, .response = webusb_response_error + ( error << 24 ), .payload_length = 0, .payload_crc = 0};
     uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
 }
 
@@ -196,9 +196,11 @@ void webusb_fs_list(webusb_packet_header_t* header, uint8_t* payload) {
     size_t         response_length = 0;
     while ((ent = readdir(dir)) != NULL) {
         response_length += sizeof(unsigned char);  // d_type
+        response_length += sizeof(size_t); // name length
         response_length += strlen(ent->d_name);    // d_name
-        response_length += sizeof(size_t);
-        response_length += sizeof(struct timespec) * 3;
+        response_length += sizeof(int); // stat ok
+        response_length += sizeof(size_t); // file size
+        response_length += sizeof(time_t); // file modification timestamp
     }
     rewinddir(dir);
 
@@ -216,17 +218,35 @@ void webusb_fs_list(webusb_packet_header_t* header, uint8_t* payload) {
         unsigned char* type = &response_buffer[response_position];
         *type               = ent->d_type;
         response_position += sizeof(unsigned char);
+        size_t* namelength = (size_t*) &response_buffer[response_position];
+        *namelength = strlen(ent->d_name);
+        response_position += sizeof(size_t);
         strcpy((char*) &response_buffer[response_position], ent->d_name);
         response_position += strlen(ent->d_name);
-        // struct stat sb; // Maybe add this?
+        struct stat sb = {0};
+        char tpath[255];
+        sprintf(tpath, path);
+        if (path[strlen(path) - 1] != '/') {
+            strcat(tpath, "/");
+        }
+        strcat(tpath, ent->d_name);
+        int* statok = (int*) &response_buffer[response_position];
+        response_position += sizeof(int);
+        *statok = stat(tpath, &sb);
+        size_t* filesize = (size_t*) &response_buffer[response_position];
+        *filesize = sb.st_size;
+        response_position += sizeof(size_t);
+        time_t* mtime = (time_t*) &response_buffer[response_position];
+        *mtime = sb.st_mtime;
+        response_position += sizeof(time_t);
     }
 
     closedir(dir);
 
     webusb_response_header_t response = {
-        .magic = webusb_packet_magic, .identifier = header->identifier, .response = header->command, .payload_length = response_length, .payload_crc = 0};
+        .magic = webusb_packet_magic, .identifier = header->identifier, .response = header->command, .payload_length = response_length, .payload_crc = crc32_le(0, response_buffer, response_length)};
     uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
-    uart_write_bytes(WEBUSB_UART, &response_buffer, response_length);
+    uart_write_bytes(WEBUSB_UART, response_buffer, response_length);
 }
 
 void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
@@ -366,7 +386,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
             }
         case WEBUSB_CMD_CHNK:
             {
-                webusb_log("Chunck");
+                webusb_log("Chunk");
                 if (file_fd == NULL) {
                     // No file open
                     webusb_send_error(header, 6);
@@ -401,7 +421,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                                                              .payload_length = length,
                                                              .payload_crc    = crc32_le(0, data, length)};
                         uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
-                        uart_write_bytes(WEBUSB_UART, &data, length);
+                        uart_write_bytes(WEBUSB_UART, data, length);
                         free(data);
                     }
                 }
@@ -481,12 +501,12 @@ static void uart_event_task(void* pvParameters) {
                                             webusb_send_error(&packet_header, 1);
                                             state = STATE_WAITING;
                                         } else {
-                                            webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                            /*webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                                                  .identifier     = packet_header.identifier,
-                                                                                 .response       = 0xFFFFDA7A,
+                                                                                 .response       = (('D' << 0) | ('A' << 8) | ('T' << 16) | ('A' << 24)),
                                                                                  .payload_length = 0,
                                                                                  .payload_crc    = 0};
-                                            uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                                            uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));*/
                                             state = STATE_RECEIVING_PAYLOAD;
                                         }
                                     } else {
