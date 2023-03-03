@@ -56,8 +56,8 @@ static const char* TAG = "fpga_test";
 
 static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t* resp, TickType_t ticks_to_wait) {
     esp_err_t res;
-    uint8_t   data_tx[6];
-    uint8_t   data_rx[6];
+    uint8_t data_tx[6] __attribute__((aligned(4)));
+    uint8_t data_rx[6] __attribute__((aligned(4)));
 
     /* Default delay */
     ticks_to_wait /= 10; /* We do 10 retries */
@@ -127,15 +127,14 @@ static bool test_bitstream_load(uint32_t* rc) {
 
 static bool _test_spi_loopback_one(ICE40* ice40) {
     esp_err_t res;
-    uint8_t   data_tx[257];
-    uint8_t   data_rx[258];
+    uint8_t data_tx[257] __attribute__((aligned(4)));
+    uint8_t data_rx[258] __attribute__((aligned(4)));
 
-    /* Generate pseudo random sequence */
+    data_tx[0] = SPI_CMD_LOOPBACK; // Send 256 bytes at high speed with echo command
     data_tx[1] = 1;
-    for (int i = 2; i < 257; i++) data_tx[i] = (data_tx[i - 1] << 1) ^ ((data_tx[i - 1] & 0x80) ? 0x1d : 0x00);
-
-    /* Send 256 bytes at high speed with echo command */
-    data_tx[0] = SPI_CMD_LOOPBACK;
+    for (int i = 2; i < 257; i++) { // Generate pseudo random sequence
+        data_tx[i] = (data_tx[i - 1] << 1) ^ ((data_tx[i - 1] & 0x80) ? 0x1d : 0x00);
+    }
 
     res = ice40_send_turbo(ice40, data_tx, 257);
     if (res != ESP_OK) {

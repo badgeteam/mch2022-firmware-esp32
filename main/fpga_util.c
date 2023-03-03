@@ -522,7 +522,7 @@ void fpga_req_del_file(uint32_t fid) { _fpga_req_delete_entry(fid); }
 
 bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err_t *err) {
     esp_err_t res;
-    uint8_t   buf[12];
+    uint8_t   buf[12] __attribute__((aligned(4)));
     uint8_t   req;
 
     // Default is no error
@@ -560,7 +560,7 @@ bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err
         req_length  = ((buf[10] << 8) | buf[11]) + 1;
 
         // Get buffer
-        buf_req = malloc(req_length + 1);
+        buf_req = malloc(req_length + 1 + ((req_length + 1) % 4)); // Allocate a 32-bit aligned amount
 
         // Load data from file
         _fpga_req_fread(prefix, req_file_id, &buf_req[1], req_length, req_offset);

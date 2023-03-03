@@ -54,5 +54,4 @@ idf_component_register(
                 ${project_dir}/resources/icons/python.png
                 ${project_dir}/resources/icons/hourglass.png
                 ${project_dir}/resources/icons/update.png
-                ${project_dir}/resources/m_logo_lattice.png
 )

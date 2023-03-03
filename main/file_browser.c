@@ -227,8 +227,8 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
 void file_browser(xQueueHandle button_queue, const char* initial_path) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     display_boot_screen("Please wait...");
-    char path[512] = {0};
-    strncpy(path, initial_path, sizeof(path));
+    char path[513] = {0};
+    strncpy(path, initial_path, sizeof(path) - 1);
     while (true) {
         menu_t* menu = menu_alloc(path, 20, 18);
         DIR*    dir  = opendir(path);
