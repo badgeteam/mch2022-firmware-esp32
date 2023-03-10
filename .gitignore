@@ -6,3 +6,4 @@ sdkconfig.old
 .vscode
 tools/__pycache__
 .cache
+esp-idf
