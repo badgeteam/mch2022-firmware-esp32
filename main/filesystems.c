@@ -16,6 +16,7 @@
 
 static const char* TAG = "fs";
 
+static bool        locfd_mounted = false;
 static bool        sdcard_mounted = false;
 static wl_handle_t s_wl_handle    = WL_INVALID_HANDLE;
 
@@ -37,15 +38,26 @@ esp_err_t mount_internal_filesystem() {
         ESP_LOGE(TAG, "failed to mount locfd (%d)", res);
         return res;
     }
+    
+    locfd_mounted = true;
 
     return ESP_OK;
 }
 
-esp_err_t format_internal_filesystem() {
+esp_err_t unmount_internal_filesystem() {
     esp_err_t res = esp_vfs_fat_spiflash_unmount("/internal", s_wl_handle);
     if (res != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to unmount FAT filesystem (%d)", res);
+        ESP_LOGE(TAG, "Failed to unmount locfd (%d)", res);
+    } else {
+        locfd_mounted = false;
     }
+    return res;
+}
+
+bool get_internal_mounted() { return locfd_mounted; }
+
+esp_err_t format_internal_filesystem() {
+    esp_err_t res = unmount_internal_filesystem();
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
     if (fs_partition == NULL) {
         ESP_LOGE(TAG, "failed to mount locfd: partition not found");
@@ -67,6 +79,16 @@ esp_err_t format_internal_filesystem() {
 esp_err_t mount_sdcard_filesystem() {
     esp_err_t res  = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);
     sdcard_mounted = (res == ESP_OK);
+    return res;
+}
+
+esp_err_t unmount_sdcard_filesystem() {
+    esp_err_t res = esp_vfs_fat_sdmmc_unmount();
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to unmount sdcard (%d)", res);
+    } else {
+        sdcard_mounted = false;
+    }
     return res;
 }
 

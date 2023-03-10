@@ -53,7 +53,8 @@ typedef enum action {
     ACTION_DEV,
     ACTION_SETTINGS,
     ACTION_UPDATE,
-    ACTION_OTA
+    ACTION_OTA,
+    ACTION_MSC
 } menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
@@ -117,6 +118,7 @@ void menu_start(xQueueHandle button_queue, const char* version) {
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
     menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
     menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
+    menu_insert_item_icon(menu, "Disk", NULL, (void*) ACTION_MSC, -1, &icon_dev);
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
@@ -212,6 +214,10 @@ void menu_start(xQueueHandle button_queue, const char* version) {
                 update_apps(button_queue);
             } else if (action == ACTION_OTA) {
                 ota_update(false);
+            } else if (action == ACTION_MSC) {
+                display_boot_screen("Starting mass storage mode...");
+                rp2040_set_msc_control(rp2040, 0x01); // Signal starting
+                esp_restart();
             }
             action = ACTION_NONE;
             render = true;
