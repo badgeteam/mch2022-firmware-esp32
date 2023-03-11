@@ -118,7 +118,7 @@ void menu_start(xQueueHandle button_queue, const char* version) {
     menu_insert_item_icon(menu, "Settings", NULL, (void*) ACTION_SETTINGS, -1, &icon_settings);
     menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
     menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
-    menu_insert_item_icon(menu, "Disk", NULL, (void*) ACTION_MSC, -1, &icon_dev);
+    //menu_insert_item_icon(menu, "Disk", NULL, (void*) ACTION_MSC, -1, &icon_dev);
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
