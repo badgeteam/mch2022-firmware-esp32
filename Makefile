@@ -6,11 +6,13 @@ SHELL := /usr/bin/env bash
 
 .PHONY: prepare clean build flash erase monitor menuconfig image qemu install size size-components size-files format
 
-all: prepare build flash
+all: build flash
 
 prepare:
 	git submodule update --init --recursive
-	cd esp-idf; bash install.sh
+	rm -rf "$(IDF_PATH)"
+	git clone --recursive --branch v4.4.1 https://github.com/espressif/esp-idf.git
+	cd "$(IDF_PATH)"; bash install.sh
 
 clean:
 	rm -rf "$(BUILDDIR)"
