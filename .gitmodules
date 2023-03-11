@@ -1,6 +1,3 @@
-[submodule "esp-idf"]
-	path = esp-idf
-	url = https://github.com/espressif/esp-idf.git
 [submodule "components/bus-i2c"]
 	path = components/bus-i2c
 	url = https://github.com/Nicolai-Electronics/esp32-component-bus-i2c.git
