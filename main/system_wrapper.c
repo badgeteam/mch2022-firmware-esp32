@@ -67,13 +67,13 @@ bool remove_recursive(const char* path) {
 
     // if path does not exists or is not dir - exit with status -1
     if (S_ISDIR(stat_path.st_mode) == 0) {
-        printf("%s: %s\n", "Is not directory", path);
+        //printf("%s: %s\n", "Is not directory", path);
         return false;
     }
 
     // if not possible to read the directory for this user
     if ((dir = opendir(path)) == NULL) {
-        printf("%s: %s\n", "Can`t open directory", path);
+        //printf("%s: %s\n", "Can`t open directory", path);
         return false;
     }
 
@@ -106,9 +106,9 @@ bool remove_recursive(const char* path) {
 
         // remove a file object
         if (unlink(full_path) == 0) {
-            printf("Removed a file: %s\n", full_path);
+            //printf("Removed a file: %s\n", full_path);
         } else {
-            printf("Can`t remove a file: %s\n", full_path);
+            //printf("Can`t remove a file: %s\n", full_path);
             failed = true;
         }
         free(full_path);
@@ -116,9 +116,9 @@ bool remove_recursive(const char* path) {
 
     // remove the devastated directory and close the object of it
     if (rmdir(path) == 0) {
-        printf("Removed a directory: %s\n", path);
+        //printf("Removed a directory: %s\n", path);
     } else {
-        printf("Can`t remove a directory: %s\n", path);
+        //printf("Can`t remove a directory: %s\n", path);
         failed = true;
     }
     closedir(dir);

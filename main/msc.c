@@ -107,7 +107,7 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
     switch (header->command) {
         case MSC_CMD_SYNC:
             {
-                terminal_log("SYNC");
+                terminal_printf("SYNC");
                 msc_response_header_t response = {
                     .magic = msc_packet_magic, .identifier = header->identifier, .response = header->command, .payload_length = 0, .payload_crc = 0};
                 uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
@@ -115,7 +115,7 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             }
         case MSC_CMD_PING:
             {
-                terminal_log("PING");
+                terminal_printf("PING");
                 msc_response_header_t response = {.magic          = msc_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
@@ -127,7 +127,7 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             }
         case MSC_CMD_READ: {
             if (header->payload_length != sizeof(msc_payload_t)) {
-                terminal_log("Invalid payload length");
+                terminal_printf("Invalid payload length");
                 msc_send_error(header, 4);
                 break;
             }
@@ -135,31 +135,31 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             msc_payload_t* readPayload = (msc_payload_t*) payload;
             
             if (readPayload->length > sizeof(disk_data_buffer)) {
-                terminal_log("Requested size too long");
+                terminal_printf("Requested size too long");
                 msc_send_error(header, 5);
                 break;
             }
 
-            //terminal_log("READ %u, %u, %u", readPayload->lba, readPayload->offset, readPayload->length);
+            //terminal_printf("READ %u, %u, %u", readPayload->lba, readPayload->offset, readPayload->length);
             
             if (readPayload->lun == 0) {
                 // Internal memory
                 esp_err_t res = esp_partition_read(internal_fs_partition, readPayload->lba * 512 + readPayload->offset, disk_data_buffer, readPayload->length);
                 if (res != ESP_OK) {
-                    terminal_log("Part read error %d", res);
+                    terminal_printf("Part read error %d", res);
                     msc_send_error(header, 7);
                 }
             } else if (readPayload->lun == 1) {
                 // SD card
                 /*esp_err_t res = sdmmc_read_sectors(card, disk_data_buffer, readPayload->lba, readPayload->length);
                 if (res != ESP_OK) {
-                    terminal_log("SD read error %d", res);
+                    terminal_printf("SD read error %d", res);
                     msc_send_error(header, 7);
                 }*/
                 memset(disk_data_buffer, 0, readPayload->length);
             } else {
                 // Invalid logical device
-                terminal_log("Invalid LUN");
+                terminal_printf("Invalid LUN");
                 msc_send_error(header, 6);
                 break;
             }
@@ -177,7 +177,7 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
         }
         case MSC_CMD_WRIT: {
             if (header->payload_length < sizeof(msc_payload_t)) {
-                terminal_log("Invalid payload length");
+                terminal_printf("Invalid payload length");
                 msc_send_error(header, 4);
                 break;
             }
@@ -186,25 +186,25 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             uint8_t* pData = (uint8_t*) writePayload->data;
             
             if (header->payload_length != sizeof(msc_payload_t) + writePayload->length) {
-                terminal_log("Data length not match payload length");
+                terminal_printf("Data length not match payload length");
                 msc_send_error(header, 5);
                 break;
             }
 
-            //terminal_log("WRITE (%u) %u, %u, %u)", header->payload_length, writePayload->lba, writePayload->offset, writePayload->length);
+            //terminal_printf("WRITE (%u) %u, %u, %u)", header->payload_length, writePayload->lba, writePayload->offset, writePayload->length);
 
             if (writePayload->lun == 0) {
                 esp_err_t res = esp_partition_write(internal_fs_partition, writePayload->lba * 512 + writePayload->offset, pData, writePayload->length);
             
                 if (res != ESP_OK) {
-                    terminal_log("Part write error %d", res);
+                    terminal_printf("Part write error %d", res);
                     msc_send_error(header, 7);
                 }
             } else if (writePayload->lun == 1) {
                 // SD card
             } else {
                 // Invalid logical device
-                terminal_log("Invalid LUN");
+                terminal_printf("Invalid LUN");
                 msc_send_error(header, 6);
                 break;
             }
@@ -221,7 +221,7 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             break;
         }
         default:
-            terminal_log("Unknown command");
+            terminal_printf("Unknown command");
             msc_send_error(header, 3);
     }
 }
@@ -259,10 +259,10 @@ static void uart_event_task(void* pvParameters) {
                                         packet_payload_position   = 0;
                                         memset(&packet_header, 0, sizeof(msc_packet_header_t));
                                         state = STATE_RECEIVING_HEADER;
-                                        // terminal_log("Received magic");
+                                        // terminal_printf("Received magic");
                                         break;
                                     } else {
-                                        // terminal_log("M %08X", *(uint32_t*) magic_buffer);
+                                        // terminal_printf("M %08X", *(uint32_t*) magic_buffer);
                                     }
                                 }
                             }
@@ -274,11 +274,11 @@ static void uart_event_task(void* pvParameters) {
                                     position++;
                                 }
                                 if (packet_header_position == sizeof(msc_packet_header_t)) {
-                                    /*terminal_log("Received header");
-                                    terminal_log("TID: %08X", packet_header.identifier);
-                                    terminal_log("CMD: %08X", packet_header.command);
-                                    terminal_log("LEN: %08X", packet_header.payload_length);
-                                    terminal_log("CRC: %08X", packet_header.payload_crc);*/
+                                    /*terminal_printf("Received header");
+                                    terminal_printf("TID: %08X", packet_header.identifier);
+                                    terminal_printf("CMD: %08X", packet_header.command);
+                                    terminal_printf("LEN: %08X", packet_header.payload_length);
+                                    terminal_printf("CRC: %08X", packet_header.payload_crc);*/
                                     if (packet_header.payload_length > 0) {
                                         packet_payload                               = malloc(packet_header.payload_length + 1);
                                         packet_payload[packet_header.payload_length] = '\0';  // NULL terminate strings
@@ -319,10 +319,10 @@ static void uart_event_task(void* pvParameters) {
                                 if (packet_payload_crc == packet_header.payload_crc) {
                                     msc_process_packet(&packet_header, packet_payload);
                                 } else {
-                                    terminal_log("CRC error");
-                                    terminal_log(" > %08X", packet_header.payload_crc);
-                                    terminal_log(" C %08X", packet_payload_crc);
-                                    terminal_log(" S %u", packet_header.payload_length);
+                                    terminal_printf("CRC error");
+                                    terminal_printf(" > %08X", packet_header.payload_crc);
+                                    terminal_printf(" C %08X", packet_payload_crc);
+                                    terminal_printf(" S %u", packet_header.payload_length);
                                     
                                     char buf[64] = {0};
                                     int p = 0;
@@ -330,12 +330,12 @@ static void uart_event_task(void* pvParameters) {
                                         sprintf(buf + p, "%02X", packet_payload[i]);
                                         p+=2;
                                         if (p >= 16) {
-                                            terminal_log("%s", buf);
+                                            terminal_printf("%s", buf);
                                             memset(buf, 0, sizeof(buf));
                                             p = 0;
                                         }
                                     }
-                                    terminal_log("%s", buf);
+                                    terminal_printf("%s", buf);
                                     
                                     msc_send_error(&packet_header, 2);
                                     free(packet_payload);
@@ -354,31 +354,31 @@ static void uart_event_task(void* pvParameters) {
                     }
                 // Event of HW FIFO overflow detected
                 case UART_FIFO_OVF:
-                    terminal_log("uart hw fifo overflow");
+                    terminal_printf("uart hw fifo overflow");
                     uart_flush_input(MSC_UART);
                     xQueueReset(uart0_queue);
                     break;
                 // Event of UART ring buffer full
                 case UART_BUFFER_FULL:
-                    terminal_log("uart ring buffer full");
+                    terminal_printf("uart ring buffer full");
                     uart_flush_input(MSC_UART);
                     xQueueReset(uart0_queue);
                     break;
                 // Event of UART RX break detected
                 case UART_BREAK:
-                    terminal_log("uart rx break");
+                    terminal_printf("uart rx break");
                     break;
                 // Event of UART parity check error
                 case UART_PARITY_ERR:
-                    terminal_log("uart parity error");
+                    terminal_printf("uart parity error");
                     break;
                 // Event of UART frame error
                 case UART_FRAME_ERR:
-                    terminal_log("uart frame error");
+                    terminal_printf("uart frame error");
                     break;
                 // Others
                 default:
-                    terminal_log("unhandled uart event: %d", event.type);
+                    terminal_printf("unhandled uart event: %d", event.type);
                     break;
             }
         }
@@ -390,7 +390,7 @@ static void uart_event_task(void* pvParameters) {
 
 void msc_main(xQueueHandle button_queue) {
     terminal_start();
-    terminal_log("Starting mass storage...");
+    terminal_printf("Starting mass storage...");
     msc_enable_uart();
     xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
     
@@ -404,7 +404,7 @@ void msc_main(xQueueHandle button_queue) {
 
     internal_fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
     if (internal_fs_partition == NULL) {
-        terminal_log("Internal partition not found");
+        terminal_printf("Internal partition not found");
         return;
     }
     uint32_t first_sector      = internal_fs_partition->address / 512;//SPI_FLASH_SEC_SIZE;
@@ -417,16 +417,16 @@ void msc_main(xQueueHandle button_queue) {
 
     bool sdOk = false;
     if (get_sdcard_mounted()) {
-        terminal_log("SD card ready");
+        terminal_printf("SD card ready");
         card = getCard();
         rp2040_set_msc_block_count(rp2040, 1, card->csd.capacity);
         rp2040_set_msc_block_size(rp2040, 1, card->csd.sector_size);
         sdOk = true;
     } else {
-        terminal_log("SD card not ready");
+        terminal_printf("SD card not ready");
     }
     
-    terminal_log("Mass storage ready!");
+    terminal_printf("Mass storage ready!");
 
     uint8_t msc_control = sdOk ? 0x07 : 0x03; // Bit 0: enable, bit 1: internal memory ready, bit 2: SD card ready
     rp2040_set_msc_control(rp2040, msc_control); // Signal ready*/
