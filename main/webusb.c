@@ -9,6 +9,8 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
+#include <nvs.h>
+#include <nvs_flash.h>
 
 #include "app_management.h"
 #include "appfs.h"
@@ -142,7 +144,7 @@ void webusb_new_disable_uart() { uart_driver_delete(WEBUSB_UART); }
 void webusb_main(xQueueHandle button_queue) {
     terminal_start();
     terminal_log("Starting FS over bus...");
-    driver_fsoverbus_init(&terminal_log);
+    driver_fsoverbus_init(&terminal_log_wrapped);
     webusb_enable_uart();
 }
 
@@ -471,15 +473,71 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
             }
         case WEBUSB_CMD_APPL:
             {
-                // Not implemented yet
-                uint8_t result[1] = {0};
-                webusb_response_header_t response = {.magic          = webusb_packet_magic,
-                                                     .identifier     = header->identifier,
-                                                     .response       = header->command,
-                                                     .payload_length = sizeof(result),
-                                                     .payload_crc    = crc32_le(0, result, sizeof(result))};
-                uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
-                uart_write_bytes(WEBUSB_UART, result, sizeof(result));
+                int response_length = 0;
+                appfs_handle_t handle = APPFS_INVALID_FD;
+                while ((handle = appfsNextEntry(handle)) != APPFS_INVALID_FD) {
+                    const char* name;
+                    const char* title;
+                    uint16_t version;
+                    int size;
+                    appfsEntryInfoExt(handle, &name, &title, &version, &size);
+                    response_length += sizeof(uint16_t); // name length
+                    response_length += strlen(name);
+                    response_length += sizeof(uint16_t); // title length
+                    response_length += strlen(title);
+                    response_length += sizeof(uint16_t); // version
+                    response_length += sizeof(int); // size
+                }
+
+                if (response_length > 0) {
+                    uint8_t* response_buffer = malloc(response_length);
+                    if (response_buffer == NULL) {
+                        terminal_log("Malloc failed (response)");
+                        webusb_send_error(header, 4);
+                        return;
+                    }
+
+                    handle = APPFS_INVALID_FD;
+                    int response_position = 0;
+                    while ((handle = appfsNextEntry(handle)) != APPFS_INVALID_FD) {
+                        const char* name;
+                        const char* title;
+                        uint16_t version;
+                        int size;
+                        appfsEntryInfoExt(handle, &name, &title, &version, &size);
+
+                        uint16_t* response_name_length = (uint16_t*) &response_buffer[response_position];
+                        *response_name_length = strlen(name);
+                        response_position += sizeof(uint16_t);
+                        memcpy((char*) &response_buffer[response_position], name, strlen(name));
+                        response_position += strlen(name);
+
+                        uint16_t* response_title_length = (uint16_t*) &response_buffer[response_position];
+                        *response_title_length = strlen(title);
+                        response_position += sizeof(uint16_t);
+                        memcpy((char*) &response_buffer[response_position], title, strlen(title));
+                        response_position += strlen(title);
+
+                        uint16_t* response_version = (uint16_t*) &response_buffer[response_position];
+                        *response_version = version;
+                        response_position += sizeof(uint16_t);
+
+                        int* response_size = (int*) &response_buffer[response_position];
+                        *response_size = size;
+                        response_position += sizeof(int); // size
+                    }
+
+                    webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                        .identifier     = header->identifier,
+                                                        .response       = header->command,
+                                                        .payload_length = response_length,
+                                                        .payload_crc    = crc32_le(0, response_buffer, response_length)};
+                    uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                    uart_write_bytes(WEBUSB_UART, response_buffer, response_length);
+                } else {
+                    webusb_response_header_t response = {.magic = webusb_packet_magic, .identifier = header->identifier, .response = header->command, .payload_length = 0, .payload_crc = 0};
+                    uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                }
                 break;
             }
         case WEBUSB_CMD_APPR:
@@ -565,8 +623,18 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
             }
             case WEBUSB_CMD_APPD:
             {
-                // Not implemented yet
+                if (header->payload_length < 1 || header->payload_length >= webusb_max_payload_size - 1) {
+                    webusb_send_error(header, 9);
+                    return;
+                }
+                payload[header->payload_length + 1] = '\0';
+
                 uint8_t result[1] = {0};
+
+                esp_err_t res = appfsDeleteFile((char*) payload);
+
+                if (res == ESP_OK) result[0] = 1;
+
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
@@ -578,7 +646,20 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
             }
             case WEBUSB_CMD_NVSL:
             {
-                // Not implemented yet
+                if (header->payload_length < 1 || header->payload_length >= webusb_max_payload_size - 1) {
+                    webusb_send_error(header, 9);
+                    return;
+                }
+                payload[header->payload_length + 1] = '\0';
+
+                nvs_iterator_t it = nvs_entry_find("nvs", (char*) payload, NVS_TYPE_ANY);
+                while(it != NULL) {
+                    nvs_entry_info_t info;
+                    nvs_entry_info(it, &info);
+                    it = nvs_entry_next(it);
+                    printf("key '%s', type '%d' \n", info.key, info.type);
+                }
+
                 uint8_t result[1] = {0};
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,

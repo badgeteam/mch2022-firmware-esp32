@@ -45,6 +45,15 @@ void terminal_log(char* buffer) {
     xQueueSend(log_queue, &line, portMAX_DELAY);
 }
 
+void terminal_log_wrapped(char* buffer) {
+    char* newbuf = calloc(1, strlen(buffer)+1);
+    strcpy(newbuf, buffer);
+    terminal_line_t line;
+    line.data = newbuf;
+    line.is_dynamically_allocated = true;
+    xQueueSend(log_queue, &line, portMAX_DELAY);
+}
+
 static void log_event_task(void* pvParameters) {
     const pax_font_t* font = pax_font_sky_mono;
     terminal_line_t lines[LOG_LINES] = {0};

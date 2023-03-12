@@ -5,4 +5,5 @@
 
 void terminal_printf(char* fmt, ...);
 void terminal_log(char* buffer);
+void terminal_log_wrapped(char* buffer);
 void terminal_start();
