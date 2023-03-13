@@ -724,6 +724,12 @@ static void uart_event_task(void* pvParameters) {
     uint32_t               packet_payload_position = 0;
     uart_event_t           event;
     uint8_t*               dtmp = (uint8_t*) malloc(webusb_packet_buffer_size);
+
+    if (packet_payload == NULL || dtmp == NULL) {
+        terminal_log("Malloc failed!");
+        return;
+    }
+
     for (;;) {
         // Waiting for UART event.
         if (xQueueReceive(uart0_queue, (void*) &event, (TickType_t) portMAX_DELAY)) {
@@ -841,8 +847,7 @@ static void uart_event_task(void* pvParameters) {
 
 void webusb_new_main(xQueueHandle button_queue) {
     terminal_start();
-    terminal_printf("Starting...");
+    terminal_printf("WebUSB mode");
     webusb_new_enable_uart();
-    terminal_printf("UART driver installed");
     xTaskCreate(uart_event_task, "uart_event_task", 20480, NULL, 12, NULL);
 }
