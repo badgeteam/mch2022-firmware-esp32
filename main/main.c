@@ -31,6 +31,7 @@
 #include "managed_i2c.h"
 #include "menu.h"
 #include "menus/start.h"
+#include "msc.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rp2040_updater.h"
@@ -45,7 +46,6 @@
 #include "wifi_defaults.h"
 #include "wifi_ota.h"
 #include "ws2812.h"
-#include "msc.h"
 
 extern const uint8_t logo_screen_png_start[] asm("_binary_logo_screen_png_start");
 extern const uint8_t logo_screen_png_end[] asm("_binary_logo_screen_png_end");
@@ -357,9 +357,9 @@ void app_main(void) {
         display_fatal_error(fatal_error_str, "Failed to read WebUSB mode", NULL, NULL);
         stop();
     }
-    
+
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
-    
+
     uint8_t msc_state;
     res = rp2040_get_msc_state(rp2040, &msc_state);
     if (res != ESP_OK) {
@@ -369,71 +369,69 @@ void app_main(void) {
     }
 
     ESP_LOGI(TAG, "MSC state 0x%02X", msc_state);
-    
+
     if (msc_state > 0) {
         msc_main(rp2040->queue);
-    } else {
-        if (webusb_mode == 0x00) {  // Normal boot
-            if (prevent_flashing) {
-                uint8_t attempted;
-                if (rp2040_get_reset_attempted(rp2040, &attempted) == ESP_OK) {
-                    if (attempted) {
-                        rp2040_set_reset_attempted(rp2040, false);
-                        ESP_LOGE(TAG, "Detected esptool.py style reset while flash lock is active");
-                        bool disable_lock = display_rp2040_flash_lock_warning();
-                        if (disable_lock) {
-                            nvs_set_u8(handle, "flash_lock", 0);
-                            nvs_commit(handle);
-                            rp2040_set_reset_lock(rp2040, 0);
-                        }
-                        esp_restart();
+    } else if (webusb_mode == 0x00) {  // Normal boot
+        if (prevent_flashing) {
+            uint8_t attempted;
+            if (rp2040_get_reset_attempted(rp2040, &attempted) == ESP_OK) {
+                if (attempted) {
+                    rp2040_set_reset_attempted(rp2040, false);
+                    ESP_LOGE(TAG, "Detected esptool.py style reset while flash lock is active");
+                    bool disable_lock = display_rp2040_flash_lock_warning();
+                    if (disable_lock) {
+                        nvs_set_u8(handle, "flash_lock", 0);
+                        nvs_commit(handle);
+                        rp2040_set_reset_lock(rp2040, 0);
                     }
+                    esp_restart();
                 }
-            } else {
-                ESP_LOGW(TAG, "Flashing using esptool.py is allowed");
             }
-
-            /* Crash check */
-            appfs_handle_t crashed_app = appfs_detect_crash();
-            if (crashed_app != APPFS_INVALID_FD) {
-                const char* app_name = NULL;
-                appfsEntryInfo(crashed_app, &app_name, NULL);
-                pax_background(pax_buffer, 0xFFFFFF);
-                render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
-                pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
-                pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
-                if (app_name != NULL) {
-                    char buffer[64];
-                    buffer[sizeof(buffer) - 1] = '\0';
-                    snprintf(buffer, sizeof(buffer) - 1, "App: %s", app_name);
-                    pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
-                }
-                pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 continue");
-                display_flush();
-                wait_for_button();
-            }
-
-            /* Rick that roll */
-            xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL);
-
-            /* Launcher menu */
-            while (true) {
-                menu_start(rp2040->queue, app_description->version);
-            }
-        } else if (webusb_mode == 0x01) {
-            webusb_main(rp2040->queue);
-        } else if (webusb_mode == 0x02) {
-            display_boot_screen("FPGA download mode");
-            while (true) {
-                fpga_download(rp2040->queue, ice40);
-            }
-        } else if (webusb_mode == 0x03) {
-            webusb_new_main(rp2040->queue);
         } else {
-            char buffer[64];
-            snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
-            display_boot_screen(buffer);
+            ESP_LOGW(TAG, "Flashing using esptool.py is allowed");
         }
+
+        /* Crash check */
+        appfs_handle_t crashed_app = appfs_detect_crash();
+        if (crashed_app != APPFS_INVALID_FD) {
+            const char* app_name = NULL;
+            appfsEntryInfo(crashed_app, &app_name, NULL);
+            pax_background(pax_buffer, 0xFFFFFF);
+            render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFFfa448c, 0xFF491d88, NULL, "App crashed");
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52, "Failed to start app,");
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20, "check console for more details.");
+            if (app_name != NULL) {
+                char buffer[64];
+                buffer[sizeof(buffer) - 1] = '\0';
+                snprintf(buffer, sizeof(buffer) - 1, "App: %s", app_name);
+                pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 40, buffer);
+            }
+            pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 continue");
+            display_flush();
+            wait_for_button();
+        }
+
+        /* Rick that roll */
+        // xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL); // Disabled because the LED driver has problems
+
+        /* Launcher menu */
+        while (true) {
+            menu_start(rp2040->queue, app_description->version);
+        }
+    } else if (webusb_mode == 0x01) {
+        webusb_main(rp2040->queue);
+    } else if (webusb_mode == 0x02) {
+        display_boot_screen("FPGA download mode");
+        while (true) {
+            fpga_download(rp2040->queue, ice40);
+        }
+    } else if (webusb_mode == 0x03) {
+        webusb_new_main(rp2040->queue);
+    } else {
+        char buffer[64];
+        snprintf(buffer, sizeof(buffer), "Invalid mode 0x%02X", webusb_mode);
+        display_boot_screen(buffer);
     }
 
     nvs_close(handle);

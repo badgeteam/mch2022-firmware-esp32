@@ -29,15 +29,15 @@ void _audio_init(int i2s_num) {
 }
 
 typedef struct _audio_player_cfg {
-    const uint8_t* buffer;
-    size_t         size;
-    bool           free_buffer;
+    uint8_t* buffer;
+    size_t   size;
+    bool     free_buffer;
 } audio_player_cfg_t;
 
 void audio_player_task(void* arg) {
     audio_player_cfg_t* config        = (audio_player_cfg_t*) arg;
     size_t              sample_length = config->size;
-    const uint8_t*      sample_buffer = config->buffer;
+    uint8_t*            sample_buffer = config->buffer;
 
     size_t count;
     size_t position = 0;
@@ -74,7 +74,8 @@ audio_player_cfg_t bootsound;
 void play_bootsound() {
     TaskHandle_t handle;
 
-    bootsound.buffer = boot_snd_start, bootsound.size = boot_snd_end - boot_snd_start;
+    bootsound.buffer      = (uint8_t*) (boot_snd_start);
+    bootsound.size        = boot_snd_end - boot_snd_start;
     bootsound.free_buffer = false;
 
     xTaskCreate(&audio_player_task, "Audio player", 4096, (void*) &bootsound, 10, &handle);

@@ -16,7 +16,7 @@
 
 static const char* TAG = "fs";
 
-static bool        locfd_mounted = false;
+static bool        locfd_mounted  = false;
 static bool        sdcard_mounted = false;
 static wl_handle_t s_wl_handle    = WL_INVALID_HANDLE;
 
@@ -38,7 +38,7 @@ esp_err_t mount_internal_filesystem() {
         ESP_LOGE(TAG, "failed to mount locfd (%d)", res);
         return res;
     }
-    
+
     locfd_mounted = true;
 
     return ESP_OK;
@@ -57,7 +57,7 @@ esp_err_t unmount_internal_filesystem() {
 bool get_internal_mounted() { return locfd_mounted; }
 
 esp_err_t format_internal_filesystem() {
-    esp_err_t res = unmount_internal_filesystem();
+    esp_err_t              res          = unmount_internal_filesystem();
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
     if (fs_partition == NULL) {
         ESP_LOGE(TAG, "failed to mount locfd: partition not found");

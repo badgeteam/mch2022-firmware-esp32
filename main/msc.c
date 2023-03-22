@@ -1,5 +1,3 @@
-#include "webusb.h"
-
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
@@ -13,6 +11,7 @@
 #include "app_management.h"
 #include "appfs.h"
 #include "appfs_wrapper.h"
+#include "driver/sdmmc_host.h"
 #include "driver/uart.h"
 #include "driver_fsoverbus.h"
 #include "esp32/rom/crc.h"
@@ -24,16 +23,16 @@
 #include "ice40.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
+#include "sdcard.h"
+#include "sdmmc_cmd.h"
 #include "system_wrapper.h"
 #include "terminal.h"
-#include "driver/sdmmc_host.h"
-#include "sdmmc_cmd.h"
-#include "sdcard.h"
+#include "webusb.h"
 
 #define MSC_UART                UART_NUM_0
 #define MSC_PACKET_BUFFER_SIZE  (16384)
 #define MSC_UART_RX_BUFFER_SIZE (MSC_PACKET_BUFFER_SIZE * 2)
-#define MSC_UART_TX_BUFFER_SIZE  MSC_UART_RX_BUFFER_SIZE
+#define MSC_UART_TX_BUFFER_SIZE MSC_UART_RX_BUFFER_SIZE
 #define MSC_UART_QUEUE_DEPTH    (20)
 
 static QueueHandle_t uart0_queue = NULL;
@@ -75,7 +74,7 @@ typedef struct {
 #define MSC_ANS_OKOK (('O' << 0) | ('K' << 8) | ('O' << 16) | ('K' << 24))
 
 const esp_partition_t* internal_fs_partition;
-uint8_t disk_data_buffer[MSC_PACKET_BUFFER_SIZE];
+uint8_t                disk_data_buffer[MSC_PACKET_BUFFER_SIZE];
 
 void msc_enable_uart() {
     // Make sure any data remaining in the hardware buffers is completely transmitted
@@ -99,7 +98,7 @@ void msc_new_disable_uart() { uart_driver_delete(MSC_UART); }
 
 void msc_send_error(msc_packet_header_t* header, uint8_t error) {
     msc_response_header_t response = {
-        .magic = msc_packet_magic, .identifier = header->identifier, .response = msc_response_error + ( error << 24 ), .payload_length = 0, .payload_crc = 0};
+        .magic = msc_packet_magic, .identifier = header->identifier, .response = msc_response_error + (error << 24), .payload_length = 0, .payload_crc = 0};
     uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
 }
 
@@ -117,109 +116,105 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
             {
                 terminal_printf("PING");
                 msc_response_header_t response = {.magic          = msc_packet_magic,
-                                                     .identifier     = header->identifier,
-                                                     .response       = header->command,
-                                                     .payload_length = header->payload_length,
-                                                     .payload_crc    = header->payload_crc};
+                                                  .identifier     = header->identifier,
+                                                  .response       = header->command,
+                                                  .payload_length = header->payload_length,
+                                                  .payload_crc    = header->payload_crc};
                 uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
                 uart_write_bytes(MSC_UART, payload, header->payload_length);
                 break;
             }
-        case MSC_CMD_READ: {
-            if (header->payload_length != sizeof(msc_payload_t)) {
-                terminal_printf("Invalid payload length");
-                msc_send_error(header, 4);
-                break;
-            }
-            
-            msc_payload_t* readPayload = (msc_payload_t*) payload;
-            
-            if (readPayload->length > sizeof(disk_data_buffer)) {
-                terminal_printf("Requested size too long");
-                msc_send_error(header, 5);
-                break;
-            }
-
-            //terminal_printf("READ %u, %u, %u", readPayload->lba, readPayload->offset, readPayload->length);
-            
-            if (readPayload->lun == 0) {
-                // Internal memory
-                esp_err_t res = esp_partition_read(internal_fs_partition, readPayload->lba * 512 + readPayload->offset, disk_data_buffer, readPayload->length);
-                if (res != ESP_OK) {
-                    terminal_printf("Part read error %d", res);
-                    msc_send_error(header, 7);
+        case MSC_CMD_READ:
+            {
+                if (header->payload_length != sizeof(msc_payload_t)) {
+                    terminal_printf("Invalid payload length");
+                    msc_send_error(header, 4);
+                    break;
                 }
-            } else if (readPayload->lun == 1) {
-                // SD card
-                /*esp_err_t res = sdmmc_read_sectors(card, disk_data_buffer, readPayload->lba, readPayload->length);
-                if (res != ESP_OK) {
-                    terminal_printf("SD read error %d", res);
-                    msc_send_error(header, 7);
-                }*/
-                memset(disk_data_buffer, 0, readPayload->length);
-            } else {
-                // Invalid logical device
-                terminal_printf("Invalid LUN");
-                msc_send_error(header, 6);
-                break;
-            }
 
-            msc_response_header_t response = {
-                .magic = msc_packet_magic,
-                .identifier = header->identifier,
-                .response = header->command,
-                .payload_length = readPayload->length,
-                .payload_crc = crc32_le(0, disk_data_buffer, readPayload->length)
-            };
-            uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
-            uart_write_bytes(MSC_UART, disk_data_buffer, readPayload->length);
-            break;
-        }
-        case MSC_CMD_WRIT: {
-            if (header->payload_length < sizeof(msc_payload_t)) {
-                terminal_printf("Invalid payload length");
-                msc_send_error(header, 4);
-                break;
-            }
-            
-            msc_payload_t* writePayload = (msc_payload_t*) payload;
-            uint8_t* pData = (uint8_t*) writePayload->data;
-            
-            if (header->payload_length != sizeof(msc_payload_t) + writePayload->length) {
-                terminal_printf("Data length not match payload length");
-                msc_send_error(header, 5);
-                break;
-            }
+                msc_payload_t* readPayload = (msc_payload_t*) payload;
 
-            //terminal_printf("WRITE (%u) %u, %u, %u)", header->payload_length, writePayload->lba, writePayload->offset, writePayload->length);
-
-            if (writePayload->lun == 0) {
-                esp_err_t res = esp_partition_write(internal_fs_partition, writePayload->lba * 512 + writePayload->offset, pData, writePayload->length);
-            
-                if (res != ESP_OK) {
-                    terminal_printf("Part write error %d", res);
-                    msc_send_error(header, 7);
+                if (readPayload->length > sizeof(disk_data_buffer)) {
+                    terminal_printf("Requested size too long");
+                    msc_send_error(header, 5);
+                    break;
                 }
-            } else if (writePayload->lun == 1) {
-                // SD card
-            } else {
-                // Invalid logical device
-                terminal_printf("Invalid LUN");
-                msc_send_error(header, 6);
+
+                // terminal_printf("READ %u, %u, %u", readPayload->lba, readPayload->offset, readPayload->length);
+
+                if (readPayload->lun == 0) {
+                    // Internal memory
+                    esp_err_t res =
+                        esp_partition_read(internal_fs_partition, readPayload->lba * 512 + readPayload->offset, disk_data_buffer, readPayload->length);
+                    if (res != ESP_OK) {
+                        terminal_printf("Part read error %d", res);
+                        msc_send_error(header, 7);
+                    }
+                } else if (readPayload->lun == 1) {
+                    // SD card
+                    /*esp_err_t res = sdmmc_read_sectors(card, disk_data_buffer, readPayload->lba, readPayload->length);
+                    if (res != ESP_OK) {
+                        terminal_printf("SD read error %d", res);
+                        msc_send_error(header, 7);
+                    }*/
+                    memset(disk_data_buffer, 0, readPayload->length);
+                } else {
+                    // Invalid logical device
+                    terminal_printf("Invalid LUN");
+                    msc_send_error(header, 6);
+                    break;
+                }
+
+                msc_response_header_t response = {.magic          = msc_packet_magic,
+                                                  .identifier     = header->identifier,
+                                                  .response       = header->command,
+                                                  .payload_length = readPayload->length,
+                                                  .payload_crc    = crc32_le(0, disk_data_buffer, readPayload->length)};
+                uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
+                uart_write_bytes(MSC_UART, disk_data_buffer, readPayload->length);
                 break;
             }
+        case MSC_CMD_WRIT:
+            {
+                if (header->payload_length < sizeof(msc_payload_t)) {
+                    terminal_printf("Invalid payload length");
+                    msc_send_error(header, 4);
+                    break;
+                }
 
-            msc_response_header_t response = {
-                .magic          = msc_packet_magic,
-                .identifier     = header->identifier,
-                .response       = MSC_ANS_OKOK,
-                .payload_length = 0,
-                .payload_crc    = 0
-            };
+                msc_payload_t* writePayload = (msc_payload_t*) payload;
+                uint8_t*       pData        = (uint8_t*) writePayload->data;
 
-            uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
-            break;
-        }
+                if (header->payload_length != sizeof(msc_payload_t) + writePayload->length) {
+                    terminal_printf("Data length not match payload length");
+                    msc_send_error(header, 5);
+                    break;
+                }
+
+                // terminal_printf("WRITE (%u) %u, %u, %u)", header->payload_length, writePayload->lba, writePayload->offset, writePayload->length);
+
+                if (writePayload->lun == 0) {
+                    esp_err_t res = esp_partition_write(internal_fs_partition, writePayload->lba * 512 + writePayload->offset, pData, writePayload->length);
+
+                    if (res != ESP_OK) {
+                        terminal_printf("Part write error %d", res);
+                        msc_send_error(header, 7);
+                    }
+                } else if (writePayload->lun == 1) {
+                    // SD card
+                } else {
+                    // Invalid logical device
+                    terminal_printf("Invalid LUN");
+                    msc_send_error(header, 6);
+                    break;
+                }
+
+                msc_response_header_t response = {
+                    .magic = msc_packet_magic, .identifier = header->identifier, .response = MSC_ANS_OKOK, .payload_length = 0, .payload_crc = 0};
+
+                uart_write_bytes(MSC_UART, &response, sizeof(msc_response_header_t));
+                break;
+            }
         default:
             terminal_printf("Unknown command");
             msc_send_error(header, 3);
@@ -228,13 +223,13 @@ void msc_process_packet(msc_packet_header_t* header, uint8_t* payload) {
 
 static void uart_event_task(void* pvParameters) {
     msc_state_t         state = STATE_WAITING;
-    uint8_t                magic_buffer[4];
+    uint8_t             magic_buffer[4];
     msc_packet_header_t packet_header           = {0};
-    size_t                 packet_header_position  = 0;
-    uint8_t*               packet_payload          = NULL;
-    size_t                 packet_payload_position = 0;
-    uart_event_t           event;
-    uint8_t*               dtmp = (uint8_t*) malloc(MSC_PACKET_BUFFER_SIZE);
+    size_t              packet_header_position  = 0;
+    uint8_t*            packet_payload          = NULL;
+    size_t              packet_payload_position = 0;
+    uart_event_t        event;
+    uint8_t*            dtmp = (uint8_t*) malloc(MSC_PACKET_BUFFER_SIZE);
     for (;;) {
         // Waiting for UART event.
         if (xQueueReceive(uart0_queue, (void*) &event, (TickType_t) portMAX_DELAY)) {
@@ -323,12 +318,12 @@ static void uart_event_task(void* pvParameters) {
                                     terminal_printf(" > %08X", packet_header.payload_crc);
                                     terminal_printf(" C %08X", packet_payload_crc);
                                     terminal_printf(" S %u", packet_header.payload_length);
-                                    
+
                                     char buf[64] = {0};
-                                    int p = 0;
+                                    int  p       = 0;
                                     for (int i = 0; i < packet_header.payload_length; i++) {
                                         sprintf(buf + p, "%02X", packet_payload[i]);
-                                        p+=2;
+                                        p += 2;
                                         if (p >= 16) {
                                             terminal_printf("%s", buf);
                                             memset(buf, 0, sizeof(buf));
@@ -336,7 +331,7 @@ static void uart_event_task(void* pvParameters) {
                                         }
                                     }
                                     terminal_printf("%s", buf);
-                                    
+
                                     msc_send_error(&packet_header, 2);
                                     free(packet_payload);
                                     packet_payload = NULL;
@@ -393,7 +388,7 @@ void msc_main(xQueueHandle button_queue) {
     terminal_printf("Starting mass storage...");
     msc_enable_uart();
     xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
-    
+
     if (get_internal_mounted()) {
         unmount_internal_filesystem();
     }
@@ -407,13 +402,13 @@ void msc_main(xQueueHandle button_queue) {
         terminal_printf("Internal partition not found");
         return;
     }
-    uint32_t first_sector      = internal_fs_partition->address / 512;//SPI_FLASH_SEC_SIZE;
-    uint32_t amount_of_sectors = internal_fs_partition->size / 512;//SPI_FLASH_SEC_SIZE;
-    
+    uint32_t first_sector      = internal_fs_partition->address / 512;  // SPI_FLASH_SEC_SIZE;
+    uint32_t amount_of_sectors = internal_fs_partition->size / 512;     // SPI_FLASH_SEC_SIZE;
+
     RP2040* rp2040 = get_rp2040();
 
     rp2040_set_msc_block_count(rp2040, 0, amount_of_sectors);
-    rp2040_set_msc_block_size(rp2040, 0, 512);//SPI_FLASH_SEC_SIZE);
+    rp2040_set_msc_block_size(rp2040, 0, 512);  // SPI_FLASH_SEC_SIZE);
 
     bool sdOk = false;
     if (get_sdcard_mounted()) {
@@ -425,9 +420,9 @@ void msc_main(xQueueHandle button_queue) {
     } else {
         terminal_printf("SD card not ready");
     }
-    
+
     terminal_printf("Mass storage ready!");
 
-    uint8_t msc_control = sdOk ? 0x07 : 0x03; // Bit 0: enable, bit 1: internal memory ready, bit 2: SD card ready
-    rp2040_set_msc_control(rp2040, msc_control); // Signal ready*/
+    uint8_t msc_control = sdOk ? 0x07 : 0x03;     // Bit 0: enable, bit 1: internal memory ready, bit 2: SD card ready
+    rp2040_set_msc_control(rp2040, msc_control);  // Signal ready*/
 }

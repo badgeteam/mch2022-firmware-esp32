@@ -19,14 +19,14 @@
 
 typedef struct terminal_line {
     char* data;
-    bool is_dynamically_allocated;
+    bool  is_dynamically_allocated;
 } terminal_line_t;
 
 static QueueHandle_t log_queue = NULL;
 
 void terminal_printf(char* fmt, ...) {
     terminal_line_t line;
-    line.data = malloc(256);
+    line.data                     = malloc(256);
     line.is_dynamically_allocated = true;
     if (line.data == NULL) return;
     line.data[255] = '\0';
@@ -40,28 +40,28 @@ void terminal_printf(char* fmt, ...) {
 
 void terminal_log(char* buffer) {
     terminal_line_t line;
-    line.data = buffer;
+    line.data                     = buffer;
     line.is_dynamically_allocated = false;
     xQueueSend(log_queue, &line, portMAX_DELAY);
 }
 
 void terminal_log_wrapped(char* buffer) {
-    char* newbuf = calloc(1, strlen(buffer)+1);
+    char* newbuf = calloc(1, strlen(buffer) + 1);
     strcpy(newbuf, buffer);
     terminal_line_t line;
-    line.data = newbuf;
+    line.data                     = newbuf;
     line.is_dynamically_allocated = true;
     xQueueSend(log_queue, &line, portMAX_DELAY);
 }
 
 static void log_event_task(void* pvParameters) {
-    const pax_font_t* font = pax_font_sky_mono;
-    terminal_line_t lines[LOG_LINES] = {0};
-    int offset = 0;
-    pax_buf_t* pax_buffer = get_pax_buffer();
-    xQueueHandle queue = (QueueHandle_t) pvParameters;
+    const pax_font_t* font             = pax_font_sky_mono;
+    terminal_line_t   lines[LOG_LINES] = {0};
+    int               offset           = 0;
+    pax_buf_t*        pax_buffer       = get_pax_buffer();
+    xQueueHandle      queue            = (QueueHandle_t) pvParameters;
     pax_noclip(pax_buffer);
-    pax_background(pax_buffer, 0x0000FF); // Blue screen
+    pax_background(pax_buffer, 0x0000FF);  // Blue screen
     display_flush();
     for (;;) {
         if (lines[offset].data != NULL && lines[offset].is_dynamically_allocated) {
@@ -87,7 +87,7 @@ static void log_event_task(void* pvParameters) {
             free(lines[index].data);
         }
     }
-    pax_background(pax_buffer, 0xFF0000); // Red screen
+    pax_background(pax_buffer, 0xFF0000);  // Red screen
     display_flush();
     vTaskDelete(NULL);
 }
