@@ -237,7 +237,6 @@ void webusb_fs_list(webusb_packet_header_t* header, uint8_t* payload) {
             response_position += strlen(ent->d_name);
             struct stat sb = {0};
             char        tpath[255];
-            sprintf(tpath, (char*) (payload));
             if (payload[strlen((char*) (payload)) - 1] != '/') {
                 strcat(tpath, "/");
             }
@@ -334,7 +333,6 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                                                      .payload_crc    = crc32_le(0, result, 1)};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, result, 1);
-                terminal_printf("Removing '%s': %s", (char*) payload, result[0] ? "OK" : "FAIL");
                 break;
             }
         case WEBUSB_CMD_FSST:
@@ -682,8 +680,8 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     namespace = (char*) payload;
                 }
 
-                uint32_t response_length = 0;
-                nvs_iterator_t it = nvs_entry_find("nvs", namespace, NVS_TYPE_ANY);
+                uint32_t       response_length = 0;
+                nvs_iterator_t it              = nvs_entry_find("nvs", namespace, NVS_TYPE_ANY);
                 while (it != NULL) {
                     nvs_entry_info_t info;
                     nvs_entry_info(it, &info);
@@ -738,33 +736,33 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     *response_size = webusb_nvs_get_size(info.namespace_name, info.key, info.type);
                 }
 
-                webusb_response_header_t response  = {.magic          = webusb_packet_magic,
-                                                      .identifier     = header->identifier,
-                                                      .response       = header->command,
-                                                      .payload_length = response_length,
-                                                      .payload_crc    = crc32_le(0, payload, response_length)};
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = response_length,
+                                                     .payload_crc    = crc32_le(0, payload, response_length)};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, payload, response_length);
                 break;
             }
         case WEBUSB_CMD_NVSR:
             {
-                if (header->payload_length < 8) {
+                if (header->payload_length < 3) {
                     webusb_send_error(header, 9);
                     return;
                 }
-                uint8_t   namespace_length  = payload[0];
-                char*     payload_namespace = (char*) &payload[sizeof(uint8_t)];
-                uint8_t   key_length        = payload[sizeof(uint8_t) + namespace_length];
-                char*     payload_key       = (char*) &payload[sizeof(uint8_t) + namespace_length + sizeof(uint8_t)];
-                uint8_t   payload_type      = payload[sizeof(uint8_t) + namespace_length + sizeof(uint8_t) + key_length];
+                uint8_t namespace_length  = payload[0];
+                char*   payload_namespace = (char*) &payload[sizeof(uint8_t)];
+                uint8_t key_length        = payload[sizeof(uint8_t) + namespace_length];
+                char*   payload_key       = (char*) &payload[sizeof(uint8_t) + namespace_length + sizeof(uint8_t)];
+                uint8_t payload_type      = payload[sizeof(uint8_t) + namespace_length + sizeof(uint8_t) + key_length];
 
-                if (namespace_length >= 17) {  // Namespace name too long
+                if (namespace_length >= 17 || namespace_length < 1) {  // Namespace name too long
                     webusb_send_error(header, 10);
                     return;
                 }
 
-                if (key_length >= 17) {  // Key too long
+                if (key_length >= 17 || key_length < 1) {  // Key too long
                     webusb_send_error(header, 11);
                     return;
                 }
@@ -775,7 +773,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 strncpy(key, payload_key, key_length);
                 nvs_type_t type = (nvs_type_t) payload_type;
 
-                uint32_t result_length = 0;
+                uint32_t     result_length = 0;
                 nvs_handle_t handle;
                 if (nvs_open(namespace_name, NVS_READONLY, &handle) == ESP_OK) {
                     if (type == NVS_TYPE_U8) {
@@ -819,7 +817,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                             result_length += sizeof(int64_t);
                         }
                     } else if (type == NVS_TYPE_STR) {
-                        char* data = (char*) payload;
+                        char*  data          = (char*) payload;
                         size_t string_length = 0;
                         if (nvs_get_str(handle, key, NULL, &string_length) == ESP_OK) {
                             if (string_length <= webusb_max_payload_size) {
@@ -829,7 +827,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                             }
                         }
                     } else if (type == NVS_TYPE_BLOB) {
-                        void* data = (void*) payload;
+                        void*  data        = (void*) payload;
                         size_t blob_length = 0;
                         if (nvs_get_blob(handle, key, NULL, &blob_length) == ESP_OK) {
                             if (blob_length <= webusb_max_payload_size) {
@@ -842,11 +840,11 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     nvs_close(handle);
                 }
 
-                webusb_response_header_t response  = {.magic          = webusb_packet_magic,
-                                                      .identifier     = header->identifier,
-                                                      .response       = header->command,
-                                                      .payload_length = result_length,
-                                                      .payload_crc    = result_length ? crc32_le(0, payload, result_length) : 0};
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = result_length,
+                                                     .payload_crc    = result_length ? crc32_le(0, payload, result_length) : 0};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 if (result_length > 0) {
                     uart_write_bytes(WEBUSB_UART, payload, result_length);
@@ -855,26 +853,147 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
             }
         case WEBUSB_CMD_NVSW:
             {
-                // Not implemented yet
-                uint8_t                  result[1] = {0};
-                webusb_response_header_t response  = {.magic          = webusb_packet_magic,
-                                                      .identifier     = header->identifier,
-                                                      .response       = header->command,
-                                                      .payload_length = sizeof(result),
-                                                      .payload_crc    = crc32_le(0, result, sizeof(result))};
+                if (header->payload_length < 3 || header->payload_length >= webusb_max_payload_size) {
+                    webusb_send_error(header, 9);
+                    return;
+                }
+
+                uint32_t payload_position = 0;
+
+                uint8_t namespace_length = payload[payload_position];
+                payload_position += sizeof(uint8_t);
+
+                char* payload_namespace = (char*) &payload[payload_position];
+                payload_position += namespace_length;
+
+                uint8_t key_length = payload[payload_position];
+                payload_position += sizeof(uint8_t);
+
+                char* payload_key = (char*) &payload[payload_position];
+                payload_position += key_length;
+
+                uint8_t payload_type = payload[payload_position];
+                payload_position += sizeof(uint8_t);
+
+                void*    data        = (void*) &payload[payload_position];
+                uint32_t data_length = header->payload_length - payload_position;
+
+                if (header->payload_length <= payload_position) {  // Request too short
+                    webusb_send_error(header, 12);
+                    return;
+                }
+
+                if (namespace_length >= 17 || namespace_length < 1) {  // Namespace name too long
+                    webusb_send_error(header, 10);
+                    return;
+                }
+
+                if (key_length >= 17 || key_length < 1) {  // Key too long
+                    webusb_send_error(header, 11);
+                    return;
+                }
+
+                char namespace_name[17] = {0};
+                strncpy(namespace_name, payload_namespace, namespace_length);
+                char key[17] = {0};
+                strncpy(key, payload_key, key_length);
+                nvs_type_t type = (nvs_type_t) payload_type;
+
+                if (type == NVS_TYPE_STR) {
+                    char* data_str        = (char*) data;
+                    data_str[data_length] = '\0';
+                }
+
+                uint8_t result[1] = {0};
+
+                nvs_handle_t handle;
+                if (nvs_open(namespace_name, NVS_READWRITE, &handle) == ESP_OK) {
+                    if ((type == NVS_TYPE_U8) && (data_length == sizeof(uint8_t)) && (nvs_set_u8(handle, key, *((uint8_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_U8) && (data_length == sizeof(uint8_t)) && (nvs_set_u8(handle, key, *((uint8_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_I8) && (data_length == sizeof(int8_t)) && (nvs_set_i8(handle, key, *((int8_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_U16) && (data_length == sizeof(uint16_t)) && (nvs_set_u16(handle, key, *((uint16_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_I16) && (data_length == sizeof(int16_t)) && (nvs_set_i16(handle, key, *((int16_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_U32) && (data_length == sizeof(uint32_t)) && (nvs_set_u32(handle, key, *((uint32_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_I32) && (data_length == sizeof(int32_t)) && (nvs_set_i32(handle, key, *((int32_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_U64) && (data_length == sizeof(uint64_t)) && (nvs_set_u64(handle, key, *((uint64_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_I64) && (data_length == sizeof(int64_t)) && (nvs_set_i64(handle, key, *((int64_t*) (data))) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_STR) && (nvs_set_str(handle, key, (char*) data) == ESP_OK)) {
+                        result[0] = 1;
+                    } else if ((type == NVS_TYPE_BLOB) && (nvs_set_blob(handle, key, data, data_length)) == ESP_OK) {
+                        result[0] = 1;
+                    }
+                    nvs_close(handle);
+                }
+
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = sizeof(result),
+                                                     .payload_crc    = crc32_le(0, result, sizeof(result))};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, result, sizeof(result));
                 break;
             }
         case WEBUSB_CMD_NVSD:
             {
-                // Not implemented yet
-                uint8_t                  result[1] = {0};
-                webusb_response_header_t response  = {.magic          = webusb_packet_magic,
-                                                      .identifier     = header->identifier,
-                                                      .response       = header->command,
-                                                      .payload_length = sizeof(result),
-                                                      .payload_crc    = crc32_le(0, result, sizeof(result))};
+                if (header->payload_length < 3) {
+                    webusb_send_error(header, 9);
+                    return;
+                }
+
+                uint32_t payload_position = 0;
+
+                uint8_t namespace_length = payload[payload_position];
+                payload_position += sizeof(uint8_t);
+
+                char* payload_namespace = (char*) &payload[payload_position];
+                payload_position += namespace_length;
+
+                uint8_t key_length = payload[payload_position];
+                payload_position += sizeof(uint8_t);
+
+                char* payload_key = (char*) &payload[payload_position];
+                payload_position += key_length;
+
+                if (namespace_length >= 17 || namespace_length < 1) {  // Namespace name too long
+                    webusb_send_error(header, 10);
+                    return;
+                }
+
+                if (key_length >= 17 || key_length < 1) {  // Key too long
+                    webusb_send_error(header, 11);
+                    return;
+                }
+
+                char namespace_name[17] = {0};
+                strncpy(namespace_name, payload_namespace, namespace_length);
+                char key[17] = {0};
+                strncpy(key, payload_key, key_length);
+
+                uint8_t result[1] = {0};
+
+                nvs_handle_t handle;
+                if (nvs_open(namespace_name, NVS_READWRITE, &handle) == ESP_OK) {
+                    if (nvs_erase_key(handle, key) == ESP_OK) {
+                        result[0] = 1;
+                    }
+                    nvs_close(handle);
+                }
+
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = sizeof(result),
+                                                     .payload_crc    = crc32_le(0, result, sizeof(result))};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, result, sizeof(result));
                 break;
@@ -882,6 +1001,28 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
         default:
             webusb_send_error(header, 3);
     }
+}
+
+static void button_event_task(void* pvParameters) {
+    RP2040* rp2040 = get_rp2040();
+    xQueueHandle button_queue = rp2040->queue;
+    rp2040_input_message_t input_message;
+    for (;;) {
+        if (xQueueReceive(button_queue, &input_message, (TickType_t) portMAX_DELAY)) {
+            if (input_message.state && (input_message.input == RP2040_INPUT_BUTTON_HOME)) {
+                pax_buf_t        *pax_buffer        = get_pax_buffer();
+                const pax_font_t *title_font        = pax_font_saira_condensed;
+                pax_background(pax_buffer, 0xFFFFFF);
+                const char* text = "Disconnecting...";
+                pax_vec1_t dims = pax_text_size(title_font, 50, text);
+                pax_center_text(pax_buffer, 0xFFE56B1A, title_font, 50, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, text);
+                display_flush();
+                rp2040_exit_webusb_mode(rp2040);
+                break;
+            }
+        }
+    }
+    vTaskDelete(NULL);
 }
 
 static void uart_event_task(void* pvParameters) {
@@ -895,7 +1036,8 @@ static void uart_event_task(void* pvParameters) {
     uint8_t*               dtmp = (uint8_t*) malloc(webusb_packet_buffer_size);
 
     if (packet_payload == NULL || dtmp == NULL) {
-        terminal_log("Failed to start UART task");
+        printf("Fatal error: failed to start UART task");
+        restart();
         return;
     }
 
@@ -1004,8 +1146,16 @@ static void uart_event_task(void* pvParameters) {
 }
 
 void webusb_new_main(xQueueHandle button_queue) {
-    terminal_start();
-    terminal_printf("WebUSB mode");
+    pax_buf_t        *pax_buffer        = get_pax_buffer();
+    const pax_font_t *title_font        = pax_font_saira_condensed;
+    const pax_font_t *instructions_font = pax_font_saira_regular;
+    pax_background(pax_buffer, 0xFFFFFF);
+    const char* text = "Connected to PC";
+    pax_vec1_t dims = pax_text_size(title_font, 50, text);
+    pax_center_text(pax_buffer, 0xFFE56B1A, title_font, 50, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, text);
+    //pax_draw_text(pax_buffer, 0xFF000000, instructions_font, 14, 5, pax_buffer->height - 17, "🅷 disconnect");
+    display_flush();
     webusb_new_enable_uart();
     xTaskCreate(uart_event_task, "uart_event_task", 20480, NULL, 12, NULL);
+    //xTaskCreate(button_event_task, "button_event_task", 2048, NULL, 12, NULL);
 }

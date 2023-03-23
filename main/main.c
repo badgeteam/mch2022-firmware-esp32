@@ -364,8 +364,9 @@ void app_main(void) {
     res = rp2040_get_msc_state(rp2040, &msc_state);
     if (res != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read MSC state: %d", res);
-        display_fatal_error(fatal_error_str, "Failed to read MSC state", NULL, NULL);
-        stop();
+        //display_fatal_error(fatal_error_str, "Failed to read MSC state", NULL, NULL);
+        //stop();
+        msc_state = 0;
     }
 
     ESP_LOGI(TAG, "MSC state 0x%02X", msc_state);
