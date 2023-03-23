@@ -38,6 +38,7 @@ SAO* sao_identify() {
         if (eeprom_read(&sao_eeprom, sizeof(header), buffer, total_length) != ESP_OK) {
             ESP_LOGE(TAG, "Failed to read SAO metadata");
             free(buffer);
+            free(sao);
             return NULL;
         }
 

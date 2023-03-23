@@ -35,6 +35,8 @@ idf_component_register(
          "filesystems.c"
          "app_management.c"
          "app_update.c"
+         "msc.c"
+         "terminal.c"
     INCLUDE_DIRS "."
                  "include"
                  "menus"

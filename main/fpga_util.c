@@ -560,7 +560,7 @@ bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err
         req_length  = ((buf[10] << 8) | buf[11]) + 1;
 
         // Get buffer
-        buf_req = malloc(req_length + 1 + ((req_length + 1) % 4)); // Allocate a 32-bit aligned amount
+        buf_req = malloc(req_length + 1 + ((req_length + 1) % 4));  // Allocate a 32-bit aligned amount
 
         // Load data from file
         _fpga_req_fread(prefix, req_file_id, &buf_req[1], req_length, req_offset);

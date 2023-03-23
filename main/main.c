@@ -31,6 +31,7 @@
 #include "managed_i2c.h"
 #include "menu.h"
 #include "menus/start.h"
+#include "msc.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "rp2040_updater.h"
@@ -359,7 +360,20 @@ void app_main(void) {
 
     ESP_LOGI(TAG, "WebUSB mode 0x%02X", webusb_mode);
 
-    if (webusb_mode == 0x00) {  // Normal boot
+    uint8_t msc_state;
+    res = rp2040_get_msc_state(rp2040, &msc_state);
+    if (res != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read MSC state: %d", res);
+        //display_fatal_error(fatal_error_str, "Failed to read MSC state", NULL, NULL);
+        //stop();
+        msc_state = 0;
+    }
+
+    ESP_LOGI(TAG, "MSC state 0x%02X", msc_state);
+
+    if (msc_state > 0) {
+        msc_main(rp2040->queue);
+    } else if (webusb_mode == 0x00) {  // Normal boot
         if (prevent_flashing) {
             uint8_t attempted;
             if (rp2040_get_reset_attempted(rp2040, &attempted) == ESP_OK) {
@@ -400,7 +414,7 @@ void app_main(void) {
         }
 
         /* Rick that roll */
-        xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL);
+        // xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL); // Disabled because the LED driver has problems
 
         /* Launcher menu */
         while (true) {
