@@ -11,6 +11,7 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "app_management.h"
 #include "appfs.h"
@@ -239,6 +240,7 @@ void webusb_fs_list(webusb_packet_header_t* header, uint8_t* payload) {
             response_position += strlen(ent->d_name);
             struct stat sb = {0};
             char        tpath[255];
+            sprintf(tpath, (char*) (payload));
             if (payload[strlen((char*) (payload)) - 1] != '/') {
                 strcat(tpath, "/");
             }
