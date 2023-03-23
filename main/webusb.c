@@ -278,8 +278,8 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
-                                                     .payload_length = 1,
-                                                     .payload_crc    = crc32_le(0, (uint8_t*) &result, 1)};
+                                                     .payload_length = sizeof(result),
+                                                     .payload_crc    = crc32_le(0, (uint8_t*) &result, sizeof(result))};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, (uint8_t*) &result, sizeof(result));
                 break;
