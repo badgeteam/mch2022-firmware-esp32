@@ -52,6 +52,8 @@ const int webusb_packet_buffer_size = sizeof(webusb_packet_header_t) + webusb_ma
 #define WEBUSB_UART             UART_NUM_0
 #define WEBUSB_UART_QUEUE_DEPTH (32)
 
+#define WEBUSB_PROTOCOL_VERSION (0x0001)
+
 static QueueHandle_t uart0_queue = NULL;
 
 static const uint32_t webusb_packet_magic   = 0xFEEDF00D;
@@ -272,9 +274,14 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
     switch (header->command) {
         case WEBUSB_CMD_SYNC:
             {
-                webusb_response_header_t response = {
-                    .magic = webusb_packet_magic, .identifier = header->identifier, .response = header->command, .payload_length = 0, .payload_crc = 0};
+                uint16_t result = WEBUSB_PROTOCOL_VERSION;
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = 1,
+                                                     .payload_crc    = crc32_le(0, (uint8_t*) &result, 1)};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                uart_write_bytes(WEBUSB_UART, (uint8_t*) &result, sizeof(result));
                 break;
             }
         case WEBUSB_CMD_PING:
@@ -1153,9 +1160,14 @@ void webusb_new_main(xQueueHandle button_queue) {
     const char* text = "Connected to PC";
     pax_vec1_t dims = pax_text_size(title_font, 50, text);
     pax_center_text(pax_buffer, 0xFFE56B1A, title_font, 50, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, text);
-    //pax_draw_text(pax_buffer, 0xFF000000, instructions_font, 14, 5, pax_buffer->height - 17, "🅷 disconnect");
+    RP2040* rp2040 = get_rp2040();
+    if (rp2040->_fw_version >= 0x0E) { // Future coprocessor firmware will support this feature
+        pax_draw_text(pax_buffer, 0xFF000000, instructions_font, 14, 5, pax_buffer->height - 17, "🅷 disconnect");
+    }
     display_flush();
     webusb_new_enable_uart();
     xTaskCreate(uart_event_task, "uart_event_task", 20480, NULL, 12, NULL);
-    //xTaskCreate(button_event_task, "button_event_task", 2048, NULL, 12, NULL);
+    if (rp2040->_fw_version >= 0x0E) { // Future coprocessor firmware will support this feature
+        xTaskCreate(button_event_task, "button_event_task", 2048, NULL, 12, NULL);
+    }
 }
