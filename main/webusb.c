@@ -1,5 +1,6 @@
 #include "webusb.h"
 
+#include <errno.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_system.h>
@@ -11,7 +12,6 @@
 #include <sdkconfig.h>
 #include <stdio.h>
 #include <string.h>
-#include <errno.h>
 
 #include "app_management.h"
 #include "appfs.h"
@@ -53,7 +53,7 @@ const int webusb_packet_buffer_size = sizeof(webusb_packet_header_t) + webusb_ma
 #define WEBUSB_UART             UART_NUM_0
 #define WEBUSB_UART_QUEUE_DEPTH (32)
 
-#define WEBUSB_PROTOCOL_VERSION (0x0001)
+#define WEBUSB_PROTOCOL_VERSION (0x0002)
 
 static QueueHandle_t uart0_queue = NULL;
 
@@ -92,8 +92,6 @@ static int            appfs_size     = 0;
 #define WEBUSB_CMD_NVSR (('N' << 0) | ('V' << 8) | ('S' << 16) | ('R' << 24))  // Read value from NVS
 #define WEBUSB_CMD_NVSW (('N' << 0) | ('V' << 8) | ('S' << 16) | ('W' << 24))  // Write value to NVS
 #define WEBUSB_CMD_NVSD (('N' << 0) | ('V' << 8) | ('S' << 16) | ('D' << 24))  // Delete value from NVS
-// Responses
-#define WEBUSB_ANS_OKOK (('O' << 0) | ('K' << 8) | ('O' << 16) | ('K' << 24))
 
 size_t webusb_nvs_get_size(char* namespace, char* key, nvs_type_t type) {
     if (type == NVS_TYPE_U8) return sizeof(uint8_t);
@@ -276,7 +274,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
     switch (header->command) {
         case WEBUSB_CMD_SYNC:
             {
-                uint16_t result = WEBUSB_PROTOCOL_VERSION;
+                uint16_t                 result   = WEBUSB_PROTOCOL_VERSION;
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
@@ -429,12 +427,6 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     return;
                 }
 
-                if ((!file_write) && (header->payload_length > 0)) {
-                    // Data sent while reading
-                    webusb_send_error(header, 7);
-                    return;
-                }
-
                 if (file_write) {
                     // Writing
                     uint32_t length = 0;
@@ -460,16 +452,26 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                     uart_write_bytes(WEBUSB_UART, (uint8_t*) &length, sizeof(uint32_t));
                 } else {
-                    uint8_t* data = malloc(webusb_max_payload_size);
+                    uint32_t requested_size = webusb_max_payload_size;
+                    if (header->payload_length == 4) {
+                        requested_size = *((uint32_t*) (payload));
+                    } else if (header->payload_length != 0) {
+                        webusb_send_error(header, 7);  // Data sent while reading
+                        return;
+                    }
+                    if (requested_size < 1 || requested_size > webusb_max_payload_size) {
+                        requested_size = webusb_max_payload_size;
+                    }
+                    uint8_t* data = malloc(requested_size);
                     if (data == NULL) {
                         webusb_send_error(header, 4);
                     } else {
                         size_t length = 0;
                         if (file_fd != NULL) {
-                            length = fread(data, 1, webusb_max_payload_size, file_fd);
+                            length = fread(data, 1, requested_size, file_fd);
                         } else {
                             size_t maximum_size = appfs_size - appfs_position;
-                            length              = webusb_max_payload_size;
+                            length              = requested_size;
                             if (length > maximum_size) {
                                 length = maximum_size;
                             }
@@ -508,7 +510,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     response_length += sizeof(uint16_t);  // title length
                     response_length += strlen(title);
                     response_length += sizeof(uint16_t);  // version
-                    response_length += sizeof(int);       // size
+                    response_length += sizeof(uint32_t);  // size
                 }
 
                 if (response_length > 0) {
@@ -543,9 +545,9 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                         *response_version          = version;
                         response_position += sizeof(uint16_t);
 
-                        int* response_size = (int*) &response_buffer[response_position];
-                        *response_size     = size;
-                        response_position += sizeof(int);  // size
+                        uint32_t* response_size = (uint32_t*) &response_buffer[response_position];
+                        *response_size          = size;
+                        response_position += sizeof(uint32_t);  // size
                     }
 
                     webusb_response_header_t response = {.magic          = webusb_packet_magic,
@@ -597,8 +599,8 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 char*     payload_name     = (char*) &payload[sizeof(uint8_t)];
                 uint8_t   title_length     = payload[sizeof(uint8_t) + name_length];
                 char*     payload_title    = (char*) &payload[sizeof(uint8_t) + name_length + sizeof(uint8_t)];
-                int*      payload_filesize = (int*) &payload[sizeof(uint8_t) + name_length + sizeof(uint8_t) + title_length];
-                uint16_t* payload_version  = (uint16_t*) &payload[sizeof(uint8_t) + name_length + sizeof(uint8_t) + title_length + sizeof(int)];
+                uint32_t* payload_filesize = (uint32_t*) &payload[sizeof(uint8_t) + name_length + sizeof(uint8_t) + title_length];
+                uint16_t* payload_version  = (uint16_t*) &payload[sizeof(uint8_t) + name_length + sizeof(uint8_t) + title_length + sizeof(uint32_t)];
 
                 if (name_length >= 48) {  // Name too long
                     webusb_send_error(header, 10);
@@ -614,11 +616,13 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 strncpy(name, payload_name, name_length);
                 char title[64] = {0};
                 strncpy(title, payload_title, title_length);
-                appfs_size = *payload_filesize;
+                appfs_size       = *payload_filesize;  // Global variable!
+                appfs_position   = 0;                  // Global variable!
+                uint16_t version = *payload_version;
 
                 uint8_t result[1] = {0};
 
-                esp_err_t res = appfsCreateFileExt(name, title, *payload_version, appfs_size, &appfs_handle);
+                esp_err_t res = appfsCreateFileExt(name, title, version, appfs_size, &appfs_handle);
 
                 if (res == ESP_OK) {
                     int roundedSize = (appfs_size + (SPI_FLASH_MMU_PAGE_SIZE - 1)) & (~(SPI_FLASH_MMU_PAGE_SIZE - 1));
@@ -793,37 +797,37 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                     } else if (type == NVS_TYPE_I8) {
                         int8_t* data = (int8_t*) payload;
                         if (nvs_get_i8(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(int8_t);
+                            result_length = sizeof(int8_t);
                         }
                     } else if (type == NVS_TYPE_U16) {
                         uint16_t* data = (uint16_t*) payload;
                         if (nvs_get_u16(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(uint16_t);
+                            result_length = sizeof(uint16_t);
                         }
                     } else if (type == NVS_TYPE_I16) {
                         int16_t* data = (int16_t*) payload;
                         if (nvs_get_i16(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(int16_t);
+                            result_length = sizeof(int16_t);
                         }
                     } else if (type == NVS_TYPE_U32) {
                         uint32_t* data = (uint32_t*) payload;
                         if (nvs_get_u32(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(uint32_t);
+                            result_length = sizeof(uint32_t);
                         }
                     } else if (type == NVS_TYPE_I32) {
                         int32_t* data = (int32_t*) payload;
                         if (nvs_get_i32(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(int32_t);
+                            result_length = sizeof(int32_t);
                         }
                     } else if (type == NVS_TYPE_U64) {
                         uint64_t* data = (uint64_t*) payload;
                         if (nvs_get_u64(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(uint64_t);
+                            result_length = sizeof(uint64_t);
                         }
                     } else if (type == NVS_TYPE_I64) {
                         int64_t* data = (int64_t*) payload;
                         if (nvs_get_i64(handle, key, data) == ESP_OK) {
-                            result_length += sizeof(int64_t);
+                            result_length = sizeof(int64_t);
                         }
                     } else if (type == NVS_TYPE_STR) {
                         char*  data          = (char*) payload;
@@ -831,7 +835,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                         if (nvs_get_str(handle, key, NULL, &string_length) == ESP_OK) {
                             if (string_length <= webusb_max_payload_size) {
                                 if (nvs_get_str(handle, key, data, &string_length) == ESP_OK) {
-                                    result_length += string_length;
+                                    result_length = string_length - 1;  // Remove \0 terminator from response data
                                 }
                             }
                         }
@@ -841,7 +845,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                         if (nvs_get_blob(handle, key, NULL, &blob_length) == ESP_OK) {
                             if (blob_length <= webusb_max_payload_size) {
                                 if (nvs_get_blob(handle, key, data, &blob_length) == ESP_OK) {
-                                    result_length += blob_length;
+                                    result_length = blob_length;
                                 }
                             }
                         }
@@ -1013,17 +1017,17 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
 }
 
 static void button_event_task(void* pvParameters) {
-    RP2040* rp2040 = get_rp2040();
-    xQueueHandle button_queue = rp2040->queue;
+    RP2040*                rp2040       = get_rp2040();
+    xQueueHandle           button_queue = rp2040->queue;
     rp2040_input_message_t input_message;
     for (;;) {
         if (xQueueReceive(button_queue, &input_message, (TickType_t) portMAX_DELAY)) {
             if (input_message.state && (input_message.input == RP2040_INPUT_BUTTON_HOME)) {
-                pax_buf_t        *pax_buffer        = get_pax_buffer();
-                const pax_font_t *title_font        = pax_font_saira_condensed;
+                pax_buf_t*        pax_buffer = get_pax_buffer();
+                const pax_font_t* title_font = pax_font_saira_condensed;
                 pax_background(pax_buffer, 0xFFFFFF);
                 const char* text = "Disconnecting...";
-                pax_vec1_t dims = pax_text_size(title_font, 50, text);
+                pax_vec1_t  dims = pax_text_size(title_font, 50, text);
                 pax_center_text(pax_buffer, 0xFFE56B1A, title_font, 50, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, text);
                 display_flush();
                 rp2040_exit_webusb_mode(rp2040);
@@ -1155,21 +1159,21 @@ static void uart_event_task(void* pvParameters) {
 }
 
 void webusb_new_main(xQueueHandle button_queue) {
-    pax_buf_t        *pax_buffer        = get_pax_buffer();
-    const pax_font_t *title_font        = pax_font_saira_condensed;
-    const pax_font_t *instructions_font = pax_font_saira_regular;
+    RP2040*           rp2040            = get_rp2040();
+    pax_buf_t*        pax_buffer        = get_pax_buffer();
+    const pax_font_t* title_font        = pax_font_saira_condensed;
+    const pax_font_t* instructions_font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     const char* text = "Connected to PC";
-    pax_vec1_t dims = pax_text_size(title_font, 50, text);
+    pax_vec1_t  dims = pax_text_size(title_font, 50, text);
     pax_center_text(pax_buffer, 0xFFE56B1A, title_font, 50, pax_buffer->width / 2, (pax_buffer->height - dims.y) / 2, text);
-    RP2040* rp2040 = get_rp2040();
-    if (rp2040->_fw_version >= 0x0E) { // Future coprocessor firmware will support this feature
+    if (rp2040->_fw_version >= 0x0E) {  // Future coprocessor firmware will support this feature
         pax_draw_text(pax_buffer, 0xFF000000, instructions_font, 14, 5, pax_buffer->height - 17, "🅷 disconnect");
     }
     display_flush();
     webusb_new_enable_uart();
     xTaskCreate(uart_event_task, "uart_event_task", 20480, NULL, 12, NULL);
-    if (rp2040->_fw_version >= 0x0E) { // Future coprocessor firmware will support this feature
+    if (rp2040->_fw_version >= 0x0E) {  // Future coprocessor firmware will support this feature
         xTaskCreate(button_event_task, "button_event_task", 2048, NULL, 12, NULL);
     }
 }
