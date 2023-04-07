@@ -1,0 +1,78 @@
+name: Build with ESP-IDF
+
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - '**.md'
+      - '.clang-format'
+      - '.gitignore'
+
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - '**.md'
+      - '.clang-format'
+      - '.gitignore'
+
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo + submodules
+      uses: actions/checkout@v3
+      with:
+        ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
+        submodules: 'recursive'
+
+    - name: Build with ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4.1
+        target: esp32
+
+    - name: Generate build report
+      env:
+        base_branch: master
+        current_ref: ${{ github.ref_name }}
+        compare_url_template: ${{ format('/{0}/compare/{{base}}...{{head}}', github.repository) }}
+        commit_hash: ${{ github.event.after }}
+        head_compare_url: ${{ github.event.compare }}
+        new_commits_json: ${{ toJSON(github.event.commits) }}
+      run: |
+        build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
+        ref_compare_url=$(sed "s/{base}/$base_branch/; s/{head}/$commit_hash/" <<< $compare_url_template)
+
+        cat << MarkdownHERE >> $GITHUB_STEP_SUMMARY
+        # Build summary 🔨${{ github.ref_name != 'master' && '🚧' || '' }}
+
+        **Source:** ${{ github.ref_type }} \`$current_ref\` -> [${{ github.repository }}@\`${commit_hash:0:7}\`](${{ github.event.head_commit.url }})
+
+        **Size of \`launcher.bin\`:** $build_size_main kB
+
+        \`\`\`console
+        \$ du -h build/*.bin build/*/*.bin
+        $(du -h build/*.bin build/*/*.bin)
+        \`\`\`
+
+        ## Build details
+        **Build trigger:** ${{ github.event.forced && '☢️ forced' || '' }} ${{ github.event_name }} \`${{ github.event.ref }}\`
+
+        ### Source
+        **HEAD:** [${{ github.repository }}@\`${commit_hash:0:7}\`](${{ github.event.head_commit.url }}) on ${{ github.ref_type }} [$current_ref]($ref_compare_url)
+
+        **Diff with previous HEAD:** $head_compare_url
+
+        #### New commits
+        $(jq -r 'map([
+          "**Commit [`\(.id[0:7])`](\(.url)) by \(if .author.username then "@"+.author.username else .author.name end):**",
+          .message,
+          (if .committer.name != .author.name then "\n> <sub>**Committer:** \(.committer.name) <\(.committer.email)></sub>" else "" end),
+          "<sub>**Timestamp:** \(.timestamp)</sub>"
+        ] | map("> \(.)\n") | join("")) | join("\n")' <<< $new_commits_json)
+
+        MarkdownHERE
+      continue-on-error: true
