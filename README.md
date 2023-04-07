@@ -55,8 +55,8 @@ make flash
 make monitor
 ```
 
-## WebUSB tools
-In [`./tools`](./tools/) you will find command line tools to push files and apps to the badge etc., and a short manual on how to use them.
+## USB tools
+In [`mch2022-tools`](https://github.com/badgeteam/mch2022-tools) you will find command line tools to push files and apps to the badge etc., and a short manual on how to use them.
 
 ## Linux permissions
 Create `/etc/udev/rules.d/99-mch2022.rules` with the following contents:
