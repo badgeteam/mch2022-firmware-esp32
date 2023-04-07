@@ -304,7 +304,9 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 uint8_t result[1] = {false};
                 FILE*   fd        = fopen((char*) payload, "rb");
                 result[0]         = (fd != NULL);
-                webusb_close_files();
+                if (fd != NULL) {
+                    fclose(fd);
+                }
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
