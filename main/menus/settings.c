@@ -37,6 +37,7 @@ typedef enum action {
     ACTION_OTA_NIGHTLY,
     ACTION_RP2040_BL,
     ACTION_NICKNAME,
+    ACTION_BRIGHTNESS,
     ACTION_LOCK,
     ACTION_FORMAT_FAT,
     ACTION_FORMAT_APPFS
@@ -77,6 +78,78 @@ void edit_lock(xQueueHandle button_queue) {
     nvs_close(handle);
 }
 
+uint8_t wait_for_button_adv() {
+    RP2040* rp2040 = get_rp2040();
+    if (rp2040 == NULL) return false;
+    while (1) {
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(rp2040->queue, &buttonMessage, portMAX_DELAY) == pdTRUE) {
+            if (buttonMessage.state) {
+                return buttonMessage.input;
+            }
+        }
+    }
+}
+
+void edit_brightness(xQueueHandle button_queue) {
+    pax_buf_t*   pax_buffer = get_pax_buffer();
+    nvs_handle_t handle;
+    esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
+    if (res != ESP_OK) {
+        ESP_LOGE("settings", "NVS open failed: %d", res);
+        return;
+    }
+    uint8_t state;
+    res = nvs_get_u8(handle, "brightness", &state);
+    if (res != ESP_OK) {
+        state = 0xFF;
+    }
+    bool quit = false;
+    while (!quit) {
+        const pax_font_t* font = pax_font_saira_regular;
+        pax_noclip(pax_buffer);
+        pax_background(pax_buffer, 0xFFFFFF);
+        pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Screen brightness");
+        char state_str[64];
+        snprintf(state_str, sizeof(state_str), "Brightness: %u%%\n", (state * 100) / 255);
+        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, state_str);
+        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "Increase / decrease  🅱 back");
+        display_flush();
+        uint8_t button = wait_for_button_adv(button_queue);
+        switch (button) {
+            case RP2040_INPUT_BUTTON_BACK:
+            case RP2040_INPUT_BUTTON_HOME:
+                quit = true;
+                break;
+            case RP2040_INPUT_JOYSTICK_UP:
+            case RP2040_INPUT_JOYSTICK_RIGHT:
+                if (state > 245) {
+                    state = 255;
+                } else {
+                    state += 10;
+                }
+                nvs_set_u8(handle, "brightness", state);
+                nvs_commit(handle);
+                rp2040_set_lcd_backlight(get_rp2040(), state);
+                break;
+            case RP2040_INPUT_JOYSTICK_DOWN:
+            case RP2040_INPUT_JOYSTICK_LEFT:
+                if (state < 16) {
+                    state = 16;
+                } else {
+                    state -= 10;
+                }
+                nvs_set_u8(handle, "brightness", state);
+                nvs_commit(handle);
+                rp2040_set_lcd_backlight(get_rp2040(), state);
+                break;
+            default:
+                break;
+        }
+    }
+    nvs_close(handle);
+}
+
 void render_settings_help(pax_buf_t* pax_buffer) {
     const pax_font_t* font = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
@@ -105,6 +178,7 @@ void menu_settings(xQueueHandle button_queue) {
 
     menu_insert_item(menu, "Edit nickname", NULL, (void*) ACTION_NICKNAME, -1);
     menu_insert_item(menu, "WiFi settings", NULL, (void*) ACTION_WIFI, -1);
+    menu_insert_item(menu, "Screen brightness", NULL, (void*) ACTION_BRIGHTNESS, -1);
     menu_insert_item(menu, "Firmware update", NULL, (void*) ACTION_OTA, -1);
     menu_insert_item(menu, "Firmware flashing lock", NULL, (void*) ACTION_LOCK, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
@@ -182,6 +256,8 @@ void menu_settings(xQueueHandle button_queue) {
             } else if (action == ACTION_FORMAT_APPFS) {
                 display_boot_screen("Formatting AppFS...");
                 appfsFormat();
+            } else if (action == ACTION_BRIGHTNESS) {
+                edit_brightness(button_queue);
             }
 
             render = true;
