@@ -164,7 +164,6 @@ void factory_test() {
 
         gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
         gpio_set_level(GPIO_SD_PWR, 1);
-        ws2812_init(GPIO_LED_DATA);
         if (result) {
             ws2812_send_data(led_blue, sizeof(led_blue));
         } else {

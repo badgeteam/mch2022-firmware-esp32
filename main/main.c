@@ -116,7 +116,6 @@ void stop() {
     ESP_LOGW(TAG, "*** HALTED ***");
     gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_SD_PWR, 1);
-    ws2812_init(GPIO_LED_DATA);
     uint8_t led_off[15]  = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
     uint8_t led_red[15]  = {0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0, 0, 50, 0};
     uint8_t led_red2[15] = {0, 0xFF, 0, 0, 0xFF, 0, 0, 0xFF, 0, 0, 0xFF, 0, 0, 0xFF, 0};
@@ -134,7 +133,7 @@ const char* fatal_error_str = "A fatal error occured";
 const char* reset_board_str = "Reset the board to try again";
 
 static void audio_player_task(void* pvParameters) {
-    vTaskDelay(pdMS_TO_TICKS(300));
+    vTaskDelay(pdMS_TO_TICKS(500));
     play_bootsound();
     uint8_t leds[15] = {0};
     for (uint8_t part = 0; part < 50; part++) {
@@ -206,6 +205,21 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize basic board support functions");
         esp_restart();
     }
+    
+    /* Initialize LCD screen */
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    display_boot_screen("Starting...");
+    
+    /* Enable power to the LEDs and the SD card */
+    res = gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
+    if (res != ESP_OK) stop();
+    res = gpio_set_level(GPIO_SD_PWR, true);
+    if (res != ESP_OK) stop();
+    
+    /* Initialize the LEDs */
+    ws2812_init(GPIO_LED_DATA, 150);
+    const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    ws2812_send_data(led_off, sizeof(led_off));
 
     /* Start NVS */
     res = nvs_init();
@@ -222,10 +236,6 @@ void app_main(void) {
         display_fatal_error(fatal_error_str, "Failed to open NVS namespace", "Flash may be corrupted", reset_board_str);
         stop();
     }
-
-    pax_buf_t* pax_buffer = get_pax_buffer();
-
-    display_boot_screen("Starting...");
 
     /* Initialize RP2040 co-processor */
     if (bsp_rp2040_init() != ESP_OK) {
@@ -317,10 +327,6 @@ void app_main(void) {
     if (sdcard_mounted) {
         ESP_LOGI(TAG, "SD card filesystem mounted");
     }
-
-    ws2812_init(GPIO_LED_DATA);
-    const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    ws2812_send_data(led_off, sizeof(led_off));
 
     /* Start WiFi */
     wifi_init();
@@ -414,7 +420,7 @@ void app_main(void) {
         }
 
         /* Rick that roll */
-        // xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL); // Disabled because the LED driver has problems
+        xTaskCreate(audio_player_task, "audio_player_task", 2048, NULL, 12, NULL);
 
         /* Launcher menu */
         while (true) {
