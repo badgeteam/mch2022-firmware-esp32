@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 
-GIT_TAG=""
-GIT_DESCRIPTION=""
-GIT_SHA=""
-GIT_BRANCH=""
-
 GIT_DESCRIPTION="$(git describe --dirty --always --tags 2> /dev/null)"
-GIT_TAG="$(git describe --match "20*" --exact-match --tags 2> /dev/null)"
+GIT_TAG="$(git describe --exact-match --tags 2> /dev/null)"
 GIT_SHA="$(git rev-parse HEAD 2> /dev/null)"
 GIT_BRANCH="$(git rev-parse --abbrev-ref HEAD 2> /dev/null)"
 
