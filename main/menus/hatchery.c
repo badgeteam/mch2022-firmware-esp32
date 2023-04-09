@@ -5,6 +5,7 @@
 #include <freertos/queue.h>
 #include <freertos/task.h>
 #include <sdkconfig.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -387,6 +388,29 @@ bool menu_hatchery_install_app(xQueueHandle button_queue, const char* type_slug)
     return result;
 }
 
+void wraplines(char string[]) {
+    char* linebreak = strchr(string, '\n');
+    if (NULL != linebreak) {
+        ptrdiff_t line_length = linebreak - string;
+        if ((int) line_length * 9 < 320) {
+            wraplines(linebreak + 1);
+            return;
+        }
+    }
+    char* line = strndup(string, (320 / 9));
+    if (NULL == line) return;
+    char* word_end = strrchr(line, ' ');
+    if (NULL == word_end) {
+        free(line);
+        return;
+    }
+    ptrdiff_t wrap_position = word_end - line;
+    char*     wrap_char     = string + (int) wrap_position;
+    *wrap_char              = '\n';
+    free(line);
+    wraplines(wrap_char + 1);
+}
+
 bool menu_hatchery_app_info(xQueueHandle button_queue, const char* type_slug, const char* category_slug, const char* app_slug) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     size_t     ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
@@ -415,6 +439,7 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, const char* type_slug, co
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 1, buffer);
             snprintf(buffer, sizeof(buffer) - 1, "Version: %u", version_obj->valueint);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 2, buffer);
+            wraplines(description_obj->valuestring);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, 52 + 20 * 3, description_obj->valuestring);
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 install app  🅱 back");
             display_flush();
