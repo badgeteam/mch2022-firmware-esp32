@@ -205,17 +205,17 @@ void app_main(void) {
         ESP_LOGE(TAG, "Failed to initialize basic board support functions");
         esp_restart();
     }
-    
+
     /* Initialize LCD screen */
     pax_buf_t* pax_buffer = get_pax_buffer();
     display_boot_screen("Starting...");
-    
+
     /* Enable power to the LEDs and the SD card */
     res = gpio_set_direction(GPIO_SD_PWR, GPIO_MODE_OUTPUT);
     if (res != ESP_OK) stop();
     res = gpio_set_level(GPIO_SD_PWR, true);
     if (res != ESP_OK) stop();
-    
+
     /* Initialize the LEDs */
     ws2812_init(GPIO_LED_DATA, 150);
     const uint8_t led_off[15] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
