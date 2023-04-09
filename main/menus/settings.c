@@ -14,6 +14,7 @@
 #include "bootscreen.h"
 #include "filesystems.h"
 #include "graphics_wrapper.h"
+#include "gui_element_header.h"
 #include "hardware.h"
 #include "menu.h"
 #include "nametag.h"
@@ -61,10 +62,10 @@ void edit_lock(xQueueHandle button_queue) {
         const pax_font_t* font = pax_font_saira_regular;
         pax_noclip(pax_buffer);
         pax_background(pax_buffer, 0xFFFFFF);
-        pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Flashing lock");
+        render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, "Flashing lock");
         char state_str[64];
         snprintf(state_str, sizeof(state_str), "State: %s\n", state ? "active" : "disabled");
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, state_str);
+        pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 40, state_str);
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 toggle state  🅱 back");
         display_flush();
         if (wait_for_button()) {
@@ -109,11 +110,11 @@ void edit_brightness(xQueueHandle button_queue) {
         const pax_font_t* font = pax_font_saira_regular;
         pax_noclip(pax_buffer);
         pax_background(pax_buffer, 0xFFFFFF);
-        pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 20 * 0, "Screen brightness");
+        render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, "Screen brightness");
         char state_str[64];
         snprintf(state_str, sizeof(state_str), "Brightness: %u%%\n", (state * 100) / 255);
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 0, 20 * 1, state_str);
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "Increase / decrease  🅱 back");
+        pax_draw_text(pax_buffer, 0xFF000000, font, 23, 0, 40, state_str);
+        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "⤓ modify  🅱 back");
         display_flush();
         uint8_t button = wait_for_button_adv(button_queue);
         switch (button) {
@@ -123,10 +124,10 @@ void edit_brightness(xQueueHandle button_queue) {
                 break;
             case RP2040_INPUT_JOYSTICK_UP:
             case RP2040_INPUT_JOYSTICK_RIGHT:
-                if (state > 245) {
+                if (state > 255 - 32) {
                     state = 255;
                 } else {
-                    state += 10;
+                    state += 32;
                 }
                 nvs_set_u8(handle, "brightness", state);
                 nvs_commit(handle);
@@ -134,10 +135,10 @@ void edit_brightness(xQueueHandle button_queue) {
                 break;
             case RP2040_INPUT_JOYSTICK_DOWN:
             case RP2040_INPUT_JOYSTICK_LEFT:
-                if (state < 16) {
-                    state = 16;
+                if (state <= 32) {
+                    state = 32;
                 } else {
-                    state -= 10;
+                    state -= 32;
                 }
                 nvs_set_u8(handle, "brightness", state);
                 nvs_commit(handle);
