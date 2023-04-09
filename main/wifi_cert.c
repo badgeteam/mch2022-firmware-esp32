@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "esp_crt_bundle.h"
 #include "esp_log.h"
 #include "esp_tls.h"
 
