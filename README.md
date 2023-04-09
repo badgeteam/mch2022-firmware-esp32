@@ -4,7 +4,7 @@ This repository contains the ESP32 part of the firmware for the MCH2022 badge. T
 
 ## ESP-IDF and submodules
 
-This project uses the ESP-IDF SDK (v4.4.1). You can either install this SDK manually following the instructiosn on the Espressif website or you can automatically install the SDK by running `make prepare` in a git clone of this repository.
+This project uses the ESP-IDF SDK (v4.4.4). You can either install this SDK manually following the instructiosn on the Espressif website or you can automatically install the SDK by running `make prepare` in a git clone of this repository.
 
 Downloading this repository as a ZIP file on Github results in an incomplete archive missing all submodules. Be sure to clone using git!
 
@@ -16,7 +16,7 @@ Some source code is licensed separately, please check the following table for de
 
 | Location                    | Version     | License                           | Author                                                                                          |
 |-----------------------------|-------------|-----------------------------------|-------------------------------------------------------------------------------------------------|
-| esp-idf                     | 4.4.1       | Apache License 2.0                | Espressif Systems (Shanghai) CO LTD                                                             |
+| esp-idf                     | 4.4.4       | Apache License 2.0                | Espressif Systems (Shanghai) CO LTD                                                             |
 | components/appfs            |             | THE BEER-WARE LICENSE Revision 42 | Jeroen Domburg <jeroen@spritesmods.com>                                                         |
 | components/bus-i2c          |             | MIT                               | Nicolai Electronics                                                                             |
 | components/i2c-bno055       |             | MIT                               | Nicolai Electronics                                                                             |
