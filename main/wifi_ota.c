@@ -12,6 +12,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "gui_element_header.h"
 #include "hardware.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -19,8 +20,6 @@
 #include "wifi.h"
 #include "wifi_cert.h"
 #include "wifi_connect.h"
-
-#include "gui_element_header.h"
 
 #define HASH_LEN 32
 
