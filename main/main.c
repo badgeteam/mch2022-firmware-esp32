@@ -260,6 +260,10 @@ void app_main(void) {
 
     RP2040* rp2040 = get_rp2040();
 
+    uint8_t brightness = 0xFF;
+    nvs_get_u8(handle, "brightness", &brightness);
+    rp2040_set_lcd_backlight(rp2040, brightness);
+
     rp2040_updater(rp2040);  // Handle RP2040 firmware update & bootloader mode
 
     uint8_t crash_debug;
