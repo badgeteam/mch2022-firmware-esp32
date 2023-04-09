@@ -11,7 +11,7 @@ all: build flash
 prepare:
 	git submodule update --init --recursive
 	rm -rf "$(IDF_PATH)"
-	git clone --recursive --branch v4.4.3 https://github.com/espressif/esp-idf.git
+	git clone --recursive --branch v4.4.4 https://github.com/espressif/esp-idf.git
 	cd "$(IDF_PATH)"; bash install.sh
 
 clean:
