@@ -20,6 +20,8 @@
 #include "wifi_cert.h"
 #include "wifi_connect.h"
 
+#include "gui_element_header.h"
+
 #define HASH_LEN 32
 
 static const char *TAG = "OTA update";
@@ -115,6 +117,7 @@ void display_ota_state(const char *text, bool nightly) {
     pax_noclip(pax_buffer);
     const pax_font_t *font = pax_font_saira_regular;
     pax_background(pax_buffer, nightly ? 0x000000 : 0xFFFFFF);
+    render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, "Firmware update");
     pax_vec1_t title_size = pax_text_size(font, 18, nightly ? "Experimental firmware" : "Firmware update");
     pax_draw_text(pax_buffer, nightly ? 0xFFFF0000 : 0xFF000000, font, 18, (320 / 2) - (title_size.x / 2), 120 - 30,
                   nightly ? "Experimental firmware" : "Firmware update");
