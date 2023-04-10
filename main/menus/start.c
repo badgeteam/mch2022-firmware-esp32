@@ -20,6 +20,8 @@
 #include "pax_codecs.h"
 #include "pax_gfx.h"
 #include "rp2040.h"
+#include "sao.h"
+#include "sao_eeprom.h"
 #include "settings.h"
 #include "wifi_ota.h"
 
@@ -44,6 +46,9 @@ extern const uint8_t settings_png_end[] asm("_binary_settings_png_end");
 extern const uint8_t update_png_start[] asm("_binary_update_png_start");
 extern const uint8_t update_png_end[] asm("_binary_update_png_end");
 
+extern const uint8_t sao_png_start[] asm("_binary_sao_png_start");
+extern const uint8_t sao_png_end[] asm("_binary_sao_png_end");
+
 typedef enum action {
     ACTION_NONE,
     ACTION_APPS,
@@ -54,7 +59,8 @@ typedef enum action {
     ACTION_SETTINGS,
     ACTION_UPDATE,
     ACTION_OTA,
-    ACTION_MSC
+    ACTION_MSC,
+    ACTION_SAO
 } menu_start_action_t;
 
 void render_battery(pax_buf_t* pax_buffer, uint8_t percentage, bool charging) {
@@ -109,6 +115,8 @@ void menu_start(xQueueHandle button_queue, const char* version) {
     pax_decode_png_buf(&icon_settings, (void*) settings_png_start, settings_png_end - settings_png_start, PAX_BUF_32_8888ARGB, 0);
     pax_buf_t icon_update;
     pax_decode_png_buf(&icon_update, (void*) update_png_start, update_png_end - update_png_start, PAX_BUF_32_8888ARGB, 0);
+    pax_buf_t icon_hardware;
+    pax_decode_png_buf(&icon_hardware, (void*) sao_png_start, sao_png_end - sao_png_start, PAX_BUF_32_8888ARGB, 0);
 
     menu_set_icon(menu, &icon_home);
     menu_insert_item_icon(menu, "Name tag", NULL, (void*) ACTION_NAMETAG, -1, &icon_tag);
@@ -119,6 +127,12 @@ void menu_start(xQueueHandle button_queue, const char* version) {
     menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
     menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
     // menu_insert_item_icon(menu, "Disk", NULL, (void*) ACTION_MSC, -1, &icon_dev);
+
+    SAO sao = {0};
+    sao_identify(&sao);
+    if (sao.type != SAO_NONE) {
+        menu_insert_item_icon(menu, sao.name, NULL, (void*) ACTION_SAO, -1, &icon_hardware);
+    }
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
@@ -218,6 +232,8 @@ void menu_start(xQueueHandle button_queue, const char* version) {
                 display_boot_screen("Starting mass storage mode...");
                 rp2040_set_msc_control(rp2040, 0x01);  // Signal starting
                 esp_restart();
+            } else if (action == ACTION_SAO) {
+                menu_sao(button_queue);
             }
             action = ACTION_NONE;
             render = true;
