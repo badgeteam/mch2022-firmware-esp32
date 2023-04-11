@@ -1,45 +1,60 @@
 [submodule "components/bus-i2c"]
 	path = components/bus-i2c
 	url = https://github.com/Nicolai-Electronics/esp32-component-bus-i2c.git
+	branch = master
 [submodule "components/i2c-bno055"]
 	path = components/i2c-bno055
 	url = https://github.com/Nicolai-Electronics/esp32-component-i2c-bno055.git
+	branch = master
 [submodule "components/spi-ili9341"]
 	path = components/spi-ili9341
 	url = https://github.com/Nicolai-Electronics/esp32-component-spi-ili9341.git
+	branch = master
 [submodule "components/spi-ice40"]
 	path = components/spi-ice40
 	url = https://github.com/Nicolai-Electronics/esp32-component-spi-ice40.git
+	branch = master
 [submodule "components/sdcard"]
 	path = components/sdcard
 	url = https://github.com/Nicolai-Electronics/esp32-component-sdcard.git
+	branch = master
 [submodule "components/pax-graphics"]
 	path = components/pax-graphics
 	url = https://github.com/robotman2412/pax-graphics.git
+	branch = main
 [submodule "components/mch2022-rp2040"]
 	path = components/mch2022-rp2040
 	url = https://github.com/badgeteam/esp32-component-mch2022-rp2040.git
+	branch = master
 [submodule "components/esp32-component-appfs"]
 	path = components/appfs
 	url = https://github.com/badgeteam/esp32-component-appfs.git
+	branch = master
 [submodule "components/ws2812"]
 	path = components/ws2812
 	url = https://github.com/badgeteam/esp32-component-ws2812.git
+	branch = master
 [submodule "components/mch2022-efuse"]
 	path = components/mch2022-efuse
 	url = https://github.com/badgeteam/esp32-component-mch2022-efuse.git
+	branch = master
 [submodule "components/mch2022-bsp"]
 	path = components/mch2022-bsp
 	url = https://github.com/badgeteam/esp32-component-mch2022-bsp.git
+	branch = master
 [submodule "components/pax-codecs"]
 	path = components/pax-codecs
 	url = https://github.com/robotman2412/pax-codecs.git
+	branch = main
 [submodule "main/pax-keyboard"]
 	path = components/pax-keyboard
 	url = https://github.com/robotman2412/pax-keyboard
+	branch = main
 [submodule "components/eeprom"]
 	path = components/eeprom
 	url = https://github.com/Nicolai-Electronics/esp32-component-i2c-eeprom.git
+	branch = main
 [submodule "components/i2c-bme680"]
 	path = components/i2c-bme680
 	url = https://github.com/badgeteam/esp32-component-bme680.git
+	branch = main
