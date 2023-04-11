@@ -1,0 +1,124 @@
+name: Release build -> OTA
+run-name: "Release build: ${{ github.event.release.name }}"
+
+on:
+  release:
+    types: [released]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo + submodules
+      uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
+
+    - name: Build with ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4.4
+        target: esp32
+
+    - name: Generate build report
+      env:
+        repo: ${{ github.repository }}
+        tag:  ${{ github.event.release.tag_name }}
+        compare_url_template: ${{ format('/{0}/compare/{{base}}...{{head}}', github.repository) }}
+      run: |
+        previous_tag=$(git tag --sort '-refname' | grep -A1 "$tag" | tail -1)
+        tag_compare_url=$(sed "s!{base}!$previous_tag!; s!{head}!$tag!" <<< $compare_url_template)
+
+        build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
+
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+
+        cat << $EOF >> $GITHUB_STEP_SUMMARY
+        # Release build summary 🚀🔨
+
+        **Release:** [${{ github.event.release.name }}](${{ github.event.release.html_url }})
+
+        **Source:** [${repo}@\`${tag}\`](/${repo}/tree/${tag})
+
+        **Size of \`launcher.bin\`:** $build_size_main kB
+
+        ## Build details
+        \`\`\`console
+        \$ du -h build/*.bin build/*.elf build/*/*.bin build/*/*.elf
+        $(du -h build/*.bin build/*.elf build/*/*.bin build/*/*.elf)
+        \`\`\`
+
+        ### Source
+        **Diff with previous tag:** $tag_compare_url
+
+        #### Submodules
+        \`\`\`
+        $(
+          git submodule --quiet foreach '
+            status=$(git status | grep -v -e "nothing to commit" -e "git pull" -e "^$")
+            echo \
+              "$path\t" \
+              "$(git rev-parse --short HEAD)\t" \
+              "$(git rev-parse --symbolic-full-name HEAD | rev | cut -d / -f1 | rev)\t" \
+              $(
+                echo "$status" | grep "HEAD detached" | sed "s&\(HEAD detached\)&⚠️ \1&";
+                echo "$status" | grep "branch is behind"     | sed "s&Your branch is&⚠️&; s/\,[a-z -]\+\.//";
+                # echo "$status" | grep "branch is up to date" | sed "s&Your branch is&✅&; s/\.$//";
+              )
+          ' | column -t -s $'\t'
+        )
+        \`\`\`
+
+        $EOF
+      continue-on-error: true
+
+    - name: Upload release asset launcher.bin
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./build/launcher.bin
+        asset_name: launcher.bin
+        asset_content_type: application/octet-stream
+
+    - name: Upload release asset launcher.elf
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: ./build/launcher.elf
+        asset_name: launcher.elf
+        asset_content_type: application/octet-stream
+
+    - name: OTA -> Checkout repo
+      uses: actions/checkout@v3
+      with:
+        repository: badgeteam/ota
+        path: ../ota
+
+    - name: OTA -> Add new firmware build
+      run: |
+        cp -f build/launcher.bin ../ota/mch2022.bin
+        cp -n build/launcher.elf ../ota/mch2022-${{ github.event.release.tag_name }}.elf
+        cd ../ota
+        jq -r --arg date $(date -I) 'map(
+          select(.id == "mch2022")
+          | .version = {
+            name: "${{ github.event.release.tag_name }}",
+            url: "${{ github.event.release.html_url }}",
+            date: $date
+          }
+        )' badges.json | sponge badges.json
+
+    - name: OTA -> Create PR for release
+      uses: peter-evans/create-pull-request@v5
+      with:
+        path: ../ota
+        token: ${{ secrets.OTA_PUSH_TOKEN }}
+        branch: autorelease/mch2022
+        assignees: ${{ github.event.sender }}
+        reviewers: Pwuts
+        title:          "Release MCH2022 ${{ github.event.release.name }}"
+        commit-message: "Release MCH2022 ${{ github.event.release.name }}"

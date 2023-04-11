@@ -25,7 +25,6 @@ jobs:
     - name: Checkout repo + submodules
       uses: actions/checkout@v3
       with:
-        ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
         submodules: 'recursive'
 
     - name: Build with ESP-IDF
@@ -73,6 +72,24 @@ jobs:
           (if .committer.name != .author.name then "\n> <sub>**Committer:** \(.committer.name) <\(.committer.email)></sub>" else "" end),
           "<sub>**Timestamp:** \(.timestamp)</sub>"
         ] | map("> \(.)\n") | join("")) | join("\n")' <<< $new_commits_json)
+
+        #### Submodules
+        \`\`\`
+        $(
+          git submodule --quiet foreach '
+            status=$(git status | grep -v -e "nothing to commit" -e "git pull" -e "^$")
+            echo \
+              "$path\t" \
+              "$(git rev-parse --short HEAD)\t" \
+              "$(git rev-parse --symbolic-full-name HEAD | rev | cut -d / -f1 | rev)\t" \
+              $(
+                echo "$status" | grep "HEAD detached" | sed "s&\(HEAD detached\)&⚠️ \1&";
+                echo "$status" | grep "branch is behind"     | sed "s&Your branch is&⚠️&; s/\,[a-z -]\+\.//";
+                # echo "$status" | grep "branch is up to date" | sed "s&Your branch is&✅&; s/\.$//";
+              )
+          ' | column -t -s $'\t'
+        )
+        \`\`\`
 
         MarkdownHERE
       continue-on-error: true
