@@ -55,7 +55,9 @@ jobs:
         build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
         ref_compare_url=$(sed "s/{base}/$base_branch/; s/{head}/$commit_hash/" <<< $compare_url_template)
 
-        cat << MarkdownHERE >> $GITHUB_STEP_SUMMARY
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+
+        cat << $EOF >> $GITHUB_STEP_SUMMARY
         # Build summary 🔨${{ github.ref_name != 'master' && '🚧' || '' }}
 
         **Source:** ${{ github.ref_type }} \`$current_ref\` -> [${{ github.repository }}@\`${commit_hash:0:7}\`](${{ github.event.head_commit.url }})
@@ -87,19 +89,21 @@ jobs:
         \`\`\`
         $(
           git submodule --quiet foreach '
-            status=$(git status | grep -v -e "nothing to commit" -e "git pull" -e "^$")
+            branch=$(grep -C1 "$(git config --get remote.origin.url)" $toplevel/.gitmodules | grep "branch =" | rev | cut -d" " -f1 | rev)
+            git fetch origin $branch --unshallow >&2
+            commits_behind=$(git --no-pager log --oneline HEAD..origin/$branch)
+            [ -n "$commits_behind" ] && echo "$name has new commits upstream:\n$commits_behind" >&2
             echo \
               "$path\t" \
+              "$branch\t" \
               "$(git rev-parse --short HEAD)\t" \
-              "$(git rev-parse --symbolic-full-name HEAD | rev | cut -d / -f1 | rev)\t" \
-              $(
-                echo "$status" | grep "HEAD detached" | sed "s&\(HEAD detached\)&⚠️ \1&";
-                echo "$status" | grep "branch is behind"     | sed "s&Your branch is&⚠️&; s/\,[a-z -]\+\.//";
-                # echo "$status" | grep "branch is up to date" | sed "s&Your branch is&✅&; s/\.$//";
-              )
+              $(if [ -z "$commits_behind" ];
+                then echo "✅ up to date";
+                else echo "⚠️ $(echo "$commits_behind" | wc -l) commits behind origin/$branch";
+              fi)
           ' | column -t -s $'\t'
         )
         \`\`\`
 
-        MarkdownHERE
+        $EOF
       continue-on-error: true
