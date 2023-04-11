@@ -33,6 +33,16 @@ jobs:
         esp_idf_version: v4.4.4
         target: esp32
 
+    - name: Upload build to artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build
+        path: |
+          build/launcher.bin
+          build/launcher.elf
+          build/bootloader/bootloader.bin
+          build/bootloader/bootloader.elf
+
     - name: Generate build report
       env:
         base_branch: master
