@@ -22,6 +22,7 @@ extern const uint8_t rp2040_firmware_bin_start[] asm("_binary_rp2040_firmware_bi
 extern const uint8_t rp2040_firmware_bin_end[] asm("_binary_rp2040_firmware_bin_end");
 #define RP2040_FIRMWARE_ADDR 0x10010000
 #define RP2040_SECTOR_SIZE   0x1000
+#define RP2040_TARGET_FW     0x0C
 
 static void draw_text_centered(pax_buf_t* pax_buffer, const pax_font_t* font, pax_col_t color, int offset, const char* text) {
     pax_center_text(pax_buffer, color, font, 18, pax_buffer->width / 2, pax_buffer->height / 2 + offset, text);
@@ -236,7 +237,7 @@ void rp2040_updater(RP2040* rp2040) {
         restart();
     }
 
-    if (fw_version < 0x0C) {  // Update required
+    if (fw_version < RP2040_TARGET_FW) {  // Update required
         rp2040_update_start(rp2040);
     }
 

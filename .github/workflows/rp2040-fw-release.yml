@@ -1,0 +1,35 @@
+name: RP2040 firmware release hook
+run-name: RP2040 firmware release ${{ github.event.client_payload.fw_version }}
+
+on:
+  repository_dispatch:
+    types: [rp2040-firmware-released]
+
+jobs:
+  pull-and-pr:
+    name: Get new RP2040 firmware & create PR
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+
+    - name: Integrate new RP2040 firmware
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release download "${{ github.event.client_payload.tag }}" \
+          -p ${{ github.event.client_payload.fw_main }} \
+          -O resources/rp2040_firmware.bin --clobber
+
+        version="${{ github.event.client_payload.fw_version }}"
+        perl -pi -e "s/(?<=#define RP2040_TARGET_FW)(\s+)0x[0-9a-fA-F]{1,2}$/\${1}${version}/" main/rp2040_updater.c
+
+    - id: create-pr
+      name: Create PR
+      uses: peter-evans/create-pull-request@v5
+      with:
+        branch:         ci/update-rp2040-firmware
+        title:          "RP2040 firmware release ${{ github.event.client_payload.fw_version }}"
+        commit-message: "RP2040 firmware release ${{ github.event.client_payload.fw_version }}"
+        assignees:      renzenicolai
+        reviewers:      Pwuts
