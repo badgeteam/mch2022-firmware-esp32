@@ -1,5 +1,7 @@
-name: Release build -> OTA
-run-name: "${{ github.event.release.prerelease && 'Prerelease' || 'Release' }} build: ${{ github.event.release.name }}"
+name: Release build
+run-name: >
+  ${{ github.event.release.prerelease && 'Prerelease' || 'Release' }} build:
+  ${{ github.event.release.name }}"
 
 on:
   release:
@@ -7,9 +9,11 @@ on:
 
 env:
   RELEASE_TYPE: ${{ github.event.release.prerelease && 'Prerelease' || 'Release' }}
+  RELEASE_CHANNEL: ${{ github.event.release.prerelease && 'dev' || 'release' }}
 
 jobs:
-  build:
+  build-release:
+    name: Build & upload to release
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo + submodules
@@ -31,41 +35,23 @@ jobs:
         build/launcher.bin
         build/launcher.elf
 
-    - name: OTA <- Checkout repo
-      uses: actions/checkout@v3
-      with:
-        repository: badgeteam/ota
-        path: ../ota
-
-    - name: OTA <- Add new firmware build
-      env:
-        build_type: ${{ github.event.release.prerelease && 'dev' || '' }}
-      run: |
-        cp -f build/launcher.bin ../ota/mch2022.bin
-        cp -n build/launcher.elf ../ota/mch2022-${{ github.event.release.tag_name }}.elf
-        cd ../ota
-        jq -r --arg build_type "$build_type" --arg date $(date -I) 'map(
-          select(.id == "mch2022")
-          | if $build_type == "" then .version else .["version_" + $build_type] end = {
-            name: "${{ github.event.release.tag_name }}",
-            url: "${{ github.event.release.html_url }}",
-            date: $date
-          }
-        )' badges.json | sponge badges.json
-
-    - id: create-pr
-      name: OTA <- Create PR for release
-      uses: peter-evans/create-pull-request@v5
+    - name: Dispatch OTA hook
+      uses: peter-evans/repository-dispatch@v2
       with:
         token: ${{ secrets.OTA_PUSH_TOKEN }}
-        path: ../ota
-        branch:         autorelease/mch2022${{ github.event.release.prerelease && '-dev' || '' }}
-        title:          "${{ env.RELEASE_TYPE }} MCH2022 ${{ github.event.release.name }}"
-        commit-message: "${{ env.RELEASE_TYPE }} MCH2022 ${{ github.event.release.name }}"
-        assignees:      ${{ github.event.sender.login }}
-        reviewers:      Pwuts
+        repository: badgeteam/ota
+        event-type: firmware-release
+        client-payload: >
+          {
+            "device_id": "mch2022",
+            "device_name": "MCH2022",
+            "tag": "${{ github.event.release.tag_name }}",
+            "channel": "${{ env.RELEASE_CHANNEL }}",
+            "fw_main": "launcher.bin"
+          }
 
     - name: Generate release build report
+      if: success() || failure()
       env:
         repo: ${{ github.repository }}
         tag:  ${{ github.event.release.tag_name }}
@@ -84,8 +70,6 @@ jobs:
         **Release:** [${{ github.event.release.name }}](${{ github.event.release.html_url }})
 
         **Source:** [${repo}@\`${tag}\`](/${repo}/tree/${tag})
-
-        **OTA release PR:** ${{ steps.create-pr.outputs.pull-request-url }}
 
         ## Build details
         **Size of \`launcher.bin\`:** $build_size_main kB
@@ -119,4 +103,3 @@ jobs:
         \`\`\`
 
         $EOF
-      continue-on-error: true

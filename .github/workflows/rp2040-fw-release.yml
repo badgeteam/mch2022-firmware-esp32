@@ -17,7 +17,8 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release download "${{ github.event.client_payload.tag }}" \
+        gh release --repo badgeteam/mch2022-firmware-rp2040 \
+          download "${{ github.event.client_payload.tag }}" \
           -p ${{ github.event.client_payload.fw_main }} \
           -O resources/rp2040_firmware.bin --clobber
 
