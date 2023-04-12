@@ -13,23 +13,76 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
 
+    - name: Check payload
+      id: payload
+      run: |
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+        payload=$(
+        cat << $EOF
+        ${{ toJson(github.event.client_payload) }}
+        $EOF
+        );
+
+        valid_payload=$(jq -r 'select(
+          (.tag        | type == "string") and
+          (.fw_main    | type == "string") and
+          (.fw_version | type == "string")
+        )' <<< $payload);
+
+        [ -n "$valid_payload" ] || exit 1
+
+        # output checked payload fields
+        echo "tag=${{ github.event.client_payload.tag }}" >> $GITHUB_OUTPUT
+        echo "fw_main=${{ github.event.client_payload.fw_main }}" >> $GITHUB_OUTPUT
+        echo "fw_version=${{ github.event.client_payload.fw_version }}" >> $GITHUB_OUTPUT
+
+    - name: Get release info
+      id: release_info
+      run: |
+        release_info=$(
+          GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}'
+          gh release
+            --repo badgeteam/mch2022-firmware-rp2040
+            view "${{ steps.payload.outputs.tag }}"
+        );
+        echo "Release info:\n$release_info";
+
+        release_header=$(awk '/[a-z]+:/' <<< $release_info)
+        release_assets=$(grep "^asset:" <<< $release_header | cut -f 2-)
+        release_description=$(awk '/--/,0' <<< $release_info | tail +2)
+
+        # output info fields
+        for label in 'title' 'tag' 'draft' 'prerelease' 'author' 'created' 'published' 'url'; do
+          echo "$label=$(grep "^${label}:" <<< $release_header | cut -f 2-)" >> $GITHUB_OUTPUT;
+        done
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+        echo "assets<<$EOF\n$release_assets\n$EOF"           >> $GITHUB_OUTPUT
+        echo "description<<$EOF\n$release_description\n$EOF" >> $GITHUB_OUTPUT
+
     - name: Integrate new RP2040 firmware
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        gh release download "${{ github.event.client_payload.tag }}" \
-          -p ${{ github.event.client_payload.fw_main }} \
+        gh release --repo badgeteam/mch2022-firmware-rp2040 \
+          download "${{ steps.payload.outputs.tag }}" \
+          -p ${{ steps.payload.outputs.fw_main }} \
           -O resources/rp2040_firmware.bin --clobber
 
-        version="${{ github.event.client_payload.fw_version }}"
+        version="${{ steps.payload.outputs.fw_version }}"
         perl -pi -e "s/(?<=#define RP2040_TARGET_FW)(\s+)0x[0-9a-fA-F]{1,2}$/\${1}${version}/" main/rp2040_updater.c
 
     - id: create-pr
       name: Create PR
       uses: peter-evans/create-pull-request@v5
+      env:
+        message: "RP2040 firmware release ${{ github.event.client_payload.fw_version }}"
       with:
         branch:         ci/update-rp2040-firmware
-        title:          "RP2040 firmware release ${{ github.event.client_payload.fw_version }}"
-        commit-message: "RP2040 firmware release ${{ github.event.client_payload.fw_version }}"
-        assignees:      renzenicolai
-        reviewers:      Pwuts
+        title:          ${{ env.message }}
+        commit-message: ${{ env.message }}
+        assignees:      ${{ steps.release_info.outputs.author }}
+        body: |
+          ## ${{ steps.release_info.outputs.title }}
+          ${{ steps.release_info.outputs.url }}
+
+          ${{ steps.release_info.outputs.description }}
