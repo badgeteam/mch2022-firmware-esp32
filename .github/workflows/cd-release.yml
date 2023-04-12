@@ -23,25 +23,13 @@ jobs:
         esp_idf_version: v4.4.4
         target: esp32
 
-    - name: Upload release asset launcher.bin
-      uses: actions/upload-release-asset@v1
+    - name: Upload release assets
       env:
-        GITHUB_TOKEN: ${{ github.token }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./build/launcher.bin
-        asset_name: launcher.bin
-        asset_content_type: application/octet-stream
-
-    - name: Upload release asset launcher.elf
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-      with:
-        upload_url: ${{ github.event.release.upload_url }}
-        asset_path: ./build/launcher.elf
-        asset_name: launcher.elf
-        asset_content_type: application/x-executable
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: >
+        gh release upload "${{ github.event.release.tag_name }}"
+        build/launcher.bin
+        build/launcher.elf
 
     - name: OTA <- Checkout repo
       uses: actions/checkout@v3

@@ -25,7 +25,7 @@ jobs:
     - name: Checkout repo + submodules
       uses: actions/checkout@v3
       with:
-        submodules: 'recursive'
+        submodules: recursive
 
     - name: Build with ESP-IDF
       uses: espressif/esp-idf-ci-action@v1
