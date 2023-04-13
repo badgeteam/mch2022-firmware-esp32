@@ -38,8 +38,8 @@ jobs:
       with:
         name: build
         path: |
-          build/launcher.bin
-          build/launcher.elf
+          build/MCH2022.bin
+          build/MCH2022.elf
           build/bootloader/bootloader.bin
           build/bootloader/bootloader.elf
 
