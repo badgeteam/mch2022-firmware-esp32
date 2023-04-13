@@ -1,0 +1,105 @@
+name: Release build
+run-name: >
+  ${{ github.event.release.prerelease && 'Prerelease' || 'Release' }} build:
+  ${{ github.event.release.name }}"
+
+on:
+  release:
+    types: [released, prereleased]
+
+env:
+  RELEASE_TYPE: ${{ github.event.release.prerelease && 'Prerelease' || 'Release' }}
+  RELEASE_CHANNEL: ${{ github.event.release.prerelease && 'dev' || 'release' }}
+
+jobs:
+  build-release:
+    name: Build & upload to release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repo + submodules
+      uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Build with ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: v4.4.4
+        target: esp32
+
+    - name: Upload release assets
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: >
+        gh release upload "${{ github.event.release.tag_name }}"
+        build/launcher.bin
+        build/launcher.elf
+
+    - name: Dispatch OTA hook
+      uses: peter-evans/repository-dispatch@v2
+      with:
+        token: ${{ secrets.OTA_PUSH_TOKEN }}
+        repository: badgeteam/ota
+        event-type: firmware-release
+        client-payload: >
+          {
+            "device_id": "mch2022",
+            "device_name": "MCH2022",
+            "tag": "${{ github.event.release.tag_name }}",
+            "channel": "${{ env.RELEASE_CHANNEL }}",
+            "fw_main": "launcher.bin"
+          }
+
+    - name: Generate release build report
+      if: success() || failure()
+      env:
+        repo: ${{ github.repository }}
+        tag:  ${{ github.event.release.tag_name }}
+        compare_url_template: ${{ format('/{0}/compare/{{base}}...{{head}}', github.repository) }}
+      run: |
+        previous_tag=$(git tag --sort '-refname' | grep -A1 "$tag" | tail -1)
+        tag_compare_url=$(sed "s!{base}!$previous_tag!; s!{head}!$tag!" <<< $compare_url_template)
+
+        build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
+
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+
+        cat << $EOF >> $GITHUB_STEP_SUMMARY
+        # $RELEASE_TYPE build summary 🚀${{ github.event.release.prerelease && '🚧' || '' }}🔨
+
+        **Release:** [${{ github.event.release.name }}](${{ github.event.release.html_url }})
+
+        **Source:** [${repo}@\`${tag}\`](/${repo}/tree/${tag})
+
+        ## Build details
+        **Size of \`launcher.bin\`:** $build_size_main kB
+
+        \`\`\`console
+        \$ du -h build/*.bin build/*.elf build/*/*.bin build/*/*.elf
+        $(du -h build/*.bin build/*.elf build/*/*.bin build/*/*.elf)
+        \`\`\`
+
+        ### Source
+        **Diff with previous tag:** $tag_compare_url
+
+        #### Submodules
+        \`\`\`
+        $(
+          git submodule --quiet foreach '
+            branch=$(grep -C1 "$(git config --get remote.origin.url)" $toplevel/.gitmodules | grep "branch =" | rev | cut -d" " -f1 | rev)
+            git fetch origin $branch --unshallow >&2
+            commits_behind=$(git --no-pager log --oneline HEAD..origin/$branch)
+            [ -n "$commits_behind" ] && echo "$name has new commits upstream:\n$commits_behind" >&2
+            echo \
+              "$path\t" \
+              "$branch\t" \
+              "$(git rev-parse --short HEAD)\t" \
+              $(if [ -z "$commits_behind" ];
+                then echo "✅ up to date";
+                else echo "⚠️ $(echo "$commits_behind" | wc -l) commits behind origin/$branch";
+              fi)
+          ' | column -t -s $'\t'
+        )
+        \`\`\`
+
+        $EOF

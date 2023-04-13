@@ -25,14 +25,23 @@ jobs:
     - name: Checkout repo + submodules
       uses: actions/checkout@v3
       with:
-        ref: ${{ github.event_name == 'pull_request' && github.head_ref || '' }}
-        submodules: 'recursive'
+        submodules: recursive
 
     - name: Build with ESP-IDF
       uses: espressif/esp-idf-ci-action@v1
       with:
         esp_idf_version: v4.4.4
         target: esp32
+
+    - name: Upload build to artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: build
+        path: |
+          build/launcher.bin
+          build/launcher.elf
+          build/bootloader/bootloader.bin
+          build/bootloader/bootloader.elf
 
     - name: Generate build report
       env:
@@ -46,7 +55,9 @@ jobs:
         build_size_main=$(du build/MCH2022.bin | awk '{ print $1 }')
         ref_compare_url=$(sed "s/{base}/$base_branch/; s/{head}/$commit_hash/" <<< $compare_url_template)
 
-        cat << MarkdownHERE >> $GITHUB_STEP_SUMMARY
+        EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+
+        cat << $EOF >> $GITHUB_STEP_SUMMARY
         # Build summary 🔨${{ github.ref_name != 'master' && '🚧' || '' }}
 
         **Source:** ${{ github.ref_type }} \`$current_ref\` -> [${{ github.repository }}@\`${commit_hash:0:7}\`](${{ github.event.head_commit.url }})
@@ -74,5 +85,25 @@ jobs:
           "<sub>**Timestamp:** \(.timestamp)</sub>"
         ] | map("> \(.)\n") | join("")) | join("\n")' <<< $new_commits_json)
 
-        MarkdownHERE
+        #### Submodules
+        \`\`\`
+        $(
+          git submodule --quiet foreach '
+            branch=$(grep -C1 "$(git config --get remote.origin.url)" $toplevel/.gitmodules | grep "branch =" | rev | cut -d" " -f1 | rev)
+            git fetch origin $branch --unshallow >&2
+            commits_behind=$(git --no-pager log --oneline HEAD..origin/$branch)
+            [ -n "$commits_behind" ] && echo "$name has new commits upstream:\n$commits_behind" >&2
+            echo \
+              "$path\t" \
+              "$branch\t" \
+              "$(git rev-parse --short HEAD)\t" \
+              $(if [ -z "$commits_behind" ];
+                then echo "✅ up to date";
+                else echo "⚠️ $(echo "$commits_behind" | wc -l) commits behind origin/$branch";
+              fi)
+          ' | column -t -s $'\t'
+        )
+        \`\`\`
+
+        $EOF
       continue-on-error: true
