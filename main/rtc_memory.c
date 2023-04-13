@@ -35,18 +35,18 @@ esp_err_t rtc_memory_string_write(const char *str) {
     memset(rtc_mem_str, 0, RTC_MEM_STR_SIZE * sizeof(char));
     strcpy(rtc_mem_str, str);
     *rtc_mem_str_crc = crc16_le(0, (uint8_t const *) rtc_mem_str, RTC_MEM_STR_SIZE);
-    printf("RTC memory @ %p written, CRC %04X\n", rtc_mem_str, *rtc_mem_str_crc);
+    // printf("RTC memory @ %p written, CRC %04X\n", rtc_mem_str, *rtc_mem_str_crc);
     return ESP_OK;
 }
 
 esp_err_t rtc_memory_string_read(const char **str) {
-    printf("RTC memory @ %p read\n", rtc_mem_str);
+    // printf("RTC memory @ %p read\n", rtc_mem_str);
     uint16_t crc = crc16_le(0, (uint8_t const *) rtc_mem_str, RTC_MEM_STR_SIZE);
     if (*rtc_mem_str_crc != crc) {
-        printf("RTC memory @ %p invalid %04X != %04x\n", rtc_mem_str, *rtc_mem_str_crc, crc);
+        // printf("RTC memory @ %p invalid %04X != %04x\n", rtc_mem_str, *rtc_mem_str_crc, crc);
         return ESP_FAIL;
     }
-    printf("RTC memory @ %p valid: %s\n", rtc_mem_str, rtc_mem_str);
+    // printf("RTC memory @ %p valid: %s\n", rtc_mem_str, rtc_mem_str);
     *str = rtc_mem_str;
     return ESP_OK;
 }
