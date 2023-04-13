@@ -19,6 +19,7 @@
 #include "driver/uart.h"
 #include "driver_fsoverbus.h"
 #include "esp32/rom/crc.h"
+#include "esp_ota_ops.h"
 #include "esp_vfs.h"
 #include "esp_vfs_fat.h"
 #include "filesystems.h"
@@ -71,6 +72,7 @@ static int            appfs_size     = 0;
 // Generic
 #define WEBUSB_CMD_SYNC (('S' << 0) | ('Y' << 8) | ('N' << 16) | ('C' << 24))  // Echo back empty response
 #define WEBUSB_CMD_PING (('P' << 0) | ('I' << 8) | ('N' << 16) | ('G' << 24))  // Echo payload back to PC
+#define WEBUSB_CMD_INFO (('I' << 0) | ('N' << 8) | ('F' << 16) | ('O' << 24))  // Version information
 // FAT FS
 #define WEBUSB_CMD_FSLS (('F' << 0) | ('S' << 8) | ('L' << 16) | ('S' << 24))  // List files
 #define WEBUSB_CMD_FSEX (('F' << 0) | ('S' << 8) | ('E' << 16) | ('X' << 24))  // Check if file exists
@@ -294,6 +296,19 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                                                      .payload_crc    = header->payload_crc};
                 uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
                 uart_write_bytes(WEBUSB_UART, payload, header->payload_length);
+                break;
+            }
+        case WEBUSB_CMD_INFO:
+            {
+                const esp_app_desc_t* app_description = esp_ota_get_app_description();
+                sprintf((char*) payload, "%s %s", app_description->project_name, app_description->version);
+                webusb_response_header_t response = {.magic          = webusb_packet_magic,
+                                                     .identifier     = header->identifier,
+                                                     .response       = header->command,
+                                                     .payload_length = strlen((char*) payload),
+                                                     .payload_crc    = crc32_le(0, payload, strlen((char*) payload))};
+                uart_write_bytes(WEBUSB_UART, &response, sizeof(webusb_response_header_t));
+                uart_write_bytes(WEBUSB_UART, payload, strlen((char*) payload));
                 break;
             }
         case WEBUSB_CMD_FSLS:
