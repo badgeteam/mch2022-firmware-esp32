@@ -27,6 +27,7 @@
 #include "ice40.h"
 #include "managed_i2c.h"
 #include "pax_gfx.h"
+#include "rtc_memory.h"
 #include "system_wrapper.h"
 #include "terminal.h"
 
@@ -672,6 +673,12 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 appfs_handle_t fd = appfsOpen((char*) payload);
                 if (fd != APPFS_INVALID_FD) {
                     result[0] = 1;
+                }
+
+                if (header->payload_length > strlen((char*) payload) + 1) {  // If payload is longer than the length of the app name
+                    char* command =
+                        (char*) &payload[strlen((char*) payload) + 1];  // Skip past the first \0 terminator and threat the rest of the payload as command
+                    rtc_memory_string_write(command);
                 }
 
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
