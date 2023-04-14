@@ -38,8 +38,8 @@ jobs:
       with:
         name: build
         path: |
-          build/launcher.bin
-          build/launcher.elf
+          build/MCH2022.bin
+          build/MCH2022.elf
           build/bootloader/bootloader.bin
           build/bootloader/bootloader.elf
 
@@ -52,7 +52,7 @@ jobs:
         head_compare_url: ${{ github.event.compare }}
         new_commits_json: ${{ toJSON(github.event.commits) }}
       run: |
-        build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
+        build_size_main=$(du build/MCH2022.bin | awk '{ print $1 }')
         ref_compare_url=$(sed "s/{base}/$base_branch/; s/{head}/$commit_hash/" <<< $compare_url_template)
 
         EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
@@ -62,7 +62,7 @@ jobs:
 
         **Source:** ${{ github.ref_type }} \`$current_ref\` -> [${{ github.repository }}@\`${commit_hash:0:7}\`](${{ github.event.head_commit.url }})
 
-        **Size of \`launcher.bin\`:** $build_size_main kB
+        **Size of \`MCH2022.bin\`:** $build_size_main kB
 
         \`\`\`console
         \$ du -h build/*.bin build/*/*.bin

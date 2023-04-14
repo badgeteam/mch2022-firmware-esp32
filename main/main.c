@@ -194,8 +194,7 @@ void app_main(void) {
     audio_init();
 
     const esp_app_desc_t* app_description = esp_ota_get_app_description();
-    ESP_LOGI(TAG, "App version: %s", app_description->version);
-    // ESP_LOGI(TAG, "Project name: %s", app_description->project_name);
+    printf("BADGE.TEAM %s launcher firmware v%s\r\n", app_description->project_name, app_description->version);
 
     /* Initialize hardware */
 

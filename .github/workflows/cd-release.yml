@@ -32,8 +32,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: >
         gh release upload "${{ github.event.release.tag_name }}"
-        build/launcher.bin
-        build/launcher.elf
+        build/MCH2022.bin
+        build/MCH2022.elf
 
     - name: Dispatch OTA hook
       uses: peter-evans/repository-dispatch@v2
@@ -47,7 +47,7 @@ jobs:
             "device_name": "MCH2022",
             "tag": "${{ github.event.release.tag_name }}",
             "channel": "${{ env.RELEASE_CHANNEL }}",
-            "fw_main": "launcher.bin"
+            "fw_main": "MCH2022.bin"
           }
 
     - name: Generate release build report
@@ -60,7 +60,7 @@ jobs:
         previous_tag=$(git tag --sort '-refname' | grep -A1 "$tag" | tail -1)
         tag_compare_url=$(sed "s!{base}!$previous_tag!; s!{head}!$tag!" <<< $compare_url_template)
 
-        build_size_main=$(du build/launcher.bin | awk '{ print $1 }')
+        build_size_main=$(du build/MCH2022.bin | awk '{ print $1 }')
 
         EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
 
@@ -72,7 +72,7 @@ jobs:
         **Source:** [${repo}@\`${tag}\`](/${repo}/tree/${tag})
 
         ## Build details
-        **Size of \`launcher.bin\`:** $build_size_main kB
+        **Size of \`MCH2022.bin\`:** $build_size_main kB
 
         \`\`\`console
         \$ du -h build/*.bin build/*.elf build/*/*.bin build/*/*.elf
