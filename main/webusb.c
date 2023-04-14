@@ -301,7 +301,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
         case WEBUSB_CMD_INFO:
             {
                 const esp_app_desc_t* app_description = esp_ota_get_app_description();
-                sprintf((char*) payload, "%s %s", app_description->project_name, app_description->version);
+                sprintf((char*) payload, "%s\n%s", app_description->project_name, app_description->version);
                 webusb_response_header_t response = {.magic          = webusb_packet_magic,
                                                      .identifier     = header->identifier,
                                                      .response       = header->command,
