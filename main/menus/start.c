@@ -130,8 +130,10 @@ void menu_start(xQueueHandle button_queue, const char* version) {
 
     SAO sao = {0};
     sao_identify(&sao);
-    if (sao.type != SAO_NONE) {
+    if (sao.type == SAO_BINARY) {
         menu_insert_item_icon(menu, sao.name, NULL, (void*) ACTION_SAO, -1, &icon_hardware);
+    } else if (sao.type != SAO_NONE) {
+        menu_insert_item_icon(menu, "Addon", NULL, (void*) ACTION_SAO, -1, &icon_hardware);
     }
 
     bool                render = true;
@@ -146,26 +148,34 @@ void menu_start(xQueueHandle button_queue, const char* version) {
 
     RP2040* rp2040 = get_rp2040();
 
+    bool full_redraw = true;
     while (1) {
         rp2040_input_message_t buttonMessage = {0};
+        bool                   user_input    = false;
         if (xQueueReceive(button_queue, &buttonMessage, 100 / portTICK_PERIOD_MS) == pdTRUE) {
             if (buttonMessage.state) {
                 switch (buttonMessage.input) {
                     case RP2040_INPUT_JOYSTICK_DOWN:
                         menu_navigate_next_row(menu);
-                        render = true;
+                        user_input  = true;
+                        render      = true;
+                        full_redraw = true;
                         break;
                     case RP2040_INPUT_JOYSTICK_UP:
                         menu_navigate_previous_row(menu);
-                        render = true;
+                        user_input  = true;
+                        render      = true;
+                        full_redraw = true;
                         break;
                     case RP2040_INPUT_JOYSTICK_LEFT:
                         menu_navigate_previous(menu);
-                        render = true;
+                        user_input = true;
+                        render     = true;
                         break;
                     case RP2040_INPUT_JOYSTICK_RIGHT:
                         menu_navigate_next(menu);
-                        render = true;
+                        user_input = true;
+                        render     = true;
                         break;
                     case RP2040_INPUT_BUTTON_ACCEPT:
                     case RP2040_INPUT_JOYSTICK_PRESS:
@@ -203,14 +213,27 @@ void menu_start(xQueueHandle button_queue, const char* version) {
         }
 
         if (render) {
-            char textBuffer[64];
-            // snprintf(textBuffer, sizeof(textBuffer), "%u%%%c (%1.1fv) v%s", battery_percent, battery_charging ? '+' : ' ', battery_voltage, version);
-            snprintf(textBuffer, sizeof(textBuffer), "v%s", version);
-            render_start_help(pax_buffer, textBuffer);
-            menu_render_grid(pax_buffer, menu, 0, 0, 320, 220);
-            render_battery(pax_buffer, battery_percent, battery_charging);
-            display_flush();
-            render = false;
+            if (full_redraw) {
+                char textBuffer[64];
+                snprintf(textBuffer, sizeof(textBuffer), "v%s", version);
+                render_start_help(pax_buffer, textBuffer);
+            }
+            if (full_redraw || user_input) {
+                if (full_redraw) {
+                    menu_render_grid(pax_buffer, menu, 0, 0, 320, 220);
+                    render_battery(pax_buffer, battery_percent, battery_charging);
+                    display_flush();
+                } else {
+                    menu_render_grid_changes(pax_buffer, menu, 0, 0, 320, 220);
+                    display_flush();
+                }
+            } else {
+                render_battery(pax_buffer, battery_percent, battery_charging);
+                display_flush();
+            }
+
+            render      = false;
+            full_redraw = false;
         }
 
         if (action != ACTION_NONE) {
@@ -235,8 +258,9 @@ void menu_start(xQueueHandle button_queue, const char* version) {
             } else if (action == ACTION_SAO) {
                 menu_sao(button_queue);
             }
-            action = ACTION_NONE;
-            render = true;
+            action      = ACTION_NONE;
+            render      = true;
+            full_redraw = true;
         }
     }
 

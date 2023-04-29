@@ -22,6 +22,7 @@ menu_t* menu_alloc(const char* title, float entry_height, float text_height) {
     menu->firstItem    = NULL;
     menu->length       = 0;
     menu->position     = 0;
+    menu->prev_pos     = 0;
     menu->entry_height = (entry_height > 0) ? entry_height : 20;
     menu->text_height  = (text_height > 0) ? text_height : (entry_height - 2);
     menu->icon         = NULL;
@@ -168,6 +169,7 @@ bool menu_remove_item(menu_t* menu, size_t position) {
 bool menu_navigate_to(menu_t* menu, size_t position) {
     if (menu == NULL) return false;
     if (menu->length < 1) return false;
+    menu->prev_pos = menu->position;
     menu->position = position;
     if (menu->position >= menu->length) menu->position = menu->length - 1;
     return true;
@@ -176,6 +178,7 @@ bool menu_navigate_to(menu_t* menu, size_t position) {
 void menu_navigate_previous(menu_t* menu) {
     if (menu == NULL) return;
     if (menu->length < 1) return;
+    menu->prev_pos = menu->position;
     menu->position--;
     if (menu->position > menu->length) {
         menu->position = menu->length - 1;
@@ -185,6 +188,7 @@ void menu_navigate_previous(menu_t* menu) {
 void menu_navigate_next(menu_t* menu) {
     if (menu == NULL) return;
     if (menu->length < 1) return;
+    menu->prev_pos = menu->position;
     menu->position = (menu->position + 1) % menu->length;
 }
 
@@ -203,6 +207,7 @@ void menu_navigate_next_row(menu_t* menu) {
 size_t menu_get_position(menu_t* menu) { return menu->position; }
 
 void menu_set_position(menu_t* menu, size_t position) {
+    menu->prev_pos = menu->position;
     menu->position = position;
     if (menu->length < 1) {
         menu->position = 0;
@@ -337,7 +342,7 @@ void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, flo
     size_t max_items = entry_count_x * entry_count_y;
 
     pax_noclip(pax_buffer);
-    
+
     render_header(pax_buffer, position_x, position_y, width, header_height, text_height, menu->titleColor, menu->titleBgColor, menu->icon, menu->title);
 
     pax_outline_rect(pax_buffer, menu->borderColor, position_x, position_y, width, height);
@@ -348,6 +353,65 @@ void menu_render_grid(pax_buf_t* pax_buffer, menu_t* menu, float position_x, flo
     }
 
     for (size_t index = item_offset; (index < item_offset + max_items) && (index < menu->length); index++) {
+        menu_item_t* item = _menu_find_item(menu, index);
+        if (item == NULL) {
+            printf("Render error: item is NULL at %u\n", index);
+            break;
+        }
+
+        size_t position = index - item_offset;
+
+        float item_position_x = position_x + margin_x + ((position % entry_count_x) * (entry_width + margin_x));
+        float item_position_y = position_y + margin_y + ((position / entry_count_x) * (entry_height + margin_y)) + header_height;
+
+        float icon_size   = (item->icon != NULL) ? 33 : 0;
+        float text_offset = ((entry_height - text_height - icon_size) / 2) + icon_size + 1;
+
+        pax_vec1_t text_size = pax_text_size(font, text_height, item->label);
+        if (index == menu->position) {
+            pax_simple_rect(pax_buffer, menu->selectedItemColor, item_position_x, item_position_y, entry_width, entry_height);
+            pax_clip(pax_buffer, item_position_x, item_position_y, entry_width, entry_height);
+            pax_draw_text(pax_buffer, menu->bgTextColor, font, text_height, item_position_x + ((entry_width - text_size.x) / 2), item_position_y + text_offset,
+                          item->label);
+        } else {
+            pax_simple_rect(pax_buffer, menu->bgColor, item_position_x, item_position_y, entry_width, entry_height);
+            pax_clip(pax_buffer, item_position_x, item_position_y, entry_width, entry_height);
+            pax_draw_text(pax_buffer, menu->fgColor, font, text_height, item_position_x + ((entry_width - text_size.x) / 2), item_position_y + text_offset,
+                          item->label);
+        }
+
+        if (item->icon != NULL) {
+            pax_clip(pax_buffer, item_position_x + ((entry_width - icon_size) / 2), item_position_y, icon_size, icon_size);
+            pax_draw_image(pax_buffer, item->icon, item_position_x + ((entry_width - icon_size) / 2), item_position_y);
+        }
+
+        pax_noclip(pax_buffer);
+    }
+
+    pax_noclip(pax_buffer);
+}
+
+void menu_render_grid_changes(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height) {
+    const pax_font_t* font = pax_font_saira_regular;
+    float header_height = menu->entry_height;
+    float margin_x = menu->grid_margin_x;
+    float margin_y = menu->grid_margin_y;
+    int entry_count_x = menu->grid_entry_count_x;
+    int entry_count_y = menu->grid_entry_count_y;
+    float entry_width  = (width - (margin_x * (entry_count_x + 1))) / entry_count_x;
+    float entry_height = (height - header_height - (margin_y * (entry_count_y + 1))) / entry_count_y;
+    float text_height = menu->text_height;
+    size_t max_items = entry_count_x * entry_count_y;
+
+    pax_noclip(pax_buffer);
+
+    size_t item_offset = 0;
+    if (menu->position >= max_items) {
+        item_offset = menu->position - max_items + 1;
+    }
+
+    for (int step = 0; step < 2; step++) {
+        size_t index = step ? menu->position : menu->prev_pos;
         menu_item_t* item = _menu_find_item(menu, index);
         if (item == NULL) {
             printf("Render error: item is NULL at %u\n", index);

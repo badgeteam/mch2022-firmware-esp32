@@ -28,100 +28,197 @@
 #include "wifi_connect.h"
 
 void program_googly() {
-    char magic[]       = "LIFE";
-    char name[]        = "Googly eye";
-    char driver[]      = "badgeteam_app_link";
-    char driver_data[] = "nicolai_sao";
-
-    size_t   length = 4 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + strlen(name) + strlen(driver) + strlen(driver_data);
-    uint8_t* data   = malloc(length);
-    memcpy(data, magic, 4);
-    data[4] = strlen(name);
-    data[5] = strlen(driver);
-    data[6] = strlen(driver_data);
-    data[7] = 0;
-    memcpy(&data[8], name, strlen(name));
-    memcpy(&data[8] + strlen(name), driver, strlen(driver));
-    memcpy(&data[8] + strlen(name) + strlen(driver), driver_data, strlen(driver_data));
-    sao_write_raw(0, data, length);
-    free(data);
+    sao_driver_storage_data_t data = {.flags         = 0,  // No LEDs
+                                      .address       = 0x50,
+                                      .size_exp      = 15,  // 32 kbit (2^15)
+                                      .page_size_exp = 6,   // 64 bytes (2^6)
+                                      .data_offset   = 1,   // 1 page (64 bytes)
+                                      .reserved      = 0};
+    sao_format("Googly eye", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0);
 }
 
 void program_cloud() {
-    char magic[]       = "LIFE";
-    char name[]        = "Cloud";
-    char driver[]      = "badgeteam_app_link";
-    char driver_data[] = "nicolai_sao";
-
-    size_t   length = 4 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + strlen(name) + strlen(driver) + strlen(driver_data);
-    uint8_t* data   = malloc(length);
-    memcpy(data, magic, 4);
-    data[4] = strlen(name);
-    data[5] = strlen(driver);
-    data[6] = strlen(driver_data);
-    data[7] = 0;
-    memcpy(&data[8], name, strlen(name));
-    memcpy(&data[8] + strlen(name), driver, strlen(driver));
-    memcpy(&data[8] + strlen(name) + strlen(driver), driver_data, strlen(driver_data));
-    sao_write_raw(0, data, length);
-    free(data);
+    sao_driver_storage_data_t data = {.flags         = SAO_DRIVER_STORAGE_FLAG_IO1_LED | SAO_DRIVER_STORAGE_FLAG_IO2_LED,  // Both IO pins have a LED attached
+                                      .address       = 0x50,
+                                      .size_exp      = 15,  // 32 kbit (2^15)
+                                      .page_size_exp = 6,   // 64 bytes (2^6)
+                                      .data_offset   = 1,   // 1 page (64 bytes)
+                                      .reserved      = 0};
+    sao_format("Cloud", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0);
 }
 
-void program_casette() {
-    char magic[]       = "LIFE";
-    char name[]        = "Casette";
-    char driver[]      = "badgeteam_app_link";
-    char driver_data[] = "nicolai_sao";
+void program_cloud_tilde() {
+    sao_driver_neopixel_data_t data_neopixel = {.length      = 2,
+                                                .color_order = SAO_DRIVER_NEOPIXEL_COLOR_ORDER_GRB,  // WS2812
+                                                .reserved    = 0};
 
-    size_t   length = 4 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + strlen(name) + strlen(driver) + strlen(driver_data);
-    uint8_t* data   = malloc(length);
-    memcpy(data, magic, 4);
-    data[4] = strlen(name);
-    data[5] = strlen(driver);
-    data[6] = strlen(driver_data);
-    data[7] = 0;
-    memcpy(&data[8], name, strlen(name));
-    memcpy(&data[8] + strlen(name), driver, strlen(driver));
-    memcpy(&data[8] + strlen(name) + strlen(driver), driver_data, strlen(driver_data));
-    sao_write_raw(0, data, length);
-    free(data);
+    sao_driver_storage_data_t data_storage = {.flags         = 0,
+                                              .address       = 0x50,
+                                              .size_exp      = 15,  // 32 kbit (2^15)
+                                              .page_size_exp = 6,   // 64 bytes (2^6)
+                                              .data_offset   = 1,   // 1 page (64 bytes)
+                                              .reserved      = 0};
+
+    sao_format("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+               sizeof(data_storage));
+}
+
+void program_cassette() {
+    sao_driver_storage_data_t data = {.flags         = SAO_DRIVER_STORAGE_FLAG_IO1_LED | SAO_DRIVER_STORAGE_FLAG_IO2_LED,  // Both IO pins have a LED attached
+                                      .address       = 0x50,
+                                      .size_exp      = 15,  // 32 kbit (2^15)
+                                      .page_size_exp = 6,   // 64 bytes (2^6)
+                                      .data_offset   = 1,   // 1 page (64 bytes)
+                                      .reserved      = 0};
+    sao_format("Cassette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0);
 }
 
 void program_diskette() {
-    char magic[]       = "LIFE";
-    char name[]        = "Diskette";
-    char driver[]      = "badgeteam_app_link";
-    char driver_data[] = "nicolai_sao";
-
-    size_t   length = 4 + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + strlen(name) + strlen(driver) + strlen(driver_data);
-    uint8_t* data   = malloc(length);
-    memcpy(data, magic, 4);
-    data[4] = strlen(name);
-    data[5] = strlen(driver);
-    data[6] = strlen(driver_data);
-    data[7] = 0;
-    memcpy(&data[8], name, strlen(name));
-    memcpy(&data[8] + strlen(name), driver, strlen(driver));
-    memcpy(&data[8] + strlen(name) + strlen(driver), driver_data, strlen(driver_data));
-    sao_write_raw(0, data, length);
-    free(data);
+    sao_driver_storage_data_t data = {.flags         = SAO_DRIVER_STORAGE_FLAG_IO1_LED | SAO_DRIVER_STORAGE_FLAG_IO2_LED,  // Both IO pins have a LED attached
+                                      .address       = 0x50,
+                                      .size_exp      = 15,  // 32 kbit (2^15)
+                                      .page_size_exp = 6,   // 64 bytes (2^6)
+                                      .data_offset   = 1,   // 1 page (64 bytes)
+                                      .reserved      = 0};
+    sao_format("Diskette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0);
 }
 
-static void program_sao(uint8_t type) {
-    switch (type) {
-        case 0:
-            program_googly();
-            break;
-        case 1:
-            program_cloud();
-            break;
-        case 2:
-            program_casette();
-            break;
-        case 3:
-            program_diskette();
-            break;
+void program_ssd1306() {
+    sao_driver_ssd1306_data_t data_ssd1306 = {.address = 0x3C, .height = 64, .reserved = 0};
+
+    sao_driver_storage_data_t data_storage = {.flags   = SAO_DRIVER_STORAGE_FLAG_IO1_LED | SAO_DRIVER_STORAGE_FLAG_IO2_LED,  // Both IO pins have a LED attached
+                                              .address = 0x50,
+                                              .size_exp      = 15,  // 32 kbit (2^15)
+                                              .page_size_exp = 6,   // 64 bytes (2^6)
+                                              .data_offset   = 1,   // 1 page (64 bytes)
+                                              .reserved      = 0};
+
+    sao_format("OLED display", SAO_DRIVER_SSD1306_NAME, (uint8_t*) &data_ssd1306, sizeof(data_ssd1306), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+               sizeof(data_storage));
+}
+
+void program_ntag() {
+    sao_driver_ntag_data_t data_ntag = {.address  = 0x55,
+                                        .size_exp = 10,  // 1k (NT3H2111)
+                                        .reserved = 0};
+
+    sao_driver_storage_data_t data_storage = {
+        .flags   = SAO_DRIVER_STORAGE_FLAG_IO1_LED | SAO_DRIVER_STORAGE_FLAG_IO2_INTERRUPT,  // IO1 has a LED attached, IO2 is the interrupt line of the NTAG IC
+        .address = 0x50,
+        .size_exp      = 15,  // 32 kbit (2^15)
+        .page_size_exp = 6,   // 64 bytes (2^6)
+        .data_offset   = 1,   // 1 page (64 bytes)
+        .reserved      = 0};
+
+    sao_format("NFC tag", SAO_DRIVER_NTAG_NAME, (uint8_t*) &data_ntag, sizeof(data_ntag), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+               sizeof(data_storage));
+}
+
+typedef enum action {
+    ACTION_NONE = 0,
+    ACTION_BACK,
+    ACTION_GOOGLY,
+    ACTION_CLOUD,
+    ACTION_CLOUD_TILDE,
+    ACTION_CASSETTE,
+    ACTION_DISKETTE,
+    ACTION_SSD1306,
+    ACTION_NTAG
+} menu_dev_action_t;
+
+static void menu_sao_format(xQueueHandle button_queue) {
+    pax_buf_t* pax_buffer = get_pax_buffer();
+    menu_t*    menu       = menu_alloc("Program EEPROM", 20, 18);
+
+    menu->fgColor           = 0xFF000000;
+    menu->bgColor           = 0xFFFFFFFF;
+    menu->bgTextColor       = 0xFF000000;
+    menu->selectedItemColor = 0xFFfec859;
+    menu->borderColor       = 0xFFfa448c;
+    menu->titleColor        = 0xFFfec859;
+    menu->titleBgColor      = 0xFFfa448c;
+    menu->scrollbarBgColor  = 0xFFCCCCCC;
+    menu->scrollbarFgColor  = 0xFF555555;
+
+    menu_insert_item(menu, "Googly eye", NULL, (void*) ACTION_GOOGLY, -1);
+    menu_insert_item(menu, "Cloud (with normal LEDs)", NULL, (void*) ACTION_CLOUD, -1);
+    menu_insert_item(menu, "Cloud (with neopixels)", NULL, (void*) ACTION_CLOUD_TILDE, -1);
+    menu_insert_item(menu, "Cassette", NULL, (void*) ACTION_CASSETTE, -1);
+    menu_insert_item(menu, "Diskette", NULL, (void*) ACTION_DISKETTE, -1);
+    menu_insert_item(menu, "SSD1306", NULL, (void*) ACTION_SSD1306, -1);
+    menu_insert_item(menu, "NTAG", NULL, (void*) ACTION_NTAG, -1);
+
+    bool              render = true;
+    menu_dev_action_t action = ACTION_NONE;
+
+    while (1) {
+        rp2040_input_message_t buttonMessage = {0};
+        if (xQueueReceive(button_queue, &buttonMessage, 16 / portTICK_PERIOD_MS) == pdTRUE) {
+            uint8_t pin   = buttonMessage.input;
+            bool    value = buttonMessage.state;
+            if (value) {
+                switch (pin) {
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        menu_navigate_next(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        menu_navigate_previous(menu);
+                        render = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_HOME:
+                    case RP2040_INPUT_BUTTON_BACK:
+                        action = ACTION_BACK;
+                        break;
+                    case RP2040_INPUT_BUTTON_ACCEPT:
+                    case RP2040_INPUT_JOYSTICK_PRESS:
+                    case RP2040_INPUT_BUTTON_SELECT:
+                    case RP2040_INPUT_BUTTON_START:
+                        action = (menu_dev_action_t) menu_get_callback_args(menu, menu_get_position(menu));
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        if (render) {
+            menu_render(pax_buffer, menu, 40, 40, 320 - 90, 220 - 90);
+            display_flush();
+            render = false;
+        }
+
+        if (action != ACTION_NONE) {
+            if (action == ACTION_GOOGLY) {
+                program_googly();
+                break;
+            } else if (action == ACTION_CLOUD) {
+                program_cloud();
+                break;
+            } else if (action == ACTION_CLOUD_TILDE) {
+                program_cloud_tilde();
+                break;
+            } else if (action == ACTION_CASSETTE) {
+                program_cassette();
+                break;
+            } else if (action == ACTION_DISKETTE) {
+                program_diskette();
+                break;
+            } else if (action == ACTION_SSD1306) {
+                program_ssd1306();
+                break;
+            } else if (action == ACTION_NTAG) {
+                program_ntag();
+                break;
+            } else if (action == ACTION_BACK) {
+                break;
+            }
+            action = ACTION_NONE;
+            render = true;
+        }
     }
+
+    menu_free(menu);
 }
 
 bool sao_is_app_installed(char* name) {
@@ -177,22 +274,34 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
 
     if (sao->type == SAO_BINARY) {
         render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, sao->name);
-        if (strncmp(sao->driver, "badgeteam_app_link", strlen("badgeteam_app_link")) == 0) {
+        if (strncmp(sao->driver, SAO_DRIVER_APP_NAME, strlen(SAO_DRIVER_APP_NAME)) == 0) {
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "This SAO wants to start an app:");
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 60, (char*) sao->driver_data);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰️ Start app 🅱 back ⤓ Program");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰️ Start app 🅱 back 🆂 Program");
+        } else if (strncmp(sao->driver, SAO_DRIVER_STORAGE_NAME, strlen(SAO_DRIVER_STORAGE_NAME)) == 0) {
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "EEPROM data storage");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
+        } else if (strncmp(sao->driver, SAO_DRIVER_NEOPIXEL_NAME, strlen(SAO_DRIVER_NEOPIXEL_NAME)) == 0) {
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "Neopixel LEDs");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
+        } else if (strncmp(sao->driver, SAO_DRIVER_SSD1306_NAME, strlen(SAO_DRIVER_SSD1306_NAME)) == 0) {
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "SSD1306 OLED display");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
+        } else if (strncmp(sao->driver, SAO_DRIVER_NTAG_NAME, strlen(SAO_DRIVER_NTAG_NAME)) == 0) {
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "NFC tag");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
         } else {
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "SAO with unsupported driver");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "SAO with unknown driver type");
             pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 55, sao->driver);
-            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back ⤓ Program");
+            pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
         }
     } else if (sao->type == SAO_JSON) {
         render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, "JSON SAO");
         pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 40, "SAO with JSON data detected\nThis type of metadata is not supported");
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back ⤓ Program");
+        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
     } else {
-        render_header(pax_buffer, 0, 0, pax_buffer->width, 18, 18, 0xFF491d88, 0xFF43b5a0, NULL, "Unformatted SAO");
-        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back ⤓ Program");
+        render_header(pax_buffer, 0, 0, pax_buffer->width, 34, 18, 0xFF491d88, 0xFF43b5a0, NULL, "Unformatted SAO");
+        pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅱 back 🆂 Program");
     }
 }
 
@@ -239,10 +348,13 @@ void menu_sao(xQueueHandle button_queue) {
                     continue;
                 }
             }
-            // Update casette eye SAOs with old data
+            // Update cassette eye SAOs with old data
             if (memcmp(sao.driver, "hatchery", strlen("hatchery")) == 0) {
-                if (memcmp(sao.name, "cassette", strlen("cassette")) == 0) {
-                    program_casette();
+                if (memcmp(sao.name, "casette", strlen("casette")) == 0) {
+                    program_cassette();
+                    continue;
+                } else if (memcmp(sao.name, "cassette", strlen("cassette")) == 0) {
+                    program_cassette();
                     continue;
                 }
             }
@@ -254,7 +366,7 @@ void menu_sao(xQueueHandle button_queue) {
                 }
             }
             // Update diskette SAOs with old data
-            if (memcmp(sao.driver, "storage", strlen("storage")) == 0) {
+            if (memcmp(sao.driver, SAO_DRIVER_STORAGE_NAME, strlen(SAO_DRIVER_STORAGE_NAME)) == 0) {
                 if (memcmp(sao.name, "googly", strlen("googly")) == 0) {
                     program_googly();
                     continue;
@@ -275,23 +387,12 @@ void menu_sao(xQueueHandle button_queue) {
             bool    value = buttonMessage.state;
             if (value) {
                 switch (pin) {
-                    case RP2040_INPUT_JOYSTICK_LEFT:
-                        program_sao(0);
-                        break;
-                    case RP2040_INPUT_JOYSTICK_UP:
-                        program_sao(1);
-                        break;
-                    case RP2040_INPUT_JOYSTICK_RIGHT:
-                        program_sao(2);
-                        break;
-                    case RP2040_INPUT_JOYSTICK_DOWN:
-                        program_sao(3);
+                    case RP2040_INPUT_BUTTON_START:
+                        menu_sao_format(button_queue);
                         break;
                     case RP2040_INPUT_BUTTON_HOME:
                     case RP2040_INPUT_BUTTON_BACK:
-                        if (value) {
-                            exit = true;
-                        }
+                        exit = true;
                         break;
                     case RP2040_INPUT_BUTTON_ACCEPT:
                         if ((sao.type == SAO_BINARY) && (strncmp(sao.driver, "badgeteam_app_link", strlen("badgeteam_app_link")) == 0)) {

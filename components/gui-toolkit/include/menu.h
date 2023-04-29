@@ -29,6 +29,7 @@ typedef struct menu {
     menu_item_t* firstItem;
     size_t       length;
     size_t       position;
+    size_t       prev_pos;
     float        entry_height;
     float        text_height;
     pax_buf_t*   icon;
@@ -68,6 +69,7 @@ pax_buf_t* menu_get_icon(menu_t* menu, size_t position);
 void       menu_debug(menu_t* menu);
 void       menu_render(pax_buf_t* pax_buffer, menu_t* menu, float position_x, float position_y, float width, float height);
 void       menu_render_grid(pax_buf_t* buffer, menu_t* menu, float position_x, float position_y, float width, float height);
+void       menu_render_grid_changes(pax_buf_t* buffer, menu_t* menu, float position_x, float position_y, float width, float height);
 
 #ifdef __cplusplus
 }
