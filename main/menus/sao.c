@@ -382,7 +382,7 @@ void menu_sao(xQueueHandle button_queue) {
 
         display_flush();
 
-        if (xQueueReceive(button_queue, &buttonMessage, 200 / portTICK_PERIOD_MS) == pdTRUE) {
+        if (xQueueReceive(button_queue, &buttonMessage, 500 / portTICK_PERIOD_MS) == pdTRUE) {
             uint8_t pin   = buttonMessage.input;
             bool    value = buttonMessage.state;
             if (value) {
@@ -393,6 +393,9 @@ void menu_sao(xQueueHandle button_queue) {
                     case RP2040_INPUT_BUTTON_HOME:
                     case RP2040_INPUT_BUTTON_BACK:
                         exit = true;
+                        break;
+                    case RP2040_INPUT_BUTTON_SELECT:
+                        dump_eeprom_contents();
                         break;
                     case RP2040_INPUT_BUTTON_ACCEPT:
                         if ((sao.type == SAO_BINARY) && (strncmp(sao.driver, "badgeteam_app_link", strlen("badgeteam_app_link")) == 0)) {

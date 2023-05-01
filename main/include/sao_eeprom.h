@@ -114,6 +114,7 @@ typedef struct __attribute__((__packed__)) _sao_driver_ntag_data {
 #define SAO_DRIVER_APP_NAME "app"
 // data is a string containing the slug name of the app, null terminated
 
+void dump_eeprom_contents();
 esp_err_t sao_identify(SAO* sao);
 esp_err_t sao_write_raw(size_t offset, uint8_t* buffer, size_t buffer_length);
 esp_err_t sao_format(const char* name, const char* driver, const uint8_t* driver_data, uint8_t driver_data_length, const char* driver2,

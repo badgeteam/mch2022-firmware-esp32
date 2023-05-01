@@ -13,6 +13,21 @@ static const char* TAG = "SAO";
 
 EEPROM sao_eeprom = {.i2c_bus = 0, .i2c_address = 0x50};
 
+void dump_eeprom_contents() {
+    uint8_t buffer[128] = {0};
+    if (eeprom_read(&sao_eeprom, 0, buffer, sizeof(buffer)) != ESP_OK) {
+        printf("Failed to read EEPROM contents\n");
+    } else {
+        for (int i = 0; i < sizeof(buffer); i++) {
+            if (i % 16 == 0) {
+                printf("\n");
+            }
+            printf("%02x ", buffer[i]);
+        }
+    }
+    printf("\n");
+}
+
 esp_err_t sao_identify(SAO* sao) {
     if (sao == NULL) return ESP_FAIL;
     memset(sao, 0, sizeof(SAO));
