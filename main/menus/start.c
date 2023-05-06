@@ -21,7 +21,6 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 #include "sao.h"
-#include "sao_eeprom.h"
 #include "settings.h"
 #include "wifi_ota.h"
 
@@ -127,14 +126,7 @@ void menu_start(xQueueHandle button_queue, const char* version) {
     menu_insert_item_icon(menu, "App update", NULL, (void*) ACTION_UPDATE, -1, &icon_update);
     menu_insert_item_icon(menu, "OS update", NULL, (void*) ACTION_OTA, -1, &icon_update);
     // menu_insert_item_icon(menu, "Disk", NULL, (void*) ACTION_MSC, -1, &icon_dev);
-
-    SAO sao = {0};
-    sao_identify(&sao);
-    if (sao.type == SAO_BINARY) {
-        menu_insert_item_icon(menu, sao.name, NULL, (void*) ACTION_SAO, -1, &icon_hardware);
-    } else if (sao.type != SAO_NONE) {
-        menu_insert_item_icon(menu, "Addon", NULL, (void*) ACTION_SAO, -1, &icon_hardware);
-    }
+    menu_insert_item_icon(menu, "SAO", NULL, (void*) ACTION_SAO, -1, &icon_hardware);
 
     bool                render = true;
     menu_start_action_t action = ACTION_NONE;
