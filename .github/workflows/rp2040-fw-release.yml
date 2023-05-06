@@ -27,7 +27,7 @@ jobs:
           (.tag        | type == "string") and
           (.fw_main    | type == "string") and
           (.fw_version | type == "string")
-        )' <<< $payload);
+        )' <<< "$payload");
 
         [ -n "$valid_payload" ] || exit 1
 
@@ -38,30 +38,36 @@ jobs:
 
     - name: Get release info
       id: release_info
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         release_info=$(
-          GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}'
-          gh release
-            --repo badgeteam/mch2022-firmware-rp2040
+          gh release \
+            --repo badgeteam/mch2022-firmware-rp2040 \
             view "${{ steps.payload.outputs.tag }}"
         );
-        echo "Release info:\n$release_info";
+        echo "Release info:";
+        echo "$release_info";
 
-        release_header=$(awk '/[a-z]+:/' <<< $release_info)
-        release_assets=$(grep "^asset:" <<< $release_header | cut -f 2-)
-        release_description=$(awk '/--/,0' <<< $release_info | tail +2)
+        release_header=$(awk '/[a-z]+:/' <<< "$release_info")
+        release_assets=$(grep "^asset:" <<< "$release_header" | cut -f 2-)
+        release_description=$(awk '/--/,0' <<< "$release_info" | tail +2)
 
         # output info fields
         for label in 'title' 'tag' 'draft' 'prerelease' 'author' 'created' 'published' 'url'; do
-          echo "$label=$(grep "^${label}:" <<< $release_header | cut -f 2-)" >> $GITHUB_OUTPUT;
+          echo "$label=$(grep "^${label}:" <<< "$release_header" | cut -f 2-)" >> $GITHUB_OUTPUT;
         done
         EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-        echo "assets<<$EOF\n$release_assets\n$EOF"           >> $GITHUB_OUTPUT
-        echo "description<<$EOF\n$release_description\n$EOF" >> $GITHUB_OUTPUT
+        echo "assets<<$EOF"     >> $GITHUB_OUTPUT
+        echo "$release_assets"  >> $GITHUB_OUTPUT
+        echo "$EOF"             >> $GITHUB_OUTPUT
+        echo "description<<$EOF"    >> $GITHUB_OUTPUT
+        echo "$release_description" >> $GITHUB_OUTPUT
+        echo "$EOF"                 >> $GITHUB_OUTPUT
 
     - name: Integrate new RP2040 firmware
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         gh release --repo badgeteam/mch2022-firmware-rp2040 \
           download "${{ steps.payload.outputs.tag }}" \
