@@ -135,7 +135,7 @@ void program_ssd1306() {
                                               .reserved      = 0};
 
     sao_driver_basic_io_data_t data_basic_io = {
-        .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE, .reserved = 0};
+        .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .reserved = 0};
 
     sao_format("OLED display", SAO_DRIVER_SSD1306_NAME, (uint8_t*) &data_ssd1306, sizeof(data_ssd1306), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io, sizeof(sao_driver_basic_io_data_t), false);
@@ -162,6 +162,20 @@ void program_ntag() {
                sizeof(data_storage), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io, sizeof(sao_driver_basic_io_data_t), false);
 }
 
+void program_tilde_butterfly() {
+    sao_driver_neopixel_data_t data_neopixel = {.length = 5, .color_order = SAO_DRIVER_NEOPIXEL_COLOR_ORDER_GRB, .reserved = 0};
+
+    sao_driver_storage_data_t data_storage = {.flags         = 0,
+                                              .address       = 0x50,
+                                              .size_exp      = 11,  // 2 kbit (2^11)
+                                              .page_size_exp = 4,   // 16 bytes (2^4)
+                                              .data_offset   = 4,   // 4 pages (64 bytes)
+                                              .reserved      = 0};
+
+    sao_format("[~] MCH butterfly", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME,
+               (uint8_t*) &data_storage, sizeof(data_storage), NULL, NULL, 0, true);
+}
+
 typedef enum action {
     ACTION_NONE = 0,
     ACTION_BACK,
@@ -173,7 +187,8 @@ typedef enum action {
     ACTION_DISKETTE,
     ACTION_SSD1306,
     ACTION_NTAG,
-    ACTION_SMALL
+    ACTION_SMALL,
+    ACTION_BUTTERFLY
 } menu_dev_action_t;
 
 static void menu_sao_format(xQueueHandle button_queue) {
@@ -199,6 +214,7 @@ static void menu_sao_format(xQueueHandle button_queue) {
     menu_insert_item(menu, "SSD1306", NULL, (void*) ACTION_SSD1306, -1);
     menu_insert_item(menu, "NTAG", NULL, (void*) ACTION_NTAG, -1);
     menu_insert_item(menu, "Generic 2kb EEPROM", NULL, (void*) ACTION_SMALL, -1);
+    menu_insert_item(menu, "Tilde butterfly", NULL, (void*) ACTION_BUTTERFLY, -1);
 
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -267,6 +283,9 @@ static void menu_sao_format(xQueueHandle button_queue) {
                 break;
             } else if (action == ACTION_SMALL) {
                 program_small();
+                break;
+            } else if (action == ACTION_BUTTERFLY) {
+                program_tilde_butterfly();
                 break;
             } else if (action == ACTION_BACK) {
                 break;
@@ -340,6 +359,11 @@ static const char* neopixelColorOrderToString(uint8_t color_order) {
     return neopixel_color_order_strings[color_order];
 }
 
+static bool neopixelColorHasWhite(uint8_t color_order) {
+    if (color_order > SAO_DRIVER_NEOPIXEL_COLOR_ORDER_WRGB) return true;
+    return false;
+}
+
 static const char* ntagInterruptToString(uint8_t interrupt_pin) {
     if (interrupt_pin == 0) return "none";
     if (interrupt_pin == 1) return "IO1";
@@ -371,14 +395,21 @@ static bool basicioFunctionIsLED(uint8_t function) {
     return false;
 }
 
-bool io1_is_led = false;
-bool io2_is_led = false;
+bool    io1_is_led      = false;
+bool    io2_is_led      = false;
+uint8_t neopixel_length = 0;
+bool    neopixel_white  = false;
 
 static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
     char              stringbuf[256] = {0};
     const pax_font_t* font           = pax_font_saira_regular;
     pax_background(pax_buffer, 0xFFFFFF);
     pax_noclip(pax_buffer);
+
+    io1_is_led      = false;
+    io2_is_led      = false;
+    neopixel_length = 0;
+    neopixel_white  = false;
 
     if (sao->type == SAO_BINARY) {
         bool can_start_app = false;
@@ -394,9 +425,11 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
             } else if (strncmp(sao->drivers[driver_index].name, SAO_DRIVER_NEOPIXEL_NAME, strlen(SAO_DRIVER_NEOPIXEL_NAME)) == 0) {
                 sao_driver_neopixel_data_t* data = (sao_driver_neopixel_data_t*) sao->drivers[driver_index].data;
                 snprintf(stringbuf, sizeof(stringbuf) - 1, "%u Neopixel LEDs (%s)", data->length, neopixelColorOrderToString(data->color_order));
+                neopixel_length = data->length;
+                neopixel_white  = neopixelColorHasWhite(data->color_order);
             } else if (strncmp(sao->drivers[driver_index].name, SAO_DRIVER_SSD1306_NAME, strlen(SAO_DRIVER_SSD1306_NAME)) == 0) {
                 sao_driver_ssd1306_data_t* data = (sao_driver_ssd1306_data_t*) sao->drivers[driver_index].data;
-                snprintf(stringbuf, sizeof(stringbuf) - 1, "SSD1306 128x%u OLED display @0x%02x", data->height, data->address);
+                snprintf(stringbuf, sizeof(stringbuf) - 1, "SSD1306 128x%u OLED @0x%02x", data->height, data->address);
             } else if (strncmp(sao->drivers[driver_index].name, SAO_DRIVER_NTAG_NAME, strlen(SAO_DRIVER_NTAG_NAME)) == 0) {
                 sao_driver_ntag_data_t* data = (sao_driver_ntag_data_t*) sao->drivers[driver_index].data;
                 snprintf(stringbuf, sizeof(stringbuf) - 1, "NTAG NFC tag @0x%02x %ukb int=%s", data->address, intPow(2, data->size_exp) / 1024,
@@ -447,6 +480,7 @@ static bool connect_to_wifi() {
 
 void reset_sao_io() {
     RP2040* rp2040 = get_rp2040();
+    // rp2040_set_ws2812_mode(rp2040, 0); // FIXME: fix bug in RP2040 firmware first, then add this line
     rp2040_set_gpio_value(rp2040, 0, false);
     rp2040_set_gpio_value(rp2040, 1, false);
     rp2040_set_gpio_dir(rp2040, 0, false);
@@ -454,9 +488,23 @@ void reset_sao_io() {
 }
 
 void set_sao_io(uint8_t pin, bool value) {
+    printf("Set IO: %u to %u\n", pin, value);
     RP2040* rp2040 = get_rp2040();
     rp2040_set_gpio_dir(rp2040, pin, true);
     rp2040_set_gpio_value(rp2040, pin, value);
+}
+
+void set_sao_neopixel(uint32_t color) {
+    if (neopixel_length > 0) {
+        printf("Set neopixels to %08X\n", color);
+        RP2040* rp2040 = get_rp2040();
+        rp2040_set_ws2812_length(rp2040, neopixel_length);
+        rp2040_set_ws2812_mode(rp2040, neopixel_white ? 2 : 1);
+        for (uint8_t i = 0; i < neopixel_length; i++) {
+            rp2040_set_ws2812_data(rp2040, i, color);
+        }
+        rp2040_ws2812_trigger(rp2040);
+    }
 }
 
 void menu_sao(xQueueHandle button_queue) {
@@ -527,21 +575,25 @@ void menu_sao(xQueueHandle button_queue) {
                         if (io1_is_led) {
                             set_sao_io(0, true);
                         }
+                        set_sao_neopixel(0xFF000000);
                         break;
                     case RP2040_INPUT_JOYSTICK_DOWN:
                         if (io1_is_led) {
                             set_sao_io(0, false);
                         }
+                        set_sao_neopixel(0x00FF0000);
                         break;
                     case RP2040_INPUT_JOYSTICK_RIGHT:
                         if (io2_is_led) {
                             set_sao_io(1, true);
                         }
+                        set_sao_neopixel(0x0000FF00);
                         break;
                     case RP2040_INPUT_JOYSTICK_LEFT:
                         if (io2_is_led) {
                             set_sao_io(1, false);
                         }
+                        set_sao_neopixel(0x000000FF);
                         break;
                     case RP2040_INPUT_BUTTON_START:
                         menu_sao_format(button_queue);
