@@ -190,12 +190,12 @@ static void menu_sao_format(xQueueHandle button_queue) {
     menu->scrollbarBgColor  = 0xFFCCCCCC;
     menu->scrollbarFgColor  = 0xFF555555;
 
-    menu_insert_item(menu, "Googly eye", NULL, (void*) ACTION_GOOGLY, -1);
-    menu_insert_item(menu, "Cloud (with normal LEDs)", NULL, (void*) ACTION_CLOUD, -1);
-    menu_insert_item(menu, "Cloud (with neopixels) 32kb", NULL, (void*) ACTION_CLOUD_TILDE, -1);
-    menu_insert_item(menu, "Cloud (with neopixels) 2kb", NULL, (void*) ACTION_CLOUD_TILDE_SMALL, -1);
-    menu_insert_item(menu, "Cassette", NULL, (void*) ACTION_CASSETTE, -1);
-    menu_insert_item(menu, "Diskette", NULL, (void*) ACTION_DISKETTE, -1);
+    menu_insert_item(menu, "Googly eye 32kb", NULL, (void*) ACTION_GOOGLY, -1);
+    menu_insert_item(menu, "Cloud (LEDs) 32kb", NULL, (void*) ACTION_CLOUD, -1);
+    menu_insert_item(menu, "Cloud (neopixels) 32kb", NULL, (void*) ACTION_CLOUD_TILDE, -1);
+    menu_insert_item(menu, "Cloud (neopixels) 2kb", NULL, (void*) ACTION_CLOUD_TILDE_SMALL, -1);
+    menu_insert_item(menu, "Cassette 32kb", NULL, (void*) ACTION_CASSETTE, -1);
+    menu_insert_item(menu, "Diskette 32kb", NULL, (void*) ACTION_DISKETTE, -1);
     menu_insert_item(menu, "SSD1306", NULL, (void*) ACTION_SSD1306, -1);
     menu_insert_item(menu, "NTAG", NULL, (void*) ACTION_NTAG, -1);
     menu_insert_item(menu, "Generic 2kb EEPROM", NULL, (void*) ACTION_SMALL, -1);
