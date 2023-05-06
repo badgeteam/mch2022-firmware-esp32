@@ -30,11 +30,11 @@
 void program_small() {
     sao_driver_storage_data_t data = {.flags         = 0,
                                       .address       = 0x50,
-                                      .size_exp      = 1,  // 2 kbit (2^1)
-                                      .page_size_exp = 6,  // 16 bytes (2^4)
-                                      .data_offset   = 4,  // 4 pages (64 bytes)
+                                      .size_exp      = 11,  // 2 kbit (2^11)
+                                      .page_size_exp = 4,   // 16 bytes (2^4)
+                                      .data_offset   = 4,   // 4 pages (64 bytes)
                                       .reserved      = 0};
-    sao_format("Small EEPROM", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, true);
+    sao_format("Generic small EEPROM (2kb)", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, true);
 }
 
 void program_googly() {
@@ -76,6 +76,22 @@ void program_cloud_tilde() {
 
     sao_format("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), NULL, NULL, 0, false);
+}
+
+void program_cloud_tilde_small() {
+    sao_driver_neopixel_data_t data_neopixel = {.length      = 2,
+                                                .color_order = SAO_DRIVER_NEOPIXEL_COLOR_ORDER_GRB,  // WS2812
+                                                .reserved    = 0};
+
+    sao_driver_storage_data_t data_storage = {.flags         = 0,
+                                              .address       = 0x50,
+                                              .size_exp      = 11,  // 2 kbit (2^11)
+                                              .page_size_exp = 4,   // 16 bytes (2^4)
+                                              .data_offset   = 4,   // 4 pages (64 bytes)
+                                              .reserved      = 0};
+
+    sao_format("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+               sizeof(data_storage), NULL, NULL, 0, true);
 }
 
 void program_cassette() {
@@ -152,6 +168,7 @@ typedef enum action {
     ACTION_GOOGLY,
     ACTION_CLOUD,
     ACTION_CLOUD_TILDE,
+    ACTION_CLOUD_TILDE_SMALL,
     ACTION_CASSETTE,
     ACTION_DISKETTE,
     ACTION_SSD1306,
@@ -175,12 +192,13 @@ static void menu_sao_format(xQueueHandle button_queue) {
 
     menu_insert_item(menu, "Googly eye", NULL, (void*) ACTION_GOOGLY, -1);
     menu_insert_item(menu, "Cloud (with normal LEDs)", NULL, (void*) ACTION_CLOUD, -1);
-    menu_insert_item(menu, "Cloud (with neopixels)", NULL, (void*) ACTION_CLOUD_TILDE, -1);
+    menu_insert_item(menu, "Cloud (with neopixels) 32kb", NULL, (void*) ACTION_CLOUD_TILDE, -1);
+    menu_insert_item(menu, "Cloud (with neopixels) 2kb", NULL, (void*) ACTION_CLOUD_TILDE_SMALL, -1);
     menu_insert_item(menu, "Cassette", NULL, (void*) ACTION_CASSETTE, -1);
     menu_insert_item(menu, "Diskette", NULL, (void*) ACTION_DISKETTE, -1);
     menu_insert_item(menu, "SSD1306", NULL, (void*) ACTION_SSD1306, -1);
     menu_insert_item(menu, "NTAG", NULL, (void*) ACTION_NTAG, -1);
-    menu_insert_item(menu, "Small EEPROM", NULL, (void*) ACTION_SMALL, -1);
+    menu_insert_item(menu, "Generic 2kb EEPROM", NULL, (void*) ACTION_SMALL, -1);
 
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -231,6 +249,9 @@ static void menu_sao_format(xQueueHandle button_queue) {
                 break;
             } else if (action == ACTION_CLOUD_TILDE) {
                 program_cloud_tilde();
+                break;
+            } else if (action == ACTION_CLOUD_TILDE_SMALL) {
+                program_cloud_tilde_small();
                 break;
             } else if (action == ACTION_CASSETTE) {
                 program_cassette();
@@ -339,6 +360,20 @@ static const char* basicioFunctionToString(uint8_t function) {
     return "unknown";
 }
 
+static bool basicioFunctionIsLED(uint8_t function) {
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_RED) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_GREEN) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_YELLOW) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_AMBER) return true;
+    if (function == SAO_DRIVER_BASIC_IO_FUNC_LED_WHITE) return true;
+    return false;
+}
+
+bool io1_is_led = false;
+bool io2_is_led = false;
+
 static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
     char              stringbuf[256] = {0};
     const pax_font_t* font           = pax_font_saira_regular;
@@ -370,6 +405,8 @@ static void render_sao_status(pax_buf_t* pax_buffer, SAO* sao) {
                 sao_driver_basic_io_data_t* data = (sao_driver_basic_io_data_t*) sao->drivers[driver_index].data;
                 snprintf(stringbuf, sizeof(stringbuf) - 1, "Basic I/O: %s and %s", basicioFunctionToString(data->io1_function),
                          basicioFunctionToString(data->io2_function));
+                io1_is_led = basicioFunctionIsLED(data->io1_function);
+                io2_is_led = basicioFunctionIsLED(data->io2_function);
             } else {
                 snprintf(stringbuf, sizeof(stringbuf) - 1, "Unsupported driver \"%s\"", sao->drivers[driver_index].name);
             }
@@ -406,6 +443,20 @@ static bool connect_to_wifi() {
         return false;
     }
     return true;
+}
+
+void reset_sao_io() {
+    RP2040* rp2040 = get_rp2040();
+    rp2040_set_gpio_value(rp2040, 0, false);
+    rp2040_set_gpio_value(rp2040, 1, false);
+    rp2040_set_gpio_dir(rp2040, 0, false);
+    rp2040_set_gpio_dir(rp2040, 1, false);
+}
+
+void set_sao_io(uint8_t pin, bool value) {
+    RP2040* rp2040 = get_rp2040();
+    rp2040_set_gpio_dir(rp2040, pin, true);
+    rp2040_set_gpio_value(rp2040, pin, value);
 }
 
 void menu_sao(xQueueHandle button_queue) {
@@ -472,6 +523,26 @@ void menu_sao(xQueueHandle button_queue) {
             bool    value = buttonMessage.state;
             if (value) {
                 switch (pin) {
+                    case RP2040_INPUT_JOYSTICK_UP:
+                        if (io1_is_led) {
+                            set_sao_io(0, true);
+                        }
+                        break;
+                    case RP2040_INPUT_JOYSTICK_DOWN:
+                        if (io1_is_led) {
+                            set_sao_io(0, false);
+                        }
+                        break;
+                    case RP2040_INPUT_JOYSTICK_RIGHT:
+                        if (io2_is_led) {
+                            set_sao_io(1, true);
+                        }
+                        break;
+                    case RP2040_INPUT_JOYSTICK_LEFT:
+                        if (io2_is_led) {
+                            set_sao_io(1, false);
+                        }
+                        break;
                     case RP2040_INPUT_BUTTON_START:
                         menu_sao_format(button_queue);
                         identify = true;
@@ -508,4 +579,6 @@ void menu_sao(xQueueHandle button_queue) {
             }
         }
     }
+
+    reset_sao_io();
 }
