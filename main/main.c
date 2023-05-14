@@ -39,6 +39,7 @@
 #include "rtc_memory.h"
 #include "sao_eeprom.h"
 #include "settings.h"
+#include "ssd1306.h"
 #include "system_wrapper.h"
 #include "webusb.h"
 #include "wifi_cert.h"
@@ -420,6 +421,26 @@ void app_main(void) {
             pax_draw_text(pax_buffer, 0xFF491d88, pax_font_saira_regular, 18, 5, pax_buffer->height - 18, "🅰 continue");
             display_flush();
             wait_for_button();
+        }
+
+        /* SSD1306 */
+
+        SSD1306 ssd1306 = {.pin_reset = -1, .i2c_bus = I2C_BUS, .i2c_address = 0x3c};
+
+        res = ssd1306_init(&ssd1306);
+        if (res == ESP_OK) {
+            ESP_LOGW(TAG, "SSD1306 found and initialized");
+            pax_buf_t ssd1306_pax_buffer;
+            pax_buf_init(&ssd1306_pax_buffer, NULL, 128, 64, PAX_BUF_1_PAL);
+            uint8_t* ssd1306_buffer = (uint8_t*) (ssd1306_pax_buffer.buf);
+            memset(ssd1306_buffer, 0xAA, 1024);  // Fill the screen with lines
+            /*pax_background(&ssd1306_pax_buffer, 0xFFFFFF);
+            for (uint8_t l = 0; l < 4; l++) {
+                pax_draw_text(&ssd1306_pax_buffer, 0, pax_font_saira_regular, 16, 0, l*16, "Hello world");
+            }*/
+            ssd1306_write(&ssd1306, ssd1306_buffer);
+        } else {
+            ESP_LOGI(TAG, "No SSD1306 detected");
         }
 
         /* Rick that roll */
