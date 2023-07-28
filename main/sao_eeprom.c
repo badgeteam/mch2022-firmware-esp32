@@ -161,7 +161,7 @@ esp_err_t sao_identify(SAO* sao) {
     return ESP_OK;
 }
 
-esp_err_t sao_format(const char* name, const char* driver, const uint8_t* driver_data, uint8_t driver_data_length, const char* driver2,
+esp_err_t sao_format_old(const char* name, const char* driver, const uint8_t* driver_data, uint8_t driver_data_length, const char* driver2,
                      const uint8_t* driver2_data, uint8_t driver2_data_length, const char* driver3, const uint8_t* driver3_data, uint8_t driver3_data_length,
                      bool small) {
     uint8_t data[256];
@@ -216,4 +216,136 @@ esp_err_t sao_format(const char* name, const char* driver, const uint8_t* driver
         printf("Writing %u bytes to big EEPROM\n", position);
         return eeprom_write(&sao_eeprom_big, 0, data, position);
     }
+}
+
+
+
+// Guess SAO page size based on EEPROM size.
+size_t guess_sao_page_size(size_t eeprom_size) {
+    return 8;
+}
+
+// Format an SAO.
+// If `eeprom_page_size` is 0, a guess is made based on `eeprom_size`.
+// If `add_storage_driver` is 1, `drivers` is optional.
+esp_err_t sao_format(char const *name, size_t eeprom_size, size_t eeprom_page_size, sao_driver_t const *drivers, size_t drivers_len, bool add_storage_driver) {
+    // Guess the page size.
+    if (!eeprom_page_size) {
+        eeprom_page_size = guess_sao_page_size(eeprom_size);
+    }
+    
+    // Compute the DATA for putting on the SAO.
+    uint8_t *buf;
+    size_t  buf_len;
+    esp_err_t ec = sao_format_data(name, eeprom_size, eeprom_page_size, drivers, drivers_len, add_storage_driver, &buf, &buf_len);
+    if (ec) return ec;
+    
+    // Create SAO device.
+    EEPROM sao_eeprom = {
+        .i2c_bus       = 0,
+        .i2c_address   = 0x50,
+        .address_16bit = eeprom_size > 256,
+        .page_size     = eeprom_page_size,
+    };
+    
+    // Write to the device.
+    ec = eeprom_write(&sao_eeprom, 0x50, buf, buf_len);
+    free(buf);
+    return ec;
+}
+
+// Format an SAO, but do not write it.
+// If `eeprom_page_size` is 0, a guess is made based on `eeprom_size`.
+// If `add_storage_driver` is 1, `drivers` is optional.
+esp_err_t sao_format_data(char const *name, size_t eeprom_size, size_t eeprom_page_size, sao_driver_t const *_drivers, size_t drivers_len, bool add_storage_driver, uint8_t **out_buf_ptr, size_t *out_size) {
+    // Guess the page size.
+    if (!eeprom_page_size) {
+        eeprom_page_size = guess_sao_page_size(eeprom_size);
+    }
+    // Not too many drivers.
+    if (drivers_len + add_storage_driver > SAO_MAX_NUM_DRIVERS) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    // Not too few drivers.
+    if (drivers_len == 0 && !add_storage_driver) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    // Assert page size is a power of 2.
+    if (eeprom_page_size & (eeprom_page_size - 1)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    // Assert EEPROM size is a power of 2 multiple of page size.
+    if (eeprom_size > eeprom_page_size && eeprom_size & (eeprom_size - 1)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Make an array of drivers to add.
+    // This is more convenient with the storage driver option.
+    sao_driver_t storage;
+    sao_driver_t const *drivers[SAO_MAX_NUM_DRIVERS];
+    if (add_storage_driver) {
+        drivers[0] = &storage;
+        for (size_t i = 0; i < drivers_len; i++) {
+            drivers[i+1] = &_drivers[i];
+        }
+        drivers_len ++;
+    } else {
+        for (size_t i = 0; i < drivers_len; i++) {
+            drivers[i] = &_drivers[i];
+        }
+    }
+    
+    // Measure the required size.
+    size_t name_len = strlen(name);
+    if (name_len > SAO_MAX_FIELD_LENGTH) {
+        return ESP_ERR_INVALID_SIZE;
+    }
+    size_t buf_len  = sizeof(sao_binary_header_t) + name_len + sizeof(sao_binary_extra_driver_t) * (drivers_len - 1);
+    
+    for (size_t i = 0; i < drivers_len; i++) {
+        buf_len += strlen(drivers[i]->name) + drivers[i]->data_length;
+    }
+    
+    // Allocate the buffer.
+    uint8_t *buf = malloc(buf_len);
+    if (!buf) {
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Pack the header.
+    size_t offset = sizeof(sao_binary_header_t);
+    *(sao_binary_header_t *) buf = (sao_binary_header_t) {
+        .magic = { 'L', 'I', 'F', 'E' },
+        .name_length = name_len,
+        .driver_name_length = strlen(drivers[0]->name),
+        .driver_data_length = drivers[0]->data_length,
+        .number_of_extra_drivers = drivers_len - 1,
+    };
+    
+    memcpy(buf + offset, name, name_len);
+    offset += name_len;
+    
+    memcpy(buf + offset, drivers[0]->name, strlen(drivers[0]->name));
+    offset += strlen(drivers[0]->name);
+    
+    memcpy(buf + offset, drivers[0]->data, drivers[0]->data_length);
+    offset += drivers[0]->data_length;
+    
+    // Pack extra drivers.
+    for (size_t i = 1; i < drivers_len; i++) {
+        *(sao_binary_extra_driver_t *) (buf + offset) = (sao_binary_extra_driver_t) {
+            .driver_name_length = strlen(drivers[i]->name),
+            .driver_data_length = drivers[i]->data_length,
+        };
+        offset += sizeof(sao_binary_extra_driver_t);
+        
+        memcpy(buf + offset, drivers[i]->name, strlen(drivers[i]->name));
+        offset += strlen(drivers[i]->name);
+        
+        memcpy(buf + offset, drivers[i]->data, drivers[i]->data_length);
+        offset += drivers[i]->data_length;
+    }
+    
+    // Fin.
+    return 0;
 }

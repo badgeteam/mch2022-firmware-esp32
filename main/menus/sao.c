@@ -34,7 +34,7 @@ void program_small() {
                                       .page_size_exp = 4,   // 16 bytes (2^4)
                                       .data_offset   = 4,   // 4 pages (64 bytes)
                                       .reserved      = 0};
-    sao_format("Generic small EEPROM (2kb)", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, true);
+    sao_format_old("Generic small EEPROM (2kb)", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, true);
 }
 
 void program_googly() {
@@ -44,7 +44,7 @@ void program_googly() {
                                       .page_size_exp = 6,   // 64 bytes (2^6)
                                       .data_offset   = 1,   // 1 page (64 bytes)
                                       .reserved      = 0};
-    sao_format("Googly eye", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, false);
+    sao_format_old("Googly eye", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), NULL, NULL, 0, NULL, NULL, 0, false);
 }
 
 void program_cloud() {
@@ -58,7 +58,7 @@ void program_cloud() {
     sao_driver_basic_io_data_t data_basic_io = {
         .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE, .reserved = 0};
 
-    sao_format("Cloud", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
+    sao_format_old("Cloud", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
                sizeof(sao_driver_basic_io_data_t), NULL, NULL, 0, false);
 }
 
@@ -74,7 +74,7 @@ void program_cloud_tilde() {
                                               .data_offset   = 1,   // 1 page (64 bytes)
                                               .reserved      = 0};
 
-    sao_format("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+    sao_format_old("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), NULL, NULL, 0, false);
 }
 
@@ -90,7 +90,7 @@ void program_cloud_tilde_small() {
                                               .data_offset   = 4,   // 4 pages (64 bytes)
                                               .reserved      = 0};
 
-    sao_format("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+    sao_format_old("Cloud", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), NULL, NULL, 0, true);
 }
 
@@ -105,7 +105,7 @@ void program_cassette() {
     sao_driver_basic_io_data_t data_basic_io = {
         .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .reserved = 0};
 
-    sao_format("Cassette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
+    sao_format_old("Cassette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
                sizeof(sao_driver_basic_io_data_t), NULL, NULL, 0, false);
 }
 
@@ -120,7 +120,7 @@ void program_diskette() {
     sao_driver_basic_io_data_t data_basic_io = {
         .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_GREEN, .reserved = 0};
 
-    sao_format("Diskette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
+    sao_format_old("Diskette", SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data, sizeof(data), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io,
                sizeof(sao_driver_basic_io_data_t), NULL, NULL, 0, false);
 }
 
@@ -137,7 +137,7 @@ void program_ssd1306() {
     sao_driver_basic_io_data_t data_basic_io = {
         .io1_function = SAO_DRIVER_BASIC_IO_FUNC_LED_BLUE, .io2_function = SAO_DRIVER_BASIC_IO_FUNC_LED_RED, .reserved = 0};
 
-    sao_format("OLED display", SAO_DRIVER_SSD1306_NAME, (uint8_t*) &data_ssd1306, sizeof(data_ssd1306), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+    sao_format_old("OLED display", SAO_DRIVER_SSD1306_NAME, (uint8_t*) &data_ssd1306, sizeof(data_ssd1306), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io, sizeof(sao_driver_basic_io_data_t), false);
 }
 
@@ -158,7 +158,7 @@ void program_ntag() {
                                                 .io2_function = SAO_DRIVER_BASIC_IO_FUNC_NONE,  // Used by the NTAG driver
                                                 .reserved     = 0};
 
-    sao_format("NFC tag", SAO_DRIVER_NTAG_NAME, (uint8_t*) &data_ntag, sizeof(data_ntag), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
+    sao_format_old("NFC tag", SAO_DRIVER_NTAG_NAME, (uint8_t*) &data_ntag, sizeof(data_ntag), SAO_DRIVER_STORAGE_NAME, (uint8_t*) &data_storage,
                sizeof(data_storage), SAO_DRIVER_BASIC_IO_NAME, (uint8_t*) &data_basic_io, sizeof(sao_driver_basic_io_data_t), false);
 }
 
@@ -172,7 +172,7 @@ void program_tilde_butterfly() {
                                               .data_offset   = 4,   // 4 pages (64 bytes)
                                               .reserved      = 0};
 
-    sao_format("[~] MCH butterfly", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME,
+    sao_format_old("[~] MCH butterfly", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME,
                (uint8_t*) &data_storage, sizeof(data_storage), NULL, NULL, 0, true);
 }
 
@@ -191,7 +191,7 @@ typedef enum action {
     ACTION_BUTTERFLY
 } menu_dev_action_t;
 
-static void menu_sao_format(xQueueHandle button_queue) {
+static void menu_sao_format_old(xQueueHandle button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Program EEPROM", 20, 18);
 
@@ -596,7 +596,7 @@ void menu_sao(xQueueHandle button_queue) {
                         set_sao_neopixel(0x000000FF);
                         break;
                     case RP2040_INPUT_BUTTON_START:
-                        menu_sao_format(button_queue);
+                        menu_sao_format_old(button_queue);
                         identify = true;
                         break;
                     case RP2040_INPUT_BUTTON_HOME:
