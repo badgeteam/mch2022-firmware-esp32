@@ -507,6 +507,30 @@ void set_sao_neopixel(uint32_t color) {
     }
 }
 
+static void sao_start_app_wrapper(xQueueHandle button_queue, char const name[SAO_MAX_FIELD_LENGTH+1]) {
+    if (strnlen(name, SAO_MAX_FIELD_LENGTH + 1) > SAO_MAX_FIELD_LENGTH) {
+        return;
+    }
+    
+    if (!sao_is_app_installed(name)) {
+        if (connect_to_wifi()) {
+            render_message("Installing app...");
+            display_flush();
+            if (sao_install_app(button_queue, name)) {
+                sao_start_app(name);
+            } else {
+                render_message("Failed to install app");
+                display_flush();
+                wait_for_button();
+            }
+        }
+    } else {
+        render_message("Starting app...");
+        display_flush();
+        sao_start_app(name);
+    }
+}
+
 void menu_sao(xQueueHandle button_queue) {
     rp2040_input_message_t buttonMessage = {0};
     while (xQueueReceive(button_queue, &buttonMessage, 0) == pdTRUE) {
@@ -604,23 +628,13 @@ void menu_sao(xQueueHandle button_queue) {
                         exit = true;
                         break;
                     case RP2040_INPUT_BUTTON_ACCEPT:
-                        if ((sao.type == SAO_BINARY) && (strncmp(sao.drivers[0].name, "badgeteam_app_link", strlen("badgeteam_app_link")) == 0)) {
-                            if (!sao_is_app_installed((char*) sao.drivers[0].data)) {
-                                if (connect_to_wifi()) {
-                                    render_message("Installing app...");
-                                    display_flush();
-                                    if (sao_install_app(button_queue, (char*) sao.drivers[0].data)) {
-                                        sao_start_app((char*) sao.drivers[0].data);
-                                    } else {
-                                        render_message("Failed to install app");
-                                        display_flush();
-                                        wait_for_button();
-                                    }
+                        if (sao.type == SAO_BINARY) {
+                            size_t n_drv = sao.amount_of_drivers < SAO_MAX_NUM_DRIVERS
+                                         ? sao.amount_of_drivers : SAO_MAX_NUM_DRIVERS;
+                            for (size_t i = 0; i < n_drv; i++) {
+                                if (!strncmp(sao.drivers[i].name, SAO_DRIVER_APP_NAME, SAO_MAX_FIELD_LENGTH)) {
+                                    sao_start_app_wrapper(button_queue, (char const*) sao.drivers[i].data);
                                 }
-                            } else {
-                                render_message("Starting app...");
-                                display_flush();
-                                sao_start_app((char*) sao.drivers[0].data);
                             }
                         }
                         identify = true;
