@@ -488,21 +488,29 @@ int fpga_req_add_file_alias(uint32_t fid, const char *path) {
     return 0;
 }
 
-int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
+int fpga_req_add_file_data(uint32_t fid, void *data, size_t len, bool capture_buffer) {
     struct req_entry *re;
     void             *buf;
 
     // Remove any previous entries
     _fpga_req_delete_entry(fid);
 
-    // Alloc new entry
-    buf = malloc(sizeof(struct req_entry) + len);
-    if (!buf) return -ENOMEM;
+    if (capture_buffer) {
+        // Use given buffer directly
+        buf = data;
+    } else {
+        // Allocate a new buffer if not capturing the given one
+        buf = malloc(sizeof(struct req_entry) + len);
+        if (!buf) return -ENOMEM;
+        // Copy content over after the record
+        memcpy(buf + sizeof(struct req_entry),data,len);
+    }
 
-    re = buf;
+    // Prepare the record
+    re = (struct req_entry *)buf;
     memset(re, 0x00, sizeof(struct req_entry));
 
-    // Add it to list
+    // Add record to list
     re->next      = g_req_entries;
     g_req_entries = re;
 
@@ -511,12 +519,11 @@ int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
     re->data = buf + sizeof(struct req_entry);
     re->len  = len;
 
-    // Copy actual data
-    memcpy(re->data, data, len);
-
     // Done
     return 0;
 }
+
+int  fpga_req_buffer_header_size() { return sizeof(struct req_entry); }
 
 void fpga_req_del_file(uint32_t fid) { _fpga_req_delete_entry(fid); }
 
@@ -561,6 +568,10 @@ bool fpga_req_process(const char *prefix, ICE40 *ice40, TickType_t wait, esp_err
 
         // Get buffer
         buf_req = malloc(req_length + 1 + ((req_length + 1) % 4));  // Allocate a 32-bit aligned amount
+        if (buf_req == NULL) {
+            res = ESP_ERR_NO_MEM;
+            goto error;
+        }
 
         // Load data from file
         _fpga_req_fread(prefix, req_file_id, &buf_req[1], req_length, req_offset);

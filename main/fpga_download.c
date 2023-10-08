@@ -143,8 +143,9 @@ static void fpga_display_message(uint32_t bg, uint32_t fg, const char* fmt, ...)
 
 static bool fpga_uart_download(ICE40* ice40) {
     TickType_t timeout = 1000 / portTICK_PERIOD_MS;
-    uint8_t*   buffer  = NULL;
-    bool       done    = false;
+    uint8_t*   buffer            = NULL;
+    uint8_t*   buffer_data_start = NULL;
+    bool       done              = false;
     struct {
         uint8_t  type;
         uint32_t fid;
@@ -163,20 +164,21 @@ static bool fpga_uart_download(ICE40* ice40) {
         // Payload
         if (header.len) {
             // Alloc zone to store content
-            buffer = malloc(header.len);
+            buffer = malloc(fpga_req_buffer_header_size() + header.len);
+            //              ^ Allocates a header to avoid another malloc in fpga_req_add_file_data
             if (buffer == NULL) {
                 fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nMalloc failed");
                 return false;
             }
-
+            // Buffer data start (skips header)
+            buffer_data_start = buffer + fpga_req_buffer_header_size();
             // Read data in
-            if (!fpga_uart_load(buffer, header.len)) {
+            if (!fpga_uart_load(buffer_data_start, header.len)) {
                 fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nTimeout while loading");
                 return false;
             }
-
             // Validate CRC
-            uint32_t checkCrc = crc32_le(0, buffer, header.len);
+            uint32_t checkCrc = crc32_le(0, buffer_data_start, header.len);
             if (checkCrc != header.crc) {
                 fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nCRC incorrect\nProvided CRC:   %08X\nCalculated CRC: %08X", header.crc,
                                      checkCrc);
@@ -196,7 +198,7 @@ static bool fpga_uart_download(ICE40* ice40) {
             case 'F':
                 {  // File alias
                     char* path = malloc(header.len + 1);
-                    memcpy(path, buffer, header.len);
+                    memcpy(path, buffer_data_start, header.len);
                     path[header.len] = '\x00';
                     fpga_req_add_file_alias(header.fid, path);
                     free(path);
@@ -205,7 +207,12 @@ static bool fpga_uart_download(ICE40* ice40) {
 
             case 'D':
                 {  // Data block
-                    fpga_req_add_file_data(header.fid, buffer, header.len);
+                    int ret = fpga_req_add_file_data(header.fid, buffer, header.len, true);
+                    if (ret) {
+                        fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nUpload failed, out of memory");
+                        return false;
+                    }
+                    buffer = NULL; // The buffer is now owned by the req list
                     break;
                 }
 
@@ -230,7 +237,7 @@ static bool fpga_uart_download(ICE40* ice40) {
     vTaskDelay(200 / portTICK_PERIOD_MS);
     ili9341_select(ili9341, true);
 
-    esp_err_t res = ice40_load_bitstream(ice40, buffer, header.len);
+    esp_err_t res = ice40_load_bitstream(ice40, buffer_data_start, header.len);
     free(buffer);
     if (res != ESP_OK) {
         ice40_disable(ice40);
@@ -277,7 +284,7 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, bool enable_uart, const c
     }
 }
 
-void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
+bool fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
     fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nPreparing...");
 
     ILI9341* ili9341 = get_ili9341();
@@ -315,12 +322,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
         ili9341_init(ili9341);
     }
 
-    return;
+    return true;
 
 error:
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     fpga_req_cleanup();
     fpga_irq_cleanup(ice40);
     fpga_uninstall_uart();
-    return;
+    return false;
 }
