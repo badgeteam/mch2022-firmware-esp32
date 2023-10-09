@@ -205,7 +205,11 @@ static bool fpga_uart_download(ICE40* ice40) {
 
             case 'D':
                 {  // Data block
-                    fpga_req_add_file_data(header.fid, buffer, header.len);
+                    int ret = fpga_req_add_file_data(header.fid, buffer, header.len);
+                    if (ret) {
+                        fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nUpload failed, out of memory");
+                        return false;
+                    }
                     break;
                 }
 
