@@ -341,6 +341,7 @@ struct req_entry {
     void    *data;
     size_t   len;
     size_t   ofs;
+    bool     external_data;
 };
 
 struct req_entry *g_req_entries;
@@ -361,6 +362,7 @@ static void _fpga_req_delete_entry(uint32_t fid) {
 
             // Release
             if (re->fh) fclose(re->fh);
+            if (re->external_data) free(re->data);
             free(re);
 
             // Done
@@ -468,6 +470,7 @@ void fpga_req_cleanup(void) {
     while (re_cur) {
         re_nxt = re_cur->next;
         if (re_cur->fh) fclose(re_cur->fh);
+        if (re_cur->external_data) free(re_cur->data);
         free(re_cur);
         re_cur = re_nxt;
     }
@@ -488,7 +491,7 @@ int fpga_req_add_file_alias(uint32_t fid, const char *path) {
     return 0;
 }
 
-int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
+int fpga_req_add_file_data(uint32_t fid, void *data, size_t len,bool capture_buffer) {
     struct req_entry *re;
     void             *buf;
 
@@ -496,7 +499,11 @@ int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
     _fpga_req_delete_entry(fid);
 
     // Alloc new entry
-    buf = malloc(sizeof(struct req_entry) + len);
+    if (capture_buffer) {
+        buf = malloc(sizeof(struct req_entry));
+    } else {
+        buf = malloc(sizeof(struct req_entry) + len);
+    }
     if (!buf) return -ENOMEM;
 
     re = buf;
@@ -508,12 +515,17 @@ int fpga_req_add_file_data(uint32_t fid, void *data, size_t len) {
 
     // Init fields
     re->fid  = fid;
-    re->data = buf + sizeof(struct req_entry);
     re->len  = len;
-
-    // Copy actual data
-    memcpy(re->data, data, len);
-
+    re->external_data = capture_buffer;
+    if (capture_buffer) {
+        // Set data pointer to external buffer
+        re->data = data;
+    } else {
+        // Set data pointer to after record
+        re->data = buf + sizeof(struct req_entry);
+        // Copy actual data
+        memcpy(re->data, data, len);
+    }
     // Done
     return 0;
 }
