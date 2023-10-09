@@ -434,7 +434,8 @@ void app_main(void) {
     } else if (webusb_mode == 0x02) {
         display_boot_screen("FPGA download mode");
         while (true) {
-            fpga_download(rp2040->queue, ice40);
+            bool ok = fpga_download(rp2040->queue, ice40);
+            if (!ok) break;
         }
     } else if (webusb_mode == 0x03) {
         webusb_new_main(rp2040->queue);
