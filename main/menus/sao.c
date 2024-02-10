@@ -176,6 +176,20 @@ void program_tilde_butterfly() {
                (uint8_t*) &data_storage, sizeof(data_storage), NULL, NULL, 0, true);
 }
 
+void program_victorian_brooch() {
+    sao_driver_neopixel_data_t data_neopixel = {.length = 6, .color_order = SAO_DRIVER_NEOPIXEL_COLOR_ORDER_GRB, .reserved = 0};
+
+    sao_driver_storage_data_t data_storage = {.flags         = 0,
+                                              .address       = 0x50,
+                                              .size_exp      = 11,  // 2 kbit (2^11)
+                                              .page_size_exp = 4,   // 16 bytes (2^4)
+                                              .data_offset   = 4,   // 4 pages (64 bytes)
+                                              .reserved      = 0};
+
+    sao_format("Victorian brooch", SAO_DRIVER_NEOPIXEL_NAME, (uint8_t*) &data_neopixel, sizeof(data_neopixel), SAO_DRIVER_STORAGE_NAME,
+               (uint8_t*) &data_storage, sizeof(data_storage), NULL, NULL, 0, false);
+}
+
 typedef enum action {
     ACTION_NONE = 0,
     ACTION_BACK,
@@ -188,7 +202,8 @@ typedef enum action {
     ACTION_SSD1306,
     ACTION_NTAG,
     ACTION_SMALL,
-    ACTION_BUTTERFLY
+    ACTION_BUTTERFLY,
+    ACTION_BROOCH
 } menu_dev_action_t;
 
 static void menu_sao_format(xQueueHandle button_queue) {
@@ -215,6 +230,7 @@ static void menu_sao_format(xQueueHandle button_queue) {
     menu_insert_item(menu, "NTAG", NULL, (void*) ACTION_NTAG, -1);
     menu_insert_item(menu, "Generic 2kb EEPROM", NULL, (void*) ACTION_SMALL, -1);
     menu_insert_item(menu, "Tilde butterfly", NULL, (void*) ACTION_BUTTERFLY, -1);
+    menu_insert_item(menu, "Victorian brooch", NULL, (void*) ACTION_BROOCH, -1);
 
     bool              render = true;
     menu_dev_action_t action = ACTION_NONE;
@@ -286,6 +302,9 @@ static void menu_sao_format(xQueueHandle button_queue) {
                 break;
             } else if (action == ACTION_BUTTERFLY) {
                 program_tilde_butterfly();
+                break;
+            } else if (action == ACTION_BROOCH) {
+                program_victorian_brooch();
                 break;
             } else if (action == ACTION_BACK) {
                 break;
