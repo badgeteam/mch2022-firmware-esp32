@@ -205,7 +205,12 @@ static bool fpga_uart_download(ICE40* ice40) {
 
             case 'D':
                 {  // Data block
-                    fpga_req_add_file_data(header.fid, buffer, header.len);
+                    int ret = fpga_req_add_file_data(header.fid, buffer, header.len, true);
+                    buffer  = NULL; // Buffer has been captured in req list
+                    if (ret) {
+                        fpga_display_message(0xa85a32, 0xFFFFFFFF, "FPGA download mode\nUpload failed, out of memory");
+                        return false;
+                    }
                     break;
                 }
 
@@ -277,7 +282,7 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, bool enable_uart, const c
     }
 }
 
-void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
+bool fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
     fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nPreparing...");
 
     ILI9341* ili9341 = get_ili9341();
@@ -315,12 +320,12 @@ void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
         ili9341_init(ili9341);
     }
 
-    return;
+    return true;
 
 error:
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     fpga_req_cleanup();
     fpga_irq_cleanup(ice40);
     fpga_uninstall_uart();
-    return;
+    return false;
 }
