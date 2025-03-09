@@ -174,7 +174,7 @@ void webusb_new_enable_uart() {
 
 void webusb_new_disable_uart() { uart_driver_delete(WEBUSB_UART); }
 
-void webusb_main(xQueueHandle button_queue) {
+void webusb_main(QueueHandle_t button_queue) {
     terminal_start();
     terminal_log("Starting FS over bus...");
     driver_fsoverbus_init(&terminal_log_wrapped);
@@ -718,11 +718,12 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
                 }
 
                 uint32_t       response_length = 0;
-                nvs_iterator_t it              = nvs_entry_find("nvs", namespace, NVS_TYPE_ANY);
-                while (it != NULL) {
+                nvs_iterator_t it              = NULL;
+                esp_err_t      res             = nvs_entry_find("nvs", namespace, NVS_TYPE_ANY, &it);
+                while (res == ESP_OK) {
                     nvs_entry_info_t info;
                     nvs_entry_info(it, &info);
-                    it = nvs_entry_next(it);
+                    res = nvs_entry_next(&it);
 
                     uint16_t* response_namespace_name_length = (uint16_t*) &payload[response_length];
                     response_length += sizeof(uint16_t);
@@ -1042,7 +1043,7 @@ void webusb_process_packet(webusb_packet_header_t* header, uint8_t* payload) {
 
 static void button_event_task(void* pvParameters) {
     RP2040*                rp2040       = get_rp2040();
-    xQueueHandle           button_queue = rp2040->queue;
+    QueueHandle_t          button_queue = rp2040->queue;
     rp2040_input_message_t input_message;
     for (;;) {
         if (xQueueReceive(button_queue, &input_message, (TickType_t) portMAX_DELAY)) {
@@ -1182,7 +1183,7 @@ static void uart_event_task(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-void webusb_new_main(xQueueHandle button_queue) {
+void webusb_new_main(QueueHandle_t button_queue) {
     RP2040*           rp2040            = get_rp2040();
     pax_buf_t*        pax_buffer        = get_pax_buffer();
     const pax_font_t* title_font        = pax_font_saira_condensed;

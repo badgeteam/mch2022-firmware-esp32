@@ -34,11 +34,11 @@
 static const char* TAG = "Updater";
 
 typedef struct _update_apps_callback_args {
-    xQueueHandle button_queue;
-    bool         sdcard;
+    QueueHandle_t button_queue;
+    bool          sdcard;
 } update_apps_callback_args_t;
 
-static bool connect_to_wifi(xQueueHandle button_queue) {
+static bool connect_to_wifi(QueueHandle_t button_queue) {
     if (!wifi_connect_to_stored()) {
         wifi_disconnect_and_disable();
         render_message("Unable to connect to\nthe WiFi network");
@@ -197,7 +197,7 @@ end:
     if (name != NULL) free(name);
 }
 
-void update_apps(xQueueHandle button_queue) {
+void update_apps(QueueHandle_t button_queue) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     terminal_add(strdup("Connecting to WiFi..."));
     terminal_render();

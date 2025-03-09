@@ -59,7 +59,7 @@ static void log_event_task(void* pvParameters) {
     terminal_line_t   lines[LOG_LINES] = {0};
     int               offset           = 0;
     pax_buf_t*        pax_buffer       = get_pax_buffer();
-    xQueueHandle      queue            = (QueueHandle_t) pvParameters;
+    QueueHandle_t     queue            = (QueueHandle_t) pvParameters;
     pax_noclip(pax_buffer);
     pax_background(pax_buffer, 0x0000FF);  // Blue screen
     display_flush();

@@ -1,0 +1,35 @@
+BasedOnStyle: Google
+CommentPragmas: '(@copydoc)'
+
+# Pointers
+DerivePointerAlignment: false
+PointerAlignment: Left
+
+# Indents
+IndentWidth: 4
+TabWidth: 4
+UseTab: "Never"
+NamespaceIndentation: All
+IndentGotoLabels: true
+AlignConsecutiveMacros: true
+
+# Line breaks
+AlwaysBreakTemplateDeclarations: No
+AllowShortFunctionsOnASingleLine: None
+AllowShortEnumsOnASingleLine: false
+KeepEmptyLinesAtTheStartOfBlocks: true
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: false
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+ColumnLimit: 120
+
+# Includes
+IncludeBlocks: Merge

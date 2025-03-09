@@ -53,7 +53,7 @@ static void display_test_state(const char* text, const char* ssid, const char* p
     display_flush();
 }
 
-void wifi_connection_test(xQueueHandle button_queue) {
+void wifi_connection_test(QueueHandle_t button_queue) {
     nvs_handle_t handle;
 
     nvs_open("system", NVS_READWRITE, &handle);

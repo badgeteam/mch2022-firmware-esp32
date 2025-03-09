@@ -9,7 +9,7 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 
-void test_adc(xQueueHandle button_queue) {
+void test_adc(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     bool       quit       = false;
 

@@ -54,7 +54,7 @@ bool fpga_wb_exec(struct fpga_wb_cmdbuf *cb, ICE40 *ice40);
 /* Button reports --------------------------------------------------------- */
 
 void fpga_btn_reset(void);
-bool fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *err);
+bool fpga_btn_forward_events(ICE40 *ice40, QueueHandle_t buttonQueue, esp_err_t *err);
 
 /* Request processing ----------------------------------------------------- */
 

@@ -3,4 +3,4 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-void menu_wifi(xQueueHandle button_queue);
+void menu_wifi(QueueHandle_t button_queue);

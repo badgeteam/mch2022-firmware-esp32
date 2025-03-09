@@ -23,6 +23,7 @@
 #include "soc/rtc.h"
 #include "wifi_connect.h"
 #include "ws2812.h"
+#include "esp_random.h"
 
 #define SLEEP_DELAY 10000
 static const char *TAG = "nametag";
@@ -31,7 +32,7 @@ typedef enum { NICKNAME_THEME_HELLO = 0, NICKNAME_THEME_SIMPLE, NICKNAME_THEME_G
 
 static int hue = 0;
 
-void edit_nickname(xQueueHandle button_queue) {
+void edit_nickname(QueueHandle_t button_queue) {
     pax_buf_t   *pax_buffer = get_pax_buffer();
     nvs_handle_t handle;
     esp_err_t    res = nvs_open("owner", NVS_READWRITE, &handle);
@@ -57,7 +58,7 @@ void edit_nickname(xQueueHandle button_queue) {
     nvs_close(handle);
 }
 
-static void show_name(xQueueHandle button_queue, const char *name, nickname_theme_t theme, bool instructions) {
+static void show_name(QueueHandle_t button_queue, const char *name, nickname_theme_t theme, bool instructions) {
     pax_buf_t        *pax_buffer        = get_pax_buffer();
     const pax_font_t *title_font        = pax_font_saira_condensed;
     const pax_font_t *instructions_font = pax_font_saira_regular;
@@ -109,7 +110,7 @@ static void show_name(xQueueHandle button_queue, const char *name, nickname_them
     display_flush();
 }
 
-static void place_in_sleep(xQueueHandle button_queue) {
+static void place_in_sleep(QueueHandle_t button_queue) {
     esp_sleep_enable_ext0_wakeup(GPIO_INT_RP2040, false);
     ESP_LOGW(TAG, "Entering deep sleep now!");
     fflush(stdout);
@@ -174,7 +175,7 @@ static void set_theme(nickname_theme_t theme) {
     ws2812_send_data(led_buffer, sizeof(led_buffer));
 }
 
-void show_nametag(xQueueHandle button_queue) {
+void show_nametag(QueueHandle_t button_queue) {
     nickname_theme_t theme      = get_theme();
     char            *buffer     = read_nickname();
     uint64_t         sleep_time = esp_timer_get_time() / 1000 + SLEEP_DELAY;

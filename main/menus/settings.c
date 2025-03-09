@@ -44,7 +44,7 @@ typedef enum action {
     ACTION_FORMAT_APPFS
 } menu_settings_action_t;
 
-void edit_lock(xQueueHandle button_queue) {
+void edit_lock(QueueHandle_t button_queue) {
     pax_buf_t*   pax_buffer = get_pax_buffer();
     nvs_handle_t handle;
     esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
@@ -92,7 +92,7 @@ uint8_t wait_for_button_adv() {
     }
 }
 
-void edit_brightness(xQueueHandle button_queue) {
+void edit_brightness(QueueHandle_t button_queue) {
     pax_buf_t*   pax_buffer = get_pax_buffer();
     nvs_handle_t handle;
     esp_err_t    res = nvs_open("system", NVS_READWRITE, &handle);
@@ -158,7 +158,7 @@ void render_settings_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void menu_settings(xQueueHandle button_queue) {
+void menu_settings(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Settings", 34, 18);
 
@@ -184,7 +184,7 @@ void menu_settings(xQueueHandle button_queue) {
     menu_insert_item(menu, "Firmware flashing lock", NULL, (void*) ACTION_LOCK, -1);
     menu_insert_item(menu, "Flash RP2040 firmware", NULL, (void*) ACTION_RP2040_BL, -1);
     menu_insert_item(menu, "Install experimental firmware", NULL, (void*) ACTION_OTA_NIGHTLY, -1);
-    menu_insert_item(menu, "Format internal FAT filesystem", NULL, (void*) ACTION_FORMAT_FAT, -1);
+    // menu_insert_item(menu, "Format internal FAT filesystem", NULL, (void*) ACTION_FORMAT_FAT, -1);
     menu_insert_item(menu, "Format internal AppFS filesystem", NULL, (void*) ACTION_FORMAT_APPFS, -1);
 
     bool                   render = true;
@@ -253,7 +253,7 @@ void menu_settings(xQueueHandle button_queue) {
                 edit_lock(button_queue);
             } else if (action == ACTION_FORMAT_FAT) {
                 display_boot_screen("Formatting FAT...");
-                format_internal_filesystem();
+                // format_internal_filesystem();
             } else if (action == ACTION_FORMAT_APPFS) {
                 display_boot_screen("Formatting AppFS...");
                 appfsFormat();

@@ -1,0 +1,6 @@
+menu "AppFS"
+    config APPFS_USE_RTC_REG
+        depends on (IDF_TARGET = "esp32")
+        bool "Use RTC_CNTL_STORE0_REG instead of LP RAM"
+        default y
+endmenu

@@ -5,7 +5,7 @@ idf_component_register(
          "menu.c"
     INCLUDE_DIRS "." "include"
     REQUIRES
-        "pax-graphics"
+        "pax-gfx"
         "pax-codecs"
         "pax-keyboard"
         "spi-ili9341"

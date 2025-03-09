@@ -45,7 +45,7 @@ void appfs_boot_app(int fd) {
     esp_deep_sleep_start();
 }
 
-void appfs_store_app(xQueueHandle button_queue, const char* path, const char* name, const char* title, uint16_t version) {
+void appfs_store_app(QueueHandle_t button_queue, const char* path, const char* name, const char* title, uint16_t version) {
     display_boot_screen("Installing app...");
     esp_err_t res;
     FILE*     app_fd = fopen(path, "rb");
@@ -79,7 +79,7 @@ void appfs_store_app(xQueueHandle button_queue, const char* path, const char* na
     free(app);
 }
 
-esp_err_t appfs_store_in_memory_app(xQueueHandle button_queue, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
+esp_err_t appfs_store_in_memory_app(QueueHandle_t button_queue, const char* name, const char* title, uint16_t version, size_t app_size, uint8_t* app) {
     appfs_handle_t handle;
     esp_err_t      res = appfsCreateFileExt(name, title, version, app_size, &handle);
     if (res != ESP_OK) {

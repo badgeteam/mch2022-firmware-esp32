@@ -40,7 +40,7 @@ bool create_dir(const char* path) {
     return mkdir(path, 0777) == 0;
 }
 
-bool install_app(xQueueHandle button_queue, const char* type_slug, bool to_sd_card, char* data_app_info, size_t size_app_info, cJSON* json_app_info) {
+bool install_app(QueueHandle_t button_queue, const char* type_slug, bool to_sd_card, char* data_app_info, size_t size_app_info, cJSON* json_app_info) {
     cJSON* slug_obj = cJSON_GetObjectItem(json_app_info, "slug");
     cJSON* name_obj = cJSON_GetObjectItem(json_app_info, "name");
     // cJSON* author_obj      = cJSON_GetObjectItem(json_app_info, "author");

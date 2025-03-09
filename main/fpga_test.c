@@ -68,7 +68,7 @@ static bool soc_message(ICE40* ice40, uint8_t cmd, uint32_t param, uint32_t* res
     data_tx[1] = cmd;
     data_tx[2] = (param >> 16) & 0xff;
     data_tx[3] = (param >> 8) & 0xff;
-    data_tx[4] = (param) &0xff;
+    data_tx[4] = (param) & 0xff;
 
     /* Send message to PicoRV */
     res = ice40_send_turbo(ice40, data_tx, 5);
@@ -406,7 +406,7 @@ static bool test_lcd_init(uint32_t* rc) {
     return *rc == SOC_RESP_OK;
 }
 
-bool run_fpga_tests(xQueueHandle button_queue) {
+bool run_fpga_tests(QueueHandle_t button_queue) {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     ICE40*            ice40      = get_ice40();
     ILI9341*          ili9341    = get_ili9341();
@@ -489,7 +489,7 @@ error:
     return ok;
 }
 
-void fpga_test(xQueueHandle button_queue) {
+void fpga_test(QueueHandle_t button_queue) {
     run_fpga_tests(button_queue);
     test_wait_for_response(NULL);
 }

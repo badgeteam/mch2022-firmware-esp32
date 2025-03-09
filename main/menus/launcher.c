@@ -48,7 +48,7 @@ extern const uint8_t dev_png_end[] asm("_binary_dev_png_end");
 static appfs_handle_t python_appfs_fd      = APPFS_INVALID_FD;
 static bool           python_not_installed = false;
 
-static void start_fpga_app(xQueueHandle button_queue, const char* path) {
+static void start_fpga_app(QueueHandle_t button_queue, const char* path) {
     ILI9341*          ili9341    = get_ili9341();
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
@@ -158,7 +158,7 @@ static bool populate_menu(menu_t* menu) {
            sdcard_result_python;
 }
 
-static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
+static void start_app(QueueHandle_t button_queue, launcher_app_t* app_to_start) {
     display_boot_screen("Starting app...");
     if ((strlen(app_to_start->type) == strlen("ice40")) && (strncmp(app_to_start->type, "ice40", strlen(app_to_start->type)) == 0)) {
         start_fpga_app(button_queue, app_to_start->path);
@@ -197,7 +197,7 @@ static void start_app(xQueueHandle button_queue, launcher_app_t* app_to_start) {
     }
 }
 
-static bool uninstall_app(xQueueHandle button_queue, launcher_app_t* app) {
+static bool uninstall_app(QueueHandle_t button_queue, launcher_app_t* app) {
     render_message("Uninstalling...");
     display_flush();
 
@@ -218,7 +218,7 @@ static bool uninstall_app(xQueueHandle button_queue, launcher_app_t* app) {
     return true;
 }
 
-static bool show_app_details(xQueueHandle button_queue, launcher_app_t* app) {
+static bool show_app_details(QueueHandle_t button_queue, launcher_app_t* app) {
     pax_buf_t* pax_buffer   = get_pax_buffer();
     bool       return_value = false;
     bool       render       = true;
@@ -271,7 +271,7 @@ static bool show_app_details(xQueueHandle button_queue, launcher_app_t* app) {
     return return_value;
 }
 
-void menu_launcher(xQueueHandle button_queue) {
+void menu_launcher(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     // size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     bool reload = true;

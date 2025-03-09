@@ -8,3 +8,4 @@ tools/__pycache__
 .cache
 esp-idf
 dependencies.lock
+esp-idf-tools

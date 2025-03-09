@@ -86,7 +86,7 @@ void render_start_help(pax_buf_t* pax_buffer, const char* text) {
     pax_draw_text(pax_buffer, 0xffffffff, font, 18, 320 - 5 - version_size.x, 240 - 18, text);
 }
 
-void menu_start(xQueueHandle button_queue, const char* version) {
+void menu_start(QueueHandle_t button_queue, const char* version) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Main menu", 34, 18);
 

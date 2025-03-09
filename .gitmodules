@@ -19,7 +19,7 @@
 	url = https://github.com/Nicolai-Electronics/esp32-component-sdcard.git
 	branch = master
 [submodule "components/pax-graphics"]
-	path = components/pax-graphics
+	path = components/pax-gfx
 	url = https://github.com/robotman2412/pax-graphics.git
 	branch = main
 [submodule "components/mch2022-rp2040"]

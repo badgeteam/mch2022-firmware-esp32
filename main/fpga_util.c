@@ -137,7 +137,7 @@ bool fpga_wb_queue_write(struct fpga_wb_cmdbuf *cb, int dev, uint32_t addr, uint
     cb->buf[cb->used++] = (val >> 24) & 0xff;
     cb->buf[cb->used++] = (val >> 16) & 0xff;
     cb->buf[cb->used++] = (val >> 8) & 0xff;
-    cb->buf[cb->used++] = (val) &0xff;
+    cb->buf[cb->used++] = (val) & 0xff;
 
     // Done
     return true;
@@ -258,7 +258,7 @@ static uint16_t g_btn_state = 0;
 
 void fpga_btn_reset(void) { g_btn_state = 0; }
 
-bool fpga_btn_forward_events(ICE40 *ice40, xQueueHandle buttonQueue, esp_err_t *err) {
+bool fpga_btn_forward_events(ICE40 *ice40, QueueHandle_t buttonQueue, esp_err_t *err) {
     rp2040_input_message_t buttonMessage;
     bool                   work_done = false;
 
@@ -411,7 +411,7 @@ static struct req_entry *_fpga_req_get_file(const char *prefix, uint32_t fid) {
         if (re->fid == fid) return re;
 
     // Nothing found, try to open file
-    snprintf(path, sizeof(path), "%s/fpga_%08x.dat", prefix, fid);
+    snprintf(path, sizeof(path), "%s/fpga_%08lx.dat", prefix, fid);
     printf("FPGA read file '%s'\n", path);
     return _fpga_req_open_file(fid, path);
 }

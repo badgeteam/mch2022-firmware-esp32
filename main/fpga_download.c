@@ -18,6 +18,7 @@
 #include "managed_i2c.h"
 #include "pax_gfx.h"
 #include "system_wrapper.h"
+#include "esp_timer.h"
 
 static void fpga_install_uart() {
     fflush(stdout);
@@ -244,7 +245,7 @@ static bool fpga_uart_download(ICE40* ice40) {
     return true;
 }
 
-bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, bool enable_uart, const char* prefix) {
+bool fpga_host(QueueHandle_t buttonQueue, ICE40* ice40, bool enable_uart, const char* prefix) {
     ILI9341* ili9341 = get_ili9341();
     while (true) {
         bool work_done = false;
@@ -277,7 +278,7 @@ bool fpga_host(xQueueHandle buttonQueue, ICE40* ice40, bool enable_uart, const c
     }
 }
 
-void fpga_download(xQueueHandle buttonQueue, ICE40* ice40) {
+void fpga_download(QueueHandle_t buttonQueue, ICE40* ice40) {
     fpga_display_message(0x325aa8, 0xFFFFFFFF, "FPGA download mode\nPreparing...");
 
     ILI9341* ili9341 = get_ili9341();

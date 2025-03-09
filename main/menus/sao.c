@@ -206,7 +206,7 @@ typedef enum action {
     ACTION_BROOCH
 } menu_dev_action_t;
 
-static void menu_sao_format(xQueueHandle button_queue) {
+static void menu_sao_format(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Program EEPROM", 20, 18);
 
@@ -346,7 +346,7 @@ void sao_start_app(char* name) {
     }
 }
 
-bool sao_install_app(xQueueHandle button_queue, char* name) {
+bool sao_install_app(QueueHandle_t button_queue, char* name) {
     char*  data_app_info = NULL;
     size_t size_app_info = 0;
     cJSON* json_app_info = NULL;
@@ -515,7 +515,7 @@ void set_sao_io(uint8_t pin, bool value) {
 
 void set_sao_neopixel(uint32_t color) {
     if (neopixel_length > 0) {
-        printf("Set neopixels to %08X\n", color);
+        printf("Set neopixels to %08lx\n", color);
         RP2040* rp2040 = get_rp2040();
         rp2040_set_ws2812_length(rp2040, neopixel_length);
         rp2040_set_ws2812_mode(rp2040, neopixel_white ? 2 : 1);
@@ -526,7 +526,7 @@ void set_sao_neopixel(uint32_t color) {
     }
 }
 
-void menu_sao(xQueueHandle button_queue) {
+void menu_sao(QueueHandle_t button_queue) {
     rp2040_input_message_t buttonMessage = {0};
     while (xQueueReceive(button_queue, &buttonMessage, 0) == pdTRUE) {
         // Flush!

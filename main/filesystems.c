@@ -56,7 +56,7 @@ esp_err_t unmount_internal_filesystem() {
 
 bool get_internal_mounted() { return locfd_mounted; }
 
-esp_err_t format_internal_filesystem() {
+/*esp_err_t format_internal_filesystem() {
     esp_err_t              res          = unmount_internal_filesystem();
     const esp_partition_t* fs_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_FAT, "locfd");
     if (fs_partition == NULL) {
@@ -74,7 +74,7 @@ esp_err_t format_internal_filesystem() {
         taskYIELD();
     }
     return mount_internal_filesystem();
-}
+}*/
 
 esp_err_t mount_sdcard_filesystem() {
     esp_err_t res  = mount_sd(GPIO_SD_CMD, GPIO_SD_CLK, GPIO_SD_D0, GPIO_SD_PWR, "/sd", false, 5);

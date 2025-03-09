@@ -3,5 +3,5 @@
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
-void edit_nickname(xQueueHandle button_queue);
-void show_nametag(xQueueHandle button_queue);
+void edit_nickname(QueueHandle_t button_queue);
+void show_nametag(QueueHandle_t button_queue);

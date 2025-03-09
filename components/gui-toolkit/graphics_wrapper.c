@@ -13,16 +13,16 @@ void render_outline(float position_x, float position_y, float width, float heigh
 }
 
 void render_message(char* message) {
-    pax_buf_t* pax_buffer = get_pax_buffer();
-    const pax_font_t* font    = pax_font_saira_regular;
-    pax_vec1_t        size    = pax_text_size(font, 18, message);
-    float             margin  = 4;
-    float             width   = size.x + (margin * 2);
-    float             posX    = (pax_buffer->width - width) / 2;
-    float             height  = size.y + (margin * 2);
-    float             posY    = (pax_buffer->height - height) / 2;
-    pax_col_t         fgColor = 0xFFfa448c;
-    pax_col_t         bgColor = 0xFFFFFFFF;
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
+    pax_vec1_t        size       = pax_text_size(font, 18, message);
+    float             margin     = 4;
+    float             width      = size.x + (margin * 2);
+    float             posX       = (pax_buffer->width - width) / 2;
+    float             height     = size.y + (margin * 2);
+    float             posY       = (pax_buffer->height - height) / 2;
+    pax_col_t         fgColor    = 0xFFfa448c;
+    pax_col_t         bgColor    = 0xFFFFFFFF;
     pax_simple_rect(pax_buffer, bgColor, posX, posY, width, height);
     pax_outline_rect(pax_buffer, fgColor, posX, posY, width, height);
     pax_clip(pax_buffer, posX + 1, posY + 1, width - 2, height - 2);
@@ -30,11 +30,11 @@ void render_message(char* message) {
     pax_noclip(pax_buffer);
 }
 
-bool keyboard(xQueueHandle buttonQueue, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle,
-              const char* aHint, char* aOutput, size_t aOutputSize) {
-    pax_buf_t* pax_buffer = get_pax_buffer();
-    const pax_font_t* font     = pax_font_saira_regular;
-    bool              accepted = false;
+bool keyboard(QueueHandle_t buttonQueue, float aPosX, float aPosY, float aWidth, float aHeight, const char* aTitle, const char* aHint, char* aOutput,
+              size_t aOutputSize) {
+    pax_buf_t*        pax_buffer = get_pax_buffer();
+    const pax_font_t* font       = pax_font_saira_regular;
+    bool              accepted   = false;
     pkb_ctx_t         kb_ctx;
     pkb_init(pax_buffer, &kb_ctx, 1024);
     pkb_set_content(&kb_ctx, aOutput);

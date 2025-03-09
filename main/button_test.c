@@ -8,7 +8,7 @@
 #include "pax_gfx.h"
 #include "rp2040.h"
 
-void test_buttons(xQueueHandle button_queue) {
+void test_buttons(QueueHandle_t button_queue) {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
 

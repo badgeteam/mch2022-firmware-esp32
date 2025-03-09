@@ -135,7 +135,7 @@ static bool is_bitstream(FILE* fd) {
     return (memcmp(expected_value, file_contents, sizeof(expected_value)) == 0);
 }
 
-static void file_browser_open_file(xQueueHandle button_queue, const char* filename, const char* label) {
+static void file_browser_open_file(QueueHandle_t button_queue, const char* filename, const char* label) {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
     pax_noclip(pax_buffer);
@@ -224,7 +224,7 @@ static void file_browser_open_file(xQueueHandle button_queue, const char* filena
     return;
 }
 
-void file_browser(xQueueHandle button_queue, const char* initial_path) {
+void file_browser(QueueHandle_t button_queue, const char* initial_path) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     display_boot_screen("Please wait...");
     char path[513] = {0};

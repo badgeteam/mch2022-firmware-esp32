@@ -383,7 +383,7 @@ static void uart_event_task(void* pvParameters) {
     vTaskDelete(NULL);
 }
 
-void msc_main(xQueueHandle button_queue) {
+void msc_main(QueueHandle_t button_queue) {
     terminal_start();
     terminal_printf("Starting mass storage...");
     msc_enable_uart();

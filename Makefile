@@ -1,59 +1,132 @@
 PORT ?= /dev/ttyACM0
-BUILDDIR ?= build
-IDF_PATH ?= $(shell pwd)/esp-idf
-IDF_EXPORT_QUIET ?= 0
+
+IDF_PATH ?= $(shell cat .IDF_PATH 2>/dev/null || echo `pwd`/esp-idf)
+IDF_TOOLS_PATH ?= $(shell cat .IDF_TOOLS_PATH 2>/dev/null || echo `pwd`/esp-idf-tools)
+IDF_BRANCH ?= master
+IDF_COMMIT ?= 94cfe394fe94af5e53da8398af5b886016e7fc11
+IDF_EXPORT_QUIET ?= 1
+IDF_GITHUB_ASSETS ?= dl.espressif.com/github_assets
+MAKEFLAGS += --silent
+
 SHELL := /usr/bin/env bash
 
-.PHONY: prepare clean build flash erase monitor menuconfig image qemu install size size-components size-files format
+export IDF_TOOLS_PATH
+export IDF_GITHUB_ASSETS
 
+# General targets
+
+.PHONY: all
 all: build flash
 
-prepare:
+.PHONY: install
+install: flash
+
+# Preparation
+
+.PHONY: prepare
+prepare: submodules sdk
+
+.PHONY: submodules
+submodules:
 	git submodule update --init --recursive
+
+.PHONY: sdk
+sdk:
+	if test -d "$(IDF_PATH)"; then echo -e "ESP-IDF target folder exists!\r\nPlease remove the folder or un-set the environment variable."; exit 1; fi
+	if test -d "$(IDF_TOOLS_PATH)"; then echo -e "ESP-IDF tools target folder exists!\r\nPlease remove the folder or un-set the environment variable."; exit 1; fi
+	git clone --recursive --branch "$(IDF_BRANCH)" https://github.com/espressif/esp-idf.git "$(IDF_PATH)" --depth=1 --shallow-submodules
+	cd "$(IDF_PATH)"; git checkout "$(IDF_COMMIT)"
+	cd "$(IDF_PATH)"; git submodule update --init --recursive
+	cd "$(IDF_PATH)"; bash install.sh all
+
+.PHONY: removesdk
+removesdk:
 	rm -rf "$(IDF_PATH)"
-	git clone --recursive --branch v4.4.4 https://github.com/espressif/esp-idf.git
-	cd "$(IDF_PATH)"; bash install.sh
+	rm -rf "$(IDF_TOOLS_PATH)"
 
+.PHONY: menuconfig
+menuconfig:
+	source "$(IDF_PATH)/export.sh" && idf.py menuconfig
+	
+# Cleaning
+
+.PHONY: clean
 clean:
-	rm -rf "$(BUILDDIR)"
+	rm -rf "build"
 
+.PHONY: fullclean
 fullclean:
-	source "$(IDF_PATH)/export.sh" && idf.py fullclean
+	rm -rf "build"
+	rm -rf sdkconfig
+	rm -rf sdkconfig.old
+	rm -rf sdkconfig.ci
+	rm -rf sdkconfig.defaults
 
+# Building
+
+.PHONY: build
 build:
-	source "$(IDF_PATH)/export.sh" && idf.py build
+	source "$(IDF_PATH)/export.sh" >/dev/null && idf.py build
 
+# Hardware
+
+.PHONY: flash
 flash: build
-	source "$(IDF_PATH)/export.sh" && idf.py flash -p $(PORT)
+	source "$(IDF_PATH)/export.sh" && \
+	idf.py flash -p $(PORT)
 
+.PHONY: flashmonitor
+flashmonitor: build
+	source "$(IDF_PATH)/export.sh" && \
+	idf.py flash -p $(PORT) monitor
+
+.PHONY: prepappfs
+prepappfs:
+	source "$(IDF_PATH)/export.sh" && \
+	python3 managed_components/badgeteam__appfs/tools/appfs_generate.py \
+	8192000 \
+	appfs.bin
+
+.PHONY: appfs
+appfs:
+	source "$(IDF_PATH)/export.sh" && \
+	esptool.py \
+		-b 921600 --port $(PORT) \
+		write_flash --flash_mode dio --flash_freq 80m --flash_size 16MB \
+		0x330000 appfs.bin
+
+.PHONY: erase
 erase:
 	source "$(IDF_PATH)/export.sh" && idf.py erase-flash -p $(PORT)
 
+.PHONY: monitor
 monitor:
 	source "$(IDF_PATH)/export.sh" && idf.py monitor -p $(PORT)
 
-menuconfig:
-	source "$(IDF_PATH)/export.sh" && idf.py menuconfig
+.PHONY: openocd
+openocd:
+	source "$(IDF_PATH)/export.sh" && idf.py openocd
 
-image:
-	cd "$(BUILDDIR)"; dd if=/dev/zero bs=1M count=16 of=flash.bin
-	cd "$(BUILDDIR)"; dd if=bootloader/bootloader.bin bs=1 seek=4096 of=flash.bin conv=notrunc
-	cd "$(BUILDDIR)"; dd if=partition_table/partition-table.bin bs=1 seek=36864 of=flash.bin conv=notrunc
-	cd "$(BUILDDIR)"; dd if=main.bin bs=1 seek=65536 of=flash.bin conv=notrunc
+.PHONY: gdb
+gdb:
+	source "$(IDF_PATH)/export.sh" && idf.py gdb
 
-qemu: image
-	cd "$(BUILDDIR)"; qemu-system-xtensa -nographic -machine esp32 -drive 'file=flash.bin,if=mtd,format=raw'
+# Tools
 
-install: flash
-
+.PHONY: size
 size:
 	source "$(IDF_PATH)/export.sh" && idf.py size
 
+.PHONY: size-components
 size-components:
 	source "$(IDF_PATH)/export.sh" && idf.py size-components
 
+.PHONY: size-files
 size-files:
 	source "$(IDF_PATH)/export.sh" && idf.py size-files
 
+# Formatting
+
+.PHONY: format
 format:
 	find main/ -iname '*.h' -o -iname '*.c' -o -iname '*.cpp' | xargs clang-format -i

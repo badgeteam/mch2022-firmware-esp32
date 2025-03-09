@@ -58,7 +58,7 @@ static void hatchery_menu_destroy(menu_t* menu) {
     menu_free(menu);
 }
 
-int wait_for_button_press(xQueueHandle button_queue, TickType_t timeout) {
+int wait_for_button_press(QueueHandle_t button_queue, TickType_t timeout) {
     int button = -1;
     while (true) {
         rp2040_input_message_t message;
@@ -69,7 +69,8 @@ int wait_for_button_press(xQueueHandle button_queue, TickType_t timeout) {
     return button;
 }
 
-static void* hatchery_menu_show(xQueueHandle button_queue, menu_t* menu, const char* prompt, bool* back_btn, bool* select_btn, bool* menu_btn, bool* home_btn) {
+static void* hatchery_menu_show(QueueHandle_t button_queue, menu_t* menu, const char* prompt, bool* back_btn, bool* select_btn, bool* menu_btn,
+                                bool* home_btn) {
     pax_buf_t* pax_buffer   = get_pax_buffer();
     bool       quit         = false;
     bool       render       = true;
@@ -209,7 +210,7 @@ static void hatchery_free() {
     hatchery_free_app_info();
 }
 
-static void show_communication_error(xQueueHandle button_queue) {
+static void show_communication_error(QueueHandle_t button_queue) {
     render_message("Unable to communicate with\nthe Hatchery server");
     display_flush();
     wait_for_button(button_queue);
@@ -259,11 +260,11 @@ static bool load_app_info(const char* type_slug, const char* category_slug, cons
     return true;
 }
 
-bool menu_hatchery_install_app_execute(xQueueHandle button_queue, const char* type_slug, bool to_sd_card) {
+bool menu_hatchery_install_app_execute(QueueHandle_t button_queue, const char* type_slug, bool to_sd_card) {
     return install_app(button_queue, type_slug, to_sd_card, data_app_info, size_app_info, json_app_info);
 }
 
-bool menu_hatchery_install_app(xQueueHandle button_queue, const char* type_slug) {
+bool menu_hatchery_install_app(QueueHandle_t button_queue, const char* type_slug) {
     pax_buf_t* pax_buffer  = get_pax_buffer();
     cJSON*     name_obj    = cJSON_GetObjectItem(json_app_info, "name");
     cJSON*     author_obj  = cJSON_GetObjectItem(json_app_info, "author");
@@ -411,7 +412,7 @@ void wraplines(char string[]) {
     wraplines(wrap_char + 1);
 }
 
-bool menu_hatchery_app_info(xQueueHandle button_queue, const char* type_slug, const char* category_slug, const char* app_slug) {
+bool menu_hatchery_app_info(QueueHandle_t button_queue, const char* type_slug, const char* category_slug, const char* app_slug) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     size_t     ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy();
@@ -484,7 +485,7 @@ bool menu_hatchery_app_info(xQueueHandle button_queue, const char* type_slug, co
     return true;
 }
 
-bool menu_hatchery_apps(xQueueHandle button_queue, const char* type_slug, const char* category_slug) {
+bool menu_hatchery_apps(QueueHandle_t button_queue, const char* type_slug, const char* category_slug) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy();
     if (!load_apps(type_slug, category_slug)) {
@@ -516,7 +517,7 @@ bool menu_hatchery_apps(xQueueHandle button_queue, const char* type_slug, const 
     return true;
 }
 
-bool menu_hatchery_categories(xQueueHandle button_queue, const char* type_slug) {
+bool menu_hatchery_categories(QueueHandle_t button_queue, const char* type_slug) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy();
     if (!load_categories(type_slug)) {
@@ -548,7 +549,7 @@ bool menu_hatchery_categories(xQueueHandle button_queue, const char* type_slug) 
     return true;
 }
 
-void menu_hatchery(xQueueHandle button_queue) {
+void menu_hatchery(QueueHandle_t button_queue) {
     size_t ram_before = heap_caps_get_free_size(MALLOC_CAP_DEFAULT);
     display_busy();
 

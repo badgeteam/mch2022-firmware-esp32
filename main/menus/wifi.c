@@ -69,13 +69,13 @@ void render_wifi_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF000000, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void              wifi_show(xQueueHandle button_queue);
-void              wifi_setup(xQueueHandle button_queue, bool scan);
-wifi_ap_record_t* wifi_scan_results(xQueueHandle button_queue, size_t num_aps, wifi_ap_record_t* aps);
-int               wifi_auth_menu(xQueueHandle button_queue, wifi_auth_mode_t default_mode);
-int               wifi_phase2_menu(xQueueHandle button_queue, esp_eap_ttls_phase2_types default_mode);
+void              wifi_show(QueueHandle_t button_queue);
+void              wifi_setup(QueueHandle_t button_queue, bool scan);
+wifi_ap_record_t* wifi_scan_results(QueueHandle_t button_queue, size_t num_aps, wifi_ap_record_t* aps);
+int               wifi_auth_menu(QueueHandle_t button_queue, wifi_auth_mode_t default_mode);
+int               wifi_phase2_menu(QueueHandle_t button_queue, esp_eap_ttls_phase2_types default_mode);
 
-void menu_wifi(xQueueHandle button_queue) {
+void menu_wifi(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("WiFi configuration", 34, 18);
     menu_insert_item(menu, "Show current settings", NULL, (void*) ACTION_SHOW, -1);
@@ -158,7 +158,7 @@ void menu_wifi(xQueueHandle button_queue) {
     menu_free(menu);
 }
 
-wifi_ap_record_t* wifi_scan_results(xQueueHandle button_queue, size_t num_aps, wifi_ap_record_t* aps) {
+wifi_ap_record_t* wifi_scan_results(QueueHandle_t button_queue, size_t num_aps, wifi_ap_record_t* aps) {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     menu_t*           menu       = menu_alloc("Select network", 20, 18);
     wifi_ap_record_t* picked     = NULL;
@@ -233,7 +233,7 @@ wifi_ap_record_t* wifi_scan_results(xQueueHandle button_queue, size_t num_aps, w
     return picked;
 }
 
-int wifi_auth_menu(xQueueHandle button_queue, wifi_auth_mode_t default_mode) {
+int wifi_auth_menu(QueueHandle_t button_queue, wifi_auth_mode_t default_mode) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Authentication mode", 20, 18);
     menu_insert_item(menu, "Insecure", NULL, (void*) ACTION_AUTH_OPEN, -1);
@@ -320,7 +320,7 @@ int wifi_auth_menu(xQueueHandle button_queue, wifi_auth_mode_t default_mode) {
     return pick;
 }
 
-int wifi_phase2_menu(xQueueHandle button_queue, esp_eap_ttls_phase2_types default_mode) {
+int wifi_phase2_menu(QueueHandle_t button_queue, esp_eap_ttls_phase2_types default_mode) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Phase 2 authentication mode", 20, 18);
     menu_insert_item(menu, "ESP", NULL, (void*) ACTION_PHASE2_EAP, -1);
@@ -409,7 +409,7 @@ static int wifi_ap_sorter(const void* a0, const void* b0) {
     return b->rssi - a->rssi;
 }
 
-void wifi_setup(xQueueHandle button_queue, bool scan) {
+void wifi_setup(QueueHandle_t button_queue, bool scan) {
     pax_buf_t*   pax_buffer   = get_pax_buffer();
     char         ssid[33]     = {0};
     char         username[33] = {0};

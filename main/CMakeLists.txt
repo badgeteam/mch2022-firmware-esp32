@@ -57,4 +57,23 @@ idf_component_register(
                 ${project_dir}/resources/icons/hourglass.png
                 ${project_dir}/resources/icons/update.png
                 ${project_dir}/resources/icons/sao.png
+     REQUIRES
+          esp_wifi
+          esp_event
+          nvs_flash
+          esp_http_client
+          esp_driver_i2s
+          esp_https_ota
+          esp_bootloader_format
+          app_update
+          gui-toolkit
+          appfs
+          fatfs
+          ws2812
+          json
+          ulp
+          esp-tls
+          eeprom
+          sdcard
+          driver_fsoverbus
 )

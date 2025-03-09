@@ -16,7 +16,6 @@
 #include "audio.h"
 #include "bootscreen.h"
 #include "driver/uart.h"
-#include "efuse.h"
 #include "esp32/rom/crc.h"
 #include "esp_ota_ops.h"
 #include "esp_vfs.h"
@@ -197,8 +196,6 @@ void app_main(void) {
     printf("BADGE.TEAM %s launcher firmware v%s\r\n", app_description->project_name, app_description->version);
 
     /* Initialize hardware */
-
-    efuse_protect();
 
     if (bsp_init() != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize basic board support functions");

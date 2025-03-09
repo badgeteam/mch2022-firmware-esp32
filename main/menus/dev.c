@@ -48,7 +48,7 @@ static void render_help(pax_buf_t* pax_buffer) {
     pax_draw_text(pax_buffer, 0xFF491d88, font, 18, 5, 240 - 18, "🅰 accept  🅱 back");
 }
 
-void menu_dev(xQueueHandle button_queue) {
+void menu_dev(QueueHandle_t button_queue) {
     pax_buf_t* pax_buffer = get_pax_buffer();
     menu_t*    menu       = menu_alloc("Tools", 34, 18);
 

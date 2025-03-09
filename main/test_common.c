@@ -55,7 +55,7 @@ bool run_test(const pax_font_t *font, int line, const char *test_name, test_fn f
     if (!test_result) {
         /* Error */
         char buf[10];
-        snprintf(buf, sizeof(buf), "%08x", rc);
+        snprintf(buf, sizeof(buf), "%08lx", rc);
         pax_draw_text(pax_buffer, 0xffff0000, font, 18, 200, 20 * line, buf);
     } else {
         /* OK ! */

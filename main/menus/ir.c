@@ -80,7 +80,7 @@ static void send_ir_repeated(uint16_t address, uint8_t command) {
     }
 }
 
-void menu_ir(xQueueHandle button_queue, bool alternative) {
+void menu_ir(QueueHandle_t button_queue, bool alternative) {
     pax_buf_t*        pax_buffer = get_pax_buffer();
     const pax_font_t* font       = pax_font_saira_regular;
     menu_t*           menu       = menu_alloc("Infrared remote", 34, 16);
